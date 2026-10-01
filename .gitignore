@@ -1,0 +1,42 @@
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+
+# Environment variables
+.env
+.env*.local
+
+# Dependencies
+node_modules
+.pnpm-store
+
+# Next.js
+.next/
+out/
+next-env.d.ts.tsbuildinfo
+*.tsbuildinfo
+
+# Testing / build cache
+coverage/
+.eslintcache
+
+# Deployment
+.vercel
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cline
+.cline/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
