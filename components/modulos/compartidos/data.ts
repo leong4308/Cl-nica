@@ -1,7 +1,6 @@
-import { Activity, Bed, CalendarDays, ClipboardList, FileText, FlaskConical, LayoutDashboard, Stethoscope, UsersRound } from 'lucide-react'
+import { Activity, Bed, CalendarDays, ClipboardList, FileText, FlaskConical, Stethoscope, UsersRound } from 'lucide-react'
 import type { ModuleConfig, Row } from './types'
 
-export const navItems = [['Resumen', LayoutDashboard], ['Citas', CalendarDays], ['Pacientes', UsersRound], ['Médicos', Stethoscope], ['Expedientes', FileText], ['Internación', Bed], ['Órdenes médicas', ClipboardList], ['Laboratorio', FlaskConical]] as const
 export const appointments: Row[] = [['08:30', 'Mariana Torres', 'Dra. Ana López', 'Consulta general', 'Confirmada'], ['09:00', 'Carlos Ramírez', 'Dr. Jorge Méndez', 'Cardiología', 'En espera'], ['09:30', 'Sofía Hernández', 'Dra. Ana López', 'Seguimiento', 'Confirmada'], ['10:00', 'Roberto García', 'Dra. Laura Ruiz', 'Control clínico', 'Pendiente'], ['10:30', 'Lucía Martínez', 'Dr. Jorge Méndez', 'Cardiología', 'Confirmada']]
 
 export const modules: Record<string, ModuleConfig> = {
