@@ -1,6 +1,6 @@
 'use client'
 
-import { HeartPulse, MoreHorizontal, X } from 'lucide-react'
+import { HeartPulse, X } from 'lucide-react'
 import { insigniasMenu, itemsAdministracion, navItems } from './items-menu'
 
 type BarraLateralProps = {
@@ -30,14 +30,6 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
         <div className="flex flex-col gap-1">
           {itemsAdministracion.map(({ label, icono: Icono }) => <button type="button" key={label} onClick={() => onAbrirModal(label)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-500 hover:bg-slate-50"><Icono size={18} />{label}</button>)}
         </div>
-      </div>
-
-      <div className="mt-auto border-t border-slate-100 p-5">
-        <button type="button" onClick={() => onAbrirModal('Perfil')} className="flex w-full items-center gap-3 text-left">
-          <div className="flex size-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">DR</div>
-          <div className="flex-1"><b className="text-xs">Diego Ramírez</b><p className="text-[11px] text-slate-400">Administrador</p></div>
-          <MoreHorizontal size={17} className="text-slate-400" />
-        </button>
       </div>
     </aside>
   )
