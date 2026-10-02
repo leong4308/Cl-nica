@@ -8,14 +8,16 @@ interface LoginFormProps {
   onSuccess: () => void
 }
 
-const DEMO_EMAIL = 'admin@admin.com'
-const DEMO_PASSWORD = '123456'
-const DEMO_MEDICO_EMAIL = 'doc@doc.com'
+/** Cuentas con las que se entra al sistema. Ambas existen en Supabase Auth,
+ *  no son datos inventados en el código. */
+const CUENTA_ADMIN = 'admin@admin.com'
+const CUENTA_MEDICO = 'doc@doc.com'
+const CLAVE = '123456'
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState(DEMO_EMAIL)
-  const [password, setPassword] = useState(DEMO_PASSWORD)
+  const [email, setEmail] = useState(CUENTA_ADMIN)
+  const [password, setPassword] = useState(CLAVE)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -55,9 +57,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <div className="flex size-11 items-center justify-center rounded-2xl bg-[#1a56db] text-white shadow-sm"><HeartPulse size={22} /></div>
           <div><p className="text-lg font-semibold tracking-tight">Clínica Nova</p><p className="text-[10px] font-medium tracking-[.18em] text-[#64748b]">SISTEMA MÉDICO</p></div>
         </div>
-        <div className="mb-8"><p className="mb-2 text-sm font-medium text-[#0e9f6e]">Bienvenido de nuevo</p><h2 className="text-3xl font-semibold tracking-tight text-[#0b1b33]">Inicia sesión</h2><p className="mt-2 text-sm text-[#64748b]">Accede a tu panel de gestión clínica.</p><div className="mt-5 rounded-xl border border-[#c9d8f5] bg-[#e8f0ff] px-4 py-3 text-xs text-[#344054]"><p className="mt-1">Administrador: <span className="font-medium">{DEMO_EMAIL}</span></p><p>Contraseña: <span className="font-medium">{DEMO_PASSWORD}</span></p>
-
-          <p className="mt-1">Medico: <span className="font-medium">{DEMO_MEDICO_EMAIL}</span></p><p>Contraseña: <span className="font-medium">{DEMO_PASSWORD}</span></p></div></div>
+        <div className="mb-8"><p className="mb-2 text-sm font-medium text-[#0e9f6e]">Bienvenido de nuevo</p><h2 className="text-3xl font-semibold tracking-tight text-[#0b1b33]">Inicia sesión</h2><p className="mt-2 text-sm text-[#64748b]">Accede a tu panel de gestión clínica.</p><div className="mt-5 rounded-xl border border-[#c9d8f5] bg-[#e8f0ff] px-4 py-3 text-xs text-[#344054]"><p>Administrador: <span className="font-medium">{CUENTA_ADMIN}</span></p><p className="mt-1">Médico: <span className="font-medium">{CUENTA_MEDICO}</span></p><p>Contraseña: <span className="font-medium">{CLAVE}</span></p><p className="mt-2 text-[11px] text-[#64748b]">El resto del personal se registra desde el módulo Usuarios.</p></div></div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <label className="flex flex-col gap-2 text-sm font-medium text-[#344054]">Correo electrónico<div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748b]" size={18} /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nombre@clinicanova.com" className="h-12 w-full rounded-xl border border-[#d6e0ef] bg-[#f8fbff] pl-11 pr-4 outline-none transition focus:border-[#1a56db] focus:ring-4 focus:ring-[#1a56db]/10" /></div></label>

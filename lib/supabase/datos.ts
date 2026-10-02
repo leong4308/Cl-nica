@@ -33,7 +33,12 @@ const ETIQUETA_ESTADO_INTERNACION: Record<string, string> = { activa: 'Ocupada',
 type CitaFila = {
   id: number; inicio: string; estado: string; motivo: string | null
   perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
-  perfiles_medicos: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+  perfiles_medicos: MedicoRelacion | MedicoRelacion[] | null
+}
+type MedicoRelacion = {
+  id: number
+  duracion_consulta: number
+  usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null
 }
 
 export async function cargarCitas(): Promise<{ filas: Row[]; error: string | null }> {
@@ -46,17 +51,29 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
   )
   return {
     error,
-    filas: filas.map((cita) => [
-      horaDe(cita.inicio),
-      nombreDe(cita.perfiles_pacientes?.usuarios),
-      nombreDe(cita.perfiles_medicos?.usuarios),
-      cita.motivo ?? 'Sin motivo',
-      ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
-    ]),
+    filas: filas.map((cita) => {
+      const medicoRel = cita.perfiles_medicos
+      const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : medicoRel
+      return [
+        horaDe(cita.inicio),
+        nombreDe(cita.perfiles_pacientes?.usuarios),
+        nombreDe(medico?.usuarios),
+        cita.motivo ?? 'Sin motivo',
+        ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
+      ]
+    }),
   }
 }
 
 export type CitaPanel = {
+  /** Identificador de la cita, necesario para actualizarla en Supabase. */
+  id: number
+  /** Id de `perfiles_medicos`, para consultar la agenda al reagendar. */
+  medicoId: number
+  /** Duración de la consulta en minutos (viene del perfil médico). */
+  duracionConsulta: number
+  /** Fecha local "AAAA-MM-DD" de la cita. */
+  fecha: string
   /** Hora local "HH:MM" de la cita. */
   hora: string
   paciente: string
@@ -77,21 +94,69 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
   const supabase = createClient()
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
-      .select('id, inicio, estado, motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
+      .select('id, inicio, estado, motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))')
       .order('inicio', { ascending: true })
       .limit(100)
   )
   return {
     error,
-    filas: filas.map((cita) => ({
-      hora: horaDe(cita.inicio),
-      paciente: nombreDe(cita.perfiles_pacientes?.usuarios),
-      medico: nombreDe(cita.perfiles_medicos?.usuarios),
-      motivo: cita.motivo ?? 'Sin motivo',
-      estado: ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
-      inicio: new Date(cita.inicio).getTime(),
-    })),
+    filas: filas.map((cita) => {
+      const medicoRel = cita.perfiles_medicos
+      const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : medicoRel
+      const usuarioMedico = medico?.usuarios
+      const nombreMedico = Array.isArray(usuarioMedico) ? usuarioMedico[0]?.nombre_completo : usuarioMedico?.nombre_completo
+      return {
+        id: cita.id,
+        medicoId: medico?.id ?? 0,
+        duracionConsulta: medico?.duracion_consulta ?? 20,
+        fecha: aIso(fechaLocal(new Date(cita.inicio).toLocaleDateString('en-CA'))),
+        hora: horaDe(cita.inicio),
+        paciente: nombreDe(cita.perfiles_pacientes?.usuarios),
+        medico: nombreMedico ?? '—',
+        motivo: cita.motivo ?? 'Sin motivo',
+        estado: ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
+        inicio: new Date(cita.inicio).getTime(),
+      }
+    }),
   }
+}
+
+/** Estados válidos de `citas.estado` (enum public.estado_cita). */
+export type EstadoCita = 'pendiente' | 'confirmada' | 'atendida' | 'cancelada_paciente' | 'cancelada_medico' | 'no_asistio'
+
+/** Cambia el estado de una cita y devuelve un mensaje para la interfaz. */
+export async function actualizarEstadoCita(
+  id: number,
+  estado: EstadoCita,
+): Promise<{ error: string | null }> {
+  const { error } = await createClient().from('citas').update({ estado }).eq('id', id)
+  if (error) return { error: error.message }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+/** Mueve una cita a otra fecha/hora respetando la agenda libre del médico. */
+export async function reagendarCita(
+  id: number,
+  medicoId: number,
+  duracionConsulta: number,
+  fecha: string,
+  hora: string,
+): Promise<{ error: string | null }> {
+  const { inicio, fin } = rangoIso(fecha, hora, duracionConsulta)
+  const { error } = await createClient()
+    .from('citas')
+    .update({ inicio, fin, estado: 'confirmada' })
+    .eq('id', id)
+  if (error) {
+    const mensaje = error.message.toLowerCase()
+    if (mensaje.includes('citas_no_traslape') || mensaje.includes('exclusion')) {
+      return { error: 'Ese horario ya está ocupado. Elige otro disponible.' }
+    }
+    return { error: error.message }
+  }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
 }
 
 type PacienteFila = {

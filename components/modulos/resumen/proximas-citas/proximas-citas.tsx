@@ -46,7 +46,13 @@ const FILTROS = [
 
 type Filtro = (typeof FILTROS)[number]['etiqueta']
 
-export function ProximasCitas({ ahora, notify, openModal, navigate }: ClinicActions & { ahora: Date }) {
+type PropsPanel = ClinicActions & {
+  ahora: Date
+  /** Abre el modal de acciones sobre una cita concreta. */
+  onAccion: (cita: CitaPanel, accion: 'detalle' | 'reagendar') => void
+}
+
+export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
   const [filtroActivo, setFiltroActivo] = useState<Filtro>('Actuales')
   const [citas, setCitas] = useState<CitaPanel[]>([])
   const [cargando, setCargando] = useState(true)
@@ -160,24 +166,23 @@ return (
                   </span>
                 )}
                 <RowActions
-                  onView={() => openModal(`Detalle de ${cita.paciente}`)}
-                  onEdit={() => openModal(`Editar cita de ${cita.paciente}`)}
+                  onView={() => onAccion(cita, 'detalle')}
+                  onEdit={() => onAccion(cita, 'reagendar')}
                 />
-                {estado === 'Confirmada' && (
-                  <>
-                    <button type="button" onClick={() => notify(`Cita de ${cita.paciente} confirmada`)} className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100">
-                      Confirmar
-                    </button>
-                    <button type="button" onClick={() => openModal(`Reagendar cita de ${cita.paciente}`)} className="rounded-md bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100">
-                      Reagendar
-                    </button>
-                  </>
-                )}
-                {necesitaReagenda && (
-                  <button type="button" onClick={() => openModal(`Reagendar cita de ${cita.paciente}`)} className="rounded-md bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100">
-                    Reagendar
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => onAccion(cita, 'detalle')}
+                  className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAccion(cita, 'reagendar')}
+                  className="rounded-md bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100"
+                >
+                  Reagendar
+                </button>
               </div>
             </div>
           )

@@ -7,9 +7,9 @@ import { Estadisticas } from './estadisticas'
 import { ProximasCitas } from './proximas-citas'
 import { CamasInternacion, MedicosEnTurno } from './paneles-laterales'
 
-export function Dashboard({ notify, openModal, navigate, addAppointment }: ClinicActions) {
+export function Dashboard({ notify, openModal, navigate, addAppointment, onAccion }: ClinicActions) {
   const [ahora, setAhora] = useState(() => new Date())
-  const acciones: ClinicActions = { notify, openModal, navigate, addAppointment }
+  const acciones: ClinicActions = { notify, openModal, navigate, addAppointment, onAccion }
 
   useEffect(() => {
     const intervalo = window.setInterval(() => setAhora(new Date()), 30_000)
