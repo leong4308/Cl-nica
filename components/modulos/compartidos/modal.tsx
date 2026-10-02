@@ -1,58 +1,306 @@
-import { useState, type KeyboardEvent } from 'react'
-import { Search, X } from 'lucide-react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
+import { Loader2, X } from 'lucide-react'
+import {
+  cargarClinicaActiva,
+  cargarDisponibilidad,
+  cargarMedicosAgenda,
+  cargarPacientes,
+  cargarPacientesParaCita,
+  crearCita,
+  type DiaDisponible,
+  type MedicoAgenda,
+} from '@/lib/supabase/datos'
+import {
+  BuscadorPaciente,
+  FormularioUsuario,
+  SelectorCita,
+} from './modal-formularios'
+
+
+const USUARIO_VACIO = {
+  nombre: '', email: '', password: '', rol: 'medico',
+  especialidad: '', cedula: '', duracion: '20', fechaNacimiento: '', genero: '', telefono: '',
+}
+
+type FormUsuario = typeof USUARIO_VACIO
 
 export function ClinicModal({ title, onClose, onSave }: { title: string; onClose: () => void; onSave: (value: string) => void }) {
   const esNuevaCita = title === 'Nueva cita'
   const esBusqueda = title === 'Buscar paciente'
   const esUsuarios = title === 'Usuarios'
-  const [usuario, setUsuario] = useState({ nombre: '', email: '', password: '', rol: 'medico' })
+
+  // ─── Estado del modal de Usuarios ───
+  const [usuario, setUsuario] = useState<FormUsuario>(USUARIO_VACIO)
   const [usuarioMensaje, setUsuarioMensaje] = useState('')
   const [guardandoUsuario, setGuardandoUsuario] = useState(false)
+
   const crearUsuario = async () => {
-    setGuardandoUsuario(true); setUsuarioMensaje('')
-    const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(usuario) })
-    const result = await response.json() as { error?: string; email?: string }
+    setGuardandoUsuario(true)
+    setUsuarioMensaje('')
+    const response = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(usuario),
+    })
+    const result = (await response.json()) as { error?: string; email?: string }
     setGuardandoUsuario(false)
-    if (!response.ok) { setUsuarioMensaje(result.error ?? 'No se pudo crear el usuario.'); return }
+    if (!response.ok) {
+      setUsuarioMensaje(result.error ?? 'No se pudo crear el usuario.')
+      return
+    }
     setUsuarioMensaje(`Usuario creado: ${result.email}`)
-    setUsuario({ nombre: '', email: '', password: '', rol: 'medico' })
+    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    setUsuario(USUARIO_VACIO)
   }
-  const pacientes = [
-    { nombre: 'Mariana Torres', identificacion: 'PAC-00124', pass: 'PASS-001', telefono: '961-123-1235', estado: 'Activo' },
-    { nombre: 'Carlos Ramírez', identificacion: 'PAC-00119', pass: 'PASS-002', telefono: '961-123-1236', estado: 'Activo' },
-    { nombre: 'Sofía Hernández', identificacion: 'PAC-00118', pass: 'PASS-003', telefono: '961-123-1237', estado: 'Activo' },
-  ]
+
+  // ─── Estado del buscador de pacientes ───
+  const [pacientes, setPacientes] = useState<{ nombre: string; identificacion: string; pass: string; telefono: string; estado: string }[]>([])
+  useEffect(() => {
+    let vigente = true
+    cargarPacientes().then((resultado) => {
+      if (!vigente) return
+      setPacientes(resultado.filas.map((fila) => ({
+        nombre: fila[0] ?? '—',
+        identificacion: fila[1] ?? '—',
+        pass: '—',
+        telefono: fila[2] ?? '—',
+        estado: fila[4] ?? 'Activo',
+      })))
+    })
+    return () => { vigente = false }
+  }, [])
+
   const [value, setValue] = useState('')
   const [resultadoActivo, setResultadoActivo] = useState(0)
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(false)
-  const normalizar = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-  const resultados = pacientes.filter((paciente) => normalizar(`${paciente.nombre} ${paciente.identificacion} ${paciente.telefono}`).includes(normalizar(value))).slice(0, 6)
-  const seleccionarPaciente = (nombre: string) => { setValue(nombre); setPacienteSeleccionado(true) }
-  const manejarTeclado = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown') { event.preventDefault(); setResultadoActivo((actual) => Math.min(actual + 1, resultados.length - 1)) }
-    if (event.key === 'ArrowUp') { event.preventDefault(); setResultadoActivo((actual) => Math.max(actual - 1, 0)) }
-    if (event.key === 'Enter' && resultados[resultadoActivo]) { event.preventDefault(); seleccionarPaciente(resultados[resultadoActivo].nombre) }
-  }
-  const doctores = [
-    { nombre: 'Dra. Ana López', especialidad: 'Medicina general' },
-    { nombre: 'Dr. Jorge Méndez', especialidad: 'Cardiología' },
-  ]
-  const [medico, setMedico] = useState('Dra. Ana López')
-  const horariosPorMedico = {
-    'Dra. Ana López': [
-      { etiqueta: 'Hoy', fecha: '30 Sep', horarios: ['11:00 AM', '12:30 PM', '3:00 PM'] },
-      { etiqueta: 'Mañana', fecha: '1 Oct', horarios: ['9:00 AM', '10:30 AM', '2:00 PM'] },
-      { etiqueta: 'Jueves', fecha: '2 Oct', horarios: ['8:30 AM', '11:30 AM', '4:00 PM'] },
-    ],
-    'Dr. Jorge Méndez': [
-      { etiqueta: 'Hoy', fecha: '30 Sep', horarios: ['10:00 AM', '1:30 PM'] },
-      { etiqueta: 'Mañana', fecha: '1 Oct', horarios: ['8:00 AM', '11:00 AM', '4:30 PM'] },
-      { etiqueta: 'Viernes', fecha: '3 Oct', horarios: ['9:30 AM', '2:30 PM', '5:00 PM'] },
-    ],
-  } as const
-  const fechasDisponibles = horariosPorMedico[medico as keyof typeof horariosPorMedico]
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(fechasDisponibles[0].fecha)
-  const [horarioSeleccionado, setHorarioSeleccionado] = useState('')
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={onClose}><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><h3 id="modal-title" className="text-lg font-bold">{title}</h3><button type="button" onClick={onClose} aria-label="Cerrar"><X size={18} /></button></div><p className="mt-2 text-sm text-slate-500">{esUsuarios ? 'Crea cuentas de acceso para el personal de la clínica.' : esBusqueda ? 'Busca por nombre, identificación o teléfono.' : esNuevaCita ? 'Ingresa los datos y revisa la disponibilidad antes de guardar.' : 'Completa la información para continuar con esta acción.'}</p><div className="mt-5 flex flex-col gap-3">{esUsuarios ? <><label className="text-sm font-medium">Nombre<input value={usuario.nombre} onChange={(e) => setUsuario({ ...usuario, nombre: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="Dra. Ana López" /></label><label className="text-sm font-medium">Correo<input type="email" value={usuario.email} onChange={(e) => setUsuario({ ...usuario, email: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="ana@clinicanova.com" /></label><label className="text-sm font-medium">Contraseña<input type="password" value={usuario.password} onChange={(e) => setUsuario({ ...usuario, password: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" placeholder="Mínimo 6 caracteres" /></label><label className="text-sm font-medium">Rol<select value={usuario.rol} onChange={(e) => setUsuario({ ...usuario, rol: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"><option value="medico">Médico</option><option value="admin">Administrador</option></select></label>{usuarioMensaje && <p role="status" className="rounded-lg bg-slate-50 px-3 py-2 text-sm">{usuarioMensaje}</p>}<button type="button" onClick={crearUsuario} disabled={guardandoUsuario} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{guardandoUsuario ? 'Creando...' : 'Crear usuario'}</button></> : esBusqueda ? <><div className="relative"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input autoFocus value={value} onChange={e => { setValue(e.target.value); setPacienteSeleccionado(false); setResultadoActivo(0) }} onKeyDown={manejarTeclado} aria-label="Buscar paciente" className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Nombre, identificación o teléfono" /></div><div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200">{resultados.length > 0 ? resultados.map((paciente, indice) => <button type="button" key={paciente.identificacion} onClick={() => seleccionarPaciente(paciente.nombre)} className={`flex w-full items-center justify-between border-b border-slate-100 px-3 py-3 text-left last:border-0 ${indice === resultadoActivo ? 'bg-blue-50' : 'hover:bg-slate-50'}`}><span><span className="block text-sm font-semibold text-slate-800">{paciente.nombre}</span><span className="block text-xs text-slate-500">{paciente.pass} · {paciente.telefono}</span></span><span className={`text-[10px] font-semibold ${paciente.estado === 'Activo' ? 'text-emerald-600' : 'text-slate-400'}`}>{paciente.estado}</span></button>) : <p className="px-3 py-6 text-center text-xs text-slate-400">No encontramos pacientes con esa búsqueda.</p>}</div></> : esNuevaCita ? <><div className="relative"><input autoFocus value={value} onChange={e => { setValue(e.target.value); setPacienteSeleccionado(false); setResultadoActivo(0) }} onKeyDown={manejarTeclado} aria-label="Paciente" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Nombre del paciente" />{value.trim() && !pacienteSeleccionado && resultados.length > 0 && <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">{resultados.map((paciente, indice) => <button type="button" key={paciente.identificacion} onClick={() => seleccionarPaciente(paciente.nombre)} className={`flex w-full items-center justify-between border-b border-slate-100 px-3 py-2.5 text-left last:border-0 ${indice === resultadoActivo ? 'bg-blue-50' : 'hover:bg-slate-50'}`}><span><span className="block text-sm font-semibold text-slate-800">{paciente.nombre}</span><span className="block text-xs text-slate-500">{paciente.pass} · {paciente.telefono}</span></span><span className="text-[10px] font-semibold text-emerald-600">{paciente.estado}</span></button>)}</div>}</div><label className="text-xs font-semibold text-slate-600">Médico y especialidad<select aria-label="Médico y especialidad" value={medico} onChange={e => { setMedico(e.target.value); setFechaSeleccionada(horariosPorMedico[e.target.value as keyof typeof horariosPorMedico][0].fecha); setHorarioSeleccionado('') }} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{doctores.map((doctor) => <option key={doctor.nombre} value={doctor.nombre}>{doctor.nombre} · {doctor.especialidad}</option>)}</select></label><div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"><p className="text-xs font-semibold text-slate-700">Fechas y horarios disponibles</p><div className="mt-3 grid grid-cols-3 gap-2">{fechasDisponibles.map((dia) => <button type="button" key={dia.fecha} onClick={() => { setFechaSeleccionada(dia.fecha); setHorarioSeleccionado('') }} aria-pressed={fechaSeleccionada === dia.fecha} className={`rounded-lg border px-2 py-2 text-center text-xs ${fechaSeleccionada === dia.fecha ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}><span className="block font-semibold text-slate-800">{dia.etiqueta}</span><span className="mt-0.5 block text-[11px] text-slate-500">{dia.fecha}</span></button>)}</div><div className="mt-3 grid grid-cols-3 gap-2">{fechasDisponibles.find((dia) => dia.fecha === fechaSeleccionada)?.horarios.map((slot) => <button type="button" key={`${fechaSeleccionada}-${slot}`} onClick={() => setHorarioSeleccionado(`${fechaSeleccionada} · ${slot}`)} aria-pressed={horarioSeleccionado === `${fechaSeleccionada} · ${slot}`} className={`rounded-lg border px-2 py-2 text-xs font-medium ${horarioSeleccionado === `${fechaSeleccionada} · ${slot}` ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'}`}>{slot}</button>)}</div>{horarioSeleccionado && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">Horario seleccionado: {horarioSeleccionado}</p>}</div></> : <><input autoFocus value={value} onChange={e => setValue(e.target.value)} aria-label="Nombre o descripción" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Nombre o descripción" /><textarea aria-label="Observaciones" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Observaciones" rows={3} /></>}</div>{!esBusqueda && <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancelar</button><button type="button" onClick={() => { if (esNuevaCita) { const partes = horarioSeleccionado.split(' · '); const hora = partes[1] ?? '09:00 AM'; const [horaTexto, periodo] = hora.split(' '); const [horas, minutos] = horaTexto.split(':').map(Number); const hora24 = periodo === 'PM' && horas !== 12 ? horas + 12 : periodo === 'AM' && horas === 12 ? 0 : horas; window.dispatchEvent(new CustomEvent('cita-creada', { detail: [String(hora24).padStart(2, '0') + ':' + String(minutos).padStart(2, '0'), value, medico, doctores.find((doctor) => doctor.nombre === medico)?.especialidad ?? 'Medicina general', 'Programada'] })) } onSave(esNuevaCita ? `${value} · ${medico} · ${fechaSeleccionada} · ${horarioSeleccionado}` : value) }} disabled={esNuevaCita && (!value.trim() || !horarioSeleccionado)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Guardar</button></div>}</div></div>
+  const normalizar = (texto: string) =>
+    texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+  const resultados = pacientes
+    .filter((paciente) => normalizar(`${paciente.nombre} ${paciente.identificacion} ${paciente.telefono}`).includes(normalizar(value)))
+    .slice(0, 6)
+
+  const seleccionarPaciente = (nombre: string) => {
+    setValue(nombre)
+    setPacienteSeleccionado(true)
+  }
+
+  const manejarTeclado = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setResultadoActivo((actual) => Math.min(actual + 1, resultados.length - 1))
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setResultadoActivo((actual) => Math.max(actual - 1, 0))
+    }
+    if (event.key === 'Enter' && resultados[resultadoActivo]) {
+      event.preventDefault()
+      seleccionarPaciente(resultados[resultadoActivo].nombre)
+    }
+  }
+  // ─── Estado de "Nueva cita" (todo viene de Supabase) ───
+  const [medicos, setMedicos] = useState<MedicoAgenda[]>([])
+  const [pacientesCita, setPacientesCita] = useState<{ id: number; nombre: string }[]>([])
+  const [clinicaId, setClinicaId] = useState<number | null>(null)
+  const [medicoId, setMedicoId] = useState<number | null>(null)
+  const [pacienteId, setPacienteId] = useState<number | null>(null)
+  const [disponibilidad, setDisponibilidad] = useState<DiaDisponible[]>([])
+  const [fechaSeleccionada, setFechaSeleccionada] = useState('')
+  const [horarioSeleccionado, setHorarioSeleccionado] = useState('')
+  const [citaError, setCitaError] = useState('')
+  const [cargandoCita, setCargandoCita] = useState(false)
+  const [cargandoAgenda, setCargandoAgenda] = useState(false)
+
+  // Carga inicial: médicos, pacientes y clínica.
+  useEffect(() => {
+    if (!esNuevaCita) return
+    let vigente = true
+    setCargandoCita(true)
+    Promise.all([cargarMedicosAgenda(), cargarPacientesParaCita(), cargarClinicaActiva()])
+      .then(([medicosResult, pacientesResult, clinica]) => {
+        if (!vigente) return
+        setMedicos(medicosResult.filas)
+        setPacientesCita(pacientesResult.filas)
+        setClinicaId(clinica)
+        setMedicoId((anterior) => anterior ?? medicosResult.filas[0]?.id ?? null)
+        setCitaError(medicosResult.error ?? '')
+        setCargandoCita(false)
+      })
+    return () => { vigente = false }
+  }, [esNuevaCita])
+
+  // Cada vez que cambia el médico, se recalcula su disponibilidad real.
+  useEffect(() => {
+    if (!esNuevaCita || medicoId === null) return
+    let vigente = true
+    setCargandoAgenda(true)
+    setHorarioSeleccionado('')
+    const medico = medicos.find((m) => m.id === medicoId)
+    cargarDisponibilidad(medicoId, medico?.duracionConsulta ?? 20).then((resultado) => {
+      if (!vigente) return
+      setDisponibilidad(resultado.filas)
+      setFechaSeleccionada(resultado.filas[0]?.fecha ?? '')
+      setCitaError(resultado.error ?? '')
+      setCargandoAgenda(false)
+    })
+    return () => { vigente = false }
+  }, [esNuevaCita, medicoId, medicos])
+
+  const medicoSeleccionado = medicos.find((m) => m.id === medicoId) ?? null
+  const diaSeleccionado = disponibilidad.find((d) => d.fecha === fechaSeleccionada) ?? null
+  const puedeGuardarCita =
+    esNuevaCita && !cargandoCita && !cargandoAgenda &&
+    pacienteId !== null && medicoId !== null && clinicaId !== null &&
+    fechaSeleccionada !== '' && horarioSeleccionado !== ''
+
+  async function confirmarCita() {
+    if (!puedeGuardarCita || medicoId === null || clinicaId === null || pacienteId === null || !medicoSeleccionado) return
+    setCargandoCita(true)
+    setCitaError('')
+    const resultado = await crearCita({
+      pacienteId,
+      medicoId,
+      clinicaId,
+      fecha: fechaSeleccionada,
+      hora: horarioSeleccionado,
+      motivo: value,
+      duracionConsulta: medicoSeleccionado.duracionConsulta,
+    })
+    setCargandoCita(false)
+    if (resultado.error) {
+      setCitaError(resultado.error)
+      return
+    }
+    // Refresca la disponibilidad para que el horario recién usado desaparezca.
+    const frescos = await cargarDisponibilidad(medicoId, medicoSeleccionado.duracionConsulta)
+    setDisponibilidad(frescos.filas)
+
+    // Avisa al resto de la app para que vuelva a leer el módulo desde Supabase.
+    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    onSave(`Cita #${resultado.id} · ${medicoSeleccionado.nombre} · ${fechaSeleccionada} · ${horarioSeleccionado}`)
+  }
+
+
+const descripcion = esUsuarios
+    ? 'Crea cuentas de acceso para el personal de la clínica.'
+    : esBusqueda
+      ? 'Busca por nombre, identificación o teléfono.'
+      : esNuevaCita
+        ? 'Ingresa los datos y revisa la disponibilidad antes de guardar.'
+        : 'Completa la información para continuar con esta acción.'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      onMouseDown={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 id="modal-title" className="text-lg font-bold">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-slate-500">{descripcion}</p>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {esUsuarios && (
+            <FormularioUsuario
+              usuario={usuario}
+              setUsuario={setUsuario}
+              mensaje={usuarioMensaje}
+              guardando={guardandoUsuario}
+              onCrear={crearUsuario}
+            />
+          )}
+
+          {esBusqueda && (
+            <BuscadorPaciente
+              value={value}
+              onChange={(v) => {
+                setValue(v)
+                setPacienteSeleccionado(false)
+                setResultadoActivo(0)
+              }}
+              resultados={resultados}
+              resultadoActivo={resultadoActivo}
+              seleccionado={pacienteSeleccionado}
+              onTeclado={manejarTeclado}
+              onSeleccionar={seleccionarPaciente}
+            />
+          )}
+
+          {!esUsuarios && !esBusqueda && (
+            <>
+              <input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                aria-label="Nombre o descripción"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Nombre o descripción"
+              />
+              <textarea
+                aria-label="Observaciones"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Observaciones"
+                rows={3}
+              />
+
+              {esNuevaCita && (
+                <SelectorCita
+                  cargando={cargandoCita}
+                  cargandoAgenda={cargandoAgenda}
+                  medicos={medicos}
+                  medicoId={medicoId}
+                  onMedico={setMedicoId}
+                  pacientes={pacientesCita}
+                  pacienteId={pacienteId}
+                  onPaciente={setPacienteId}
+                  dias={disponibilidad}
+                  diaActual={diaSeleccionado}
+                  fecha={fechaSeleccionada}
+                  onFecha={(f) => {
+                    setFechaSeleccionada(f)
+                    setHorarioSeleccionado('')
+                  }}
+                  horario={horarioSeleccionado}
+                  onHorario={setHorarioSeleccionado}
+                  error={citaError}
+                />
+              )}
+            </>
+          )}
+        </div>
+
+        {!esBusqueda && (
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={esNuevaCita ? confirmarCita : () => onSave(value)}
+              disabled={esNuevaCita ? !puedeGuardarCita : false}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {esNuevaCita && cargandoCita && <Loader2 size={14} className="animate-spin" />}
+              {esNuevaCita && cargandoCita ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

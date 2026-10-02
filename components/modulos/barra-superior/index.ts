@@ -1,2 +1,2 @@
 export { BarraSuperior } from './barra-superior'
-export { fechaEncabezado, saludoEncabezado, usuarioEncabezado } from './datos-encabezado'
+export { fechaEncabezado, saludoEncabezado } from './datos-encabezado'

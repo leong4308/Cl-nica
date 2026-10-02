@@ -1,13 +1,18 @@
 import { KeyRound, LifeBuoy, LogOut, Settings, User, Wrench } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 export const fechaEncabezado = 'Martes, 24 de septiembre de 2024'
 
-export const saludoEncabezado = 'Buenos días, Diego'
+export const saludoEncabezado = 'Buenos días'
 
-export const usuarioEncabezado = { nombre: 'Diego Ramírez', iniciales: 'DR' }
+export type OpcionMenu = { etiqueta: string; icono: LucideIcon; modal: string }
 
-export const opcionesMenuUsuario = [
+export const opcionesMenuUsuario: OpcionMenu[] = [
+  { etiqueta: 'Mi perfil', icono: User, modal: 'Perfil' },
+  { etiqueta: 'Configuración', icono: Settings, modal: 'Configuración' },
+  { etiqueta: 'Cambiar contraseña', icono: KeyRound, modal: 'Cambiar contraseña' },
+  { etiqueta: 'Preferencias', icono: Wrench, modal: 'Preferencias' },
+  { etiqueta: 'Ayuda y soporte', icono: LifeBuoy, modal: 'Ayuda' },
+]
 
-] as const
-
-export const opcionCerrarSesion = { etiqueta: 'Cerrar sesión', icono: LogOut } as const
+export const opcionCerrarSesion: { etiqueta: string; icono: LucideIcon } = { etiqueta: 'Cerrar sesión', icono: LogOut }

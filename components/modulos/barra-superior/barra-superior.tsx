@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Bell, ChevronDown, Menu } from 'lucide-react'
-import { fechaEncabezado, opcionCerrarSesion, opcionesMenuUsuario, saludoEncabezado, usuarioEncabezado } from './datos-encabezado'
+import { ETIQUETA_ROL, type RolUsuario } from '@/lib/supabase/tipos-rol'
+import { opcionCerrarSesion, opcionesMenuUsuario, fechaEncabezado, saludoEncabezado } from './datos-encabezado'
 
-export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion }: { onAbrirMenu: () => void; onAbrirModal: (title: string) => void; onCerrarSesion: () => void }) {
+const iniciales = (nombre: string) => nombre.split(' ').filter(Boolean).slice(0, 2).map((palabra) => palabra[0]?.toUpperCase() ?? '').join('') || 'US'
+
+export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion, usuario }: { onAbrirMenu: () => void; onAbrirModal: (title: string) => void; onCerrarSesion: () => void; usuario: { nombre: string; rol: RolUsuario } }) {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const contenedor = useRef<HTMLDivElement>(null)
 
@@ -31,7 +34,7 @@ export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion }: { o
         <button type="button" className="lg:hidden" onClick={onAbrirMenu} aria-label="Abrir menú"><Menu size={21} /></button>
         <div>
           <p className="text-[11px] text-slate-400">{fechaEncabezado}</p>
-          <h1 className="text-[21px] font-bold tracking-tight">{saludoEncabezado}</h1>
+          <h1 className="text-[21px] font-bold tracking-tight">{saludoEncabezado}, {usuario.nombre.split(' ')[0]}</h1>
         </div>
       </div>
 
@@ -51,15 +54,15 @@ export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion }: { o
             aria-label="Menú de usuario"
             className="flex items-center gap-2"
           >
-            <span className="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">{usuarioEncabezado.iniciales}</span>
+            <span className="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">{iniciales(usuario.nombre)}</span>
             <ChevronDown size={15} className={`text-slate-400 transition-transform ${menuAbierto ? 'rotate-180' : ''}`} />
           </button>
 
           {menuAbierto && (
             <div role="menu" className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
               <div className="border-b border-slate-100 px-4 py-2.5">
-                <b className="block truncate text-[13px] text-slate-800">{usuarioEncabezado.nombre}</b>
-                <span className="text-[11px] text-slate-400">Administrador</span>
+                <b className="block truncate text-[13px] text-slate-800">{usuario.nombre}</b>
+                <span className="text-[11px] text-slate-400">{ETIQUETA_ROL[usuario.rol]}</span>
               </div>
 
               {opcionesMenuUsuario.map(({ etiqueta, icono: Icono, modal }) => (

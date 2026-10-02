@@ -11,7 +11,7 @@ type BarraLateralProps = {
   onCerrar: () => void
 }
 
-export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar }: BarraLateralProps) {
+export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar, esAdmin }: BarraLateralProps & { esAdmin?: boolean }) {
   return (
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-[82px] items-center gap-3 border-b border-slate-100 px-7">
@@ -28,7 +28,7 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
       <div className="mt-8 px-4">
         <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Administración</p>
         <div className="flex flex-col gap-1">
-          {itemsAdministracion.map(({ label, icono: Icono }) => <button type="button" key={label} onClick={() => onAbrirModal(label)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-500 hover:bg-slate-50"><Icono size={18} />{label}</button>)}
+          {itemsAdministracion.filter((item) => !item.soloAdmin || esAdmin).map(({ label, icono: Icono }) => <button type="button" key={label} onClick={() => onAbrirModal(label)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-500 hover:bg-slate-50"><Icono size={18} />{label}</button>)}
         </div>
       </div>
     </aside>
