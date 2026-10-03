@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CalendarClock, Loader2, UserRound, X } from 'lucide-react'
+import { UserRound, X } from 'lucide-react'
 import {
   cargarDisponibilidad,
   reagendarCita,
   type CitaPanel,
   type DiaDisponible,
 } from '@/lib/supabase/datos'
+import { actualizarAgendaEnCache, leerAgendaEnCache } from '@/lib/supabase/cache-cita'
 
 export type AccionCita = 'detalle' | 'reagendar'
 
@@ -35,13 +36,23 @@ export function ModalAccionCita({
   const [error, setError] = useState('')
 
   // ─── Estado de reagendar ───
-  const [dias, setDias] = useState<DiaDisponible[]>([])
-  const [fecha, setFecha] = useState('')
+  // La agenda del médico suele estar precargada, así que el modal abre completo.
+  const agendaPrecargada = accion === 'reagendar' && cita.medicoId ? leerAgendaEnCache(cita.medicoId) : null
+  const [dias, setDias] = useState<DiaDisponible[]>(agendaPrecargada?.filas ?? [])
+  const [fecha, setFecha] = useState(agendaPrecargada?.filas[0]?.fecha ?? '')
   const [hora, setHora] = useState('')
-  const [cargandoAgenda, setCargandoAgenda] = useState(false)
+  const [cargandoAgenda, setCargandoAgenda] = useState(agendaPrecargada === null)
 
   useEffect(() => {
     if (accion !== 'reagendar' || !cita.medicoId) return
+    const guardada = leerAgendaEnCache(cita.medicoId)
+    if (guardada) {
+      setDias(guardada.filas)
+      setFecha(guardada.filas[0]?.fecha ?? '')
+      setError(guardada.error ?? '')
+      setCargandoAgenda(false)
+      return
+    }
     let vigente = true
     setCargandoAgenda(true)
     cargarDisponibilidad(cita.medicoId, cita.duracionConsulta).then((resultado) => {
@@ -50,6 +61,7 @@ export function ModalAccionCita({
       setFecha(resultado.filas[0]?.fecha ?? '')
       setError(resultado.error ?? '')
       setCargandoAgenda(false)
+      actualizarAgendaEnCache(cita.medicoId, resultado.filas, resultado.error)
     })
     return () => { vigente = false }
   }, [accion, cita.medicoId, cita.duracionConsulta])
@@ -112,9 +124,7 @@ export function ModalAccionCita({
           <>
             <div className="mt-4">
               <p className="text-xs font-semibold text-slate-700">Nueva fecha y hora</p>
-              {cargandoAgenda ? (
-                <p className="mt-2 flex items-center gap-2 text-xs text-slate-400"><Loader2 size={14} className="animate-spin" /> Consultando disponibilidad...</p>
-              ) : dias.length === 0 ? (
+              {cargandoAgenda ? null : dias.length === 0 ? (
                 <p className="mt-2 text-xs text-slate-400">Este médico no tiene horarios libres por ahora.</p>
               ) : (
                 <>
@@ -139,8 +149,7 @@ export function ModalAccionCita({
 
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancelar</button>
-              <button type="button" onClick={confirmarReagenda} disabled={trabajando !== '' || !hora} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-                {trabajando === 'reagendar' ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />}
+              <button type="button" onClick={confirmarReagenda} disabled={trabajando !== '' || !hora} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 Guardar nueva fecha
               </button>
             </div>
@@ -174,9 +183,8 @@ function BotonAccion({ etiqueta, color, cargando, onClick }: PropsBotonAccion) {
       type="button"
       onClick={onClick}
       disabled={cargando}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 ${color}`}
+      className={`rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 ${color}`}
     >
-      {cargando && <Loader2 size={14} className="animate-spin" />}
       {etiqueta}
     </button>
   )

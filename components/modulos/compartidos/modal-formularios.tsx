@@ -1,7 +1,7 @@
 'use client'
 
-import type { Dispatch, KeyboardEvent, SetStateAction } from 'react'
-import { Loader2, Search } from 'lucide-react'
+import { useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
+import { Search } from 'lucide-react'
 import type { DiaDisponible, MedicoAgenda } from '@/lib/supabase/datos'
 
 const CAMPO = 'mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm'
@@ -103,7 +103,7 @@ export function FormularioUsuario({ usuario, setUsuario, mensaje, guardando, onC
         disabled={guardando}
         className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
       >
-        {guardando ? 'Creando...' : 'Crear usuario'}
+        Crear usuario
       </button>
     </>
   )
@@ -171,15 +171,119 @@ export function BuscadorPaciente({
   )
 }
 
+type PacienteCita = { id: number; nombre: string }
+
+type PropsBuscadorCita = {
+  pacientes: PacienteCita[]
+  seleccionadoId: number | null
+  onSeleccionar: (id: number) => void
+}
+
+/**
+ * Buscador de paciente para "Nueva cita".
+ * A diferencia del buscador general, devuelve el `id` del paciente porque es
+ * el valor que necesita `citas.paciente_id` en Supabase.
+ */
+export function BuscadorPacienteCita({ pacientes, seleccionadoId, onSeleccionar }: PropsBuscadorCita) {
+  const [texto, setTexto] = useState('')
+  const [activo, setActivo] = useState(0)
+  const [abierto, setAbierto] = useState(false)
+
+  const normalizar = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+  const coincidencias = pacientes
+    .filter((p) => normalizar(p.nombre).includes(normalizar(texto)))
+    .slice(0, 6)
+
+  const seleccionado = pacientes.find((p) => p.id === seleccionadoId) ?? null
+
+  function elegir(paciente: PacienteCita) {
+    onSeleccionar(paciente.id)
+    setTexto('')
+    setAbierto(false)
+    setActivo(0)
+  }
+
+  function alTeclado(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActivo((a) => Math.min(a + 1, coincidencias.length - 1))
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActivo((a) => Math.max(a - 1, 0))
+    }
+    if (event.key === 'Enter' && coincidencias[activo]) {
+      event.preventDefault()
+      elegir(coincidencias[activo])
+    }
+    if (event.key === 'Escape') setAbierto(false)
+  }
+
+  if (seleccionado) {
+    return (
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
+        <p className="text-xs font-semibold text-emerald-800">Paciente seleccionado</p>
+        <p className="mt-0.5 text-sm font-medium text-emerald-900">{seleccionado.nombre}</p>
+        <button
+          type="button"
+          onClick={() => onSeleccionar(0)}
+          className="mt-2 rounded-md border border-emerald-300 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+        >
+          Cambiar paciente
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <label className="text-sm font-medium" htmlFor="buscar-paciente-cita">
+        Paciente
+      </label>
+      <Search size={16} className="pointer-events-none absolute left-3 top-[38px] text-slate-400" />
+      <input
+        id="buscar-paciente-cita"
+        value={texto}
+        onChange={(e) => { setTexto(e.target.value); setAbierto(true); setActivo(0) }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => window.setTimeout(() => setAbierto(false), 120)}
+        onKeyDown={alTeclado}
+        autoComplete="off"
+        placeholder="Escribe el nombre del paciente"
+        className="mt-1 w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+      />
+      {abierto && texto && (
+        coincidencias.length > 0 ? (
+          <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            {coincidencias.map((paciente, i) => (
+              <li key={paciente.id}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); elegir(paciente) }}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${i === activo ? 'bg-blue-50' : ''}`}
+                >
+                  {paciente.nombre}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="absolute left-0 right-0 top-full z-10 mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-lg">
+            Sin coincidencias
+          </p>
+        )
+      )}
+    </div>
+  )
+}
+
 type PropsSelectorCita = {
   cargando: boolean
   cargandoAgenda: boolean
   medicos: MedicoAgenda[]
   medicoId: number | null
   onMedico: (id: number) => void
-  pacientes: { id: number; nombre: string }[]
-  pacienteId: number | null
-  onPaciente: (id: number) => void
   dias: DiaDisponible[]
   diaActual: DiaDisponible | null
   fecha: string
@@ -189,18 +293,14 @@ type PropsSelectorCita = {
   error: string
 }
 
-/** Selector de médico, paciente y horario libre. Todo viene de Supabase. */
+/** Selector de médico y horario libre. Todo viene de Supabase.
+ *  El paciente se elige con `BuscadorPacienteCita`, que se muestra arriba. */
 export function SelectorCita({
-  cargando, cargandoAgenda, medicos, medicoId, onMedico, pacientes, pacienteId, onPaciente,
+  cargando, cargandoAgenda, medicos, medicoId, onMedico,
   dias, diaActual, fecha, onFecha, horario, onHorario, error,
-}: PropsSelectorCita) {
-  if (cargando) {
-    return (
-      <p className="flex items-center gap-2 text-sm text-slate-400">
-        <Loader2 size={16} className="animate-spin" /> Cargando médicos desde Supabase...
-      </p>
-    )
-  }
+}: Omit<PropsSelectorCita, 'pacientes' | 'pacienteId' | 'onPaciente'>) {
+  // Mientras carga no se muestra nada: así el modal no aparece a medias.
+  if (cargando) return null
 
   if (medicos.length === 0) {
     return (
@@ -226,32 +326,15 @@ export function SelectorCita({
         </select>
       </label>
 
-      <label className={ETIQUETA}>
-        Paciente
-        <select
-          aria-label="Paciente"
-          value={pacienteId ?? ''}
-          onChange={(e) => onPaciente(Number(e.target.value))}
-          className={CAMPO}
-        >
-          <option value="">Selecciona un paciente</option>
-          {pacientes.map((p) => (
-            <option key={p.id} value={p.id}>{p.nombre}</option>
-          ))}
-        </select>
-      </label>
-
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
         <p className="text-xs font-semibold text-slate-700">Fechas y horarios disponibles</p>
 
-        {cargandoAgenda ? (
-          <p className="mt-3 flex items-center gap-2 text-xs text-slate-400">
-            <Loader2 size={14} className="animate-spin" /> Consultando disponibilidad...
-          </p>
-        ) : dias.length === 0 ? (
+        {/* Al cambiar de médico se mantiene lo que había, atenuado y sin clics,
+            en vez de dejar el recuadro vacío mientras llega la nueva agenda. */}
+        {dias.length === 0 ? (
           <p className="mt-3 text-xs text-slate-400">Este médico no tiene horarios libres por ahora.</p>
         ) : (
-          <>
+          <div className={cargandoAgenda ? 'pointer-events-none opacity-40 transition-opacity' : 'transition-opacity'}>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {dias.map((dia) => (
                 <button
@@ -288,7 +371,7 @@ export function SelectorCita({
                 </button>
               ))}
             </div>
-          </>
+          </div>
         )}
 
         {horario && (

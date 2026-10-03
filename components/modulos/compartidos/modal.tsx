@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import {
   cargarClinicaActiva,
   cargarDisponibilidad,
@@ -10,8 +10,11 @@ import {
   type DiaDisponible,
   type MedicoAgenda,
 } from '@/lib/supabase/datos'
+import { actualizarAgendaEnCache, leerCacheCita } from '@/lib/supabase/cache-cita'
+import { guardarModulo, leerModulo } from '@/lib/supabase/cache-modulos'
 import {
   BuscadorPaciente,
+  BuscadorPacienteCita,
   FormularioUsuario,
   SelectorCita,
 } from './modal-formularios'
@@ -54,11 +57,22 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
   }
 
   // ─── Estado del buscador de pacientes ───
-  const [pacientes, setPacientes] = useState<{ nombre: string; identificacion: string; pass: string; telefono: string; estado: string }[]>([])
+  // Los pacientes vienen precargados con los módulos, así que el buscador abre
+  // con resultados ya disponibles.
+  const pacientesIniciales = leerModulo('Pacientes')
+  const [pacientes, setPacientes] = useState<{ nombre: string; identificacion: string; pass: string; telefono: string; estado: string }[]>(
+    () => (pacientesIniciales?.filas ?? []).map((fila) => ({
+      nombre: fila[0] ?? '—',
+      identificacion: fila[1] ?? '—',
+      pass: '—',
+      telefono: fila[2] ?? '—',
+      estado: fila[4] ?? 'Activo',
+    })),
+  )
   useEffect(() => {
     let vigente = true
     cargarPacientes().then((resultado) => {
-      if (!vigente) return
+      if (!vigente || resultado.error) return
       setPacientes(resultado.filas.map((fila) => ({
         nombre: fila[0] ?? '—',
         identificacion: fila[1] ?? '—',
@@ -66,6 +80,7 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
         telefono: fila[2] ?? '—',
         estado: fila[4] ?? 'Activo',
       })))
+      guardarModulo('Pacientes', resultado.filas, resultado.error)
     })
     return () => { vigente = false }
   }, [])
@@ -101,21 +116,31 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
     }
   }
   // ─── Estado de "Nueva cita" (todo viene de Supabase) ───
-  const [medicos, setMedicos] = useState<MedicoAgenda[]>([])
-  const [pacientesCita, setPacientesCita] = useState<{ id: number; nombre: string }[]>([])
-  const [clinicaId, setClinicaId] = useState<number | null>(null)
-  const [medicoId, setMedicoId] = useState<number | null>(null)
+  // La caché se lee de forma síncrona durante el render: si los datos ya
+  // estaban precargados al entrar a la app, el modal aparece completo de una.
+  const cacheInicial = leerCacheCita()
+  const medicoInicial = cacheInicial?.medicos[0]?.id ?? null
+  const agendaInicial =
+    medicoInicial !== null ? cacheInicial?.agendas[medicoInicial] : undefined
+
+  const [medicos, setMedicos] = useState<MedicoAgenda[]>(cacheInicial?.medicos ?? [])
+  const [pacientesCita, setPacientesCita] = useState<{ id: number; nombre: string }[]>(cacheInicial?.pacientes ?? [])
+  const [clinicaId, setClinicaId] = useState<number | null>(cacheInicial?.clinicaId ?? null)
+  const [medicoId, setMedicoId] = useState<number | null>(medicoInicial)
   const [pacienteId, setPacienteId] = useState<number | null>(null)
-  const [disponibilidad, setDisponibilidad] = useState<DiaDisponible[]>([])
-  const [fechaSeleccionada, setFechaSeleccionada] = useState('')
+  const [disponibilidad, setDisponibilidad] = useState<DiaDisponible[]>(agendaInicial?.filas ?? [])
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(agendaInicial?.filas[0]?.fecha ?? '')
   const [horarioSeleccionado, setHorarioSeleccionado] = useState('')
   const [citaError, setCitaError] = useState('')
-  const [cargandoCita, setCargandoCita] = useState(false)
+  const [cargandoCita, setCargandoCita] = useState(!cacheInicial)
   const [cargandoAgenda, setCargandoAgenda] = useState(false)
+  // Con la caché llena el modal se dibuja desde el primer render; sin ella
+  // espera a que termine la carga, para no aparecer a medias.
+  const [citaLista, setCitaLista] = useState(cacheInicial !== null)
 
-  // Carga inicial: médicos, pacientes y clínica.
+  // Carga inicial: médicos, pacientes y clínica. Solo si no Vinieron en caché.
   useEffect(() => {
-    if (!esNuevaCita) return
+    if (!esNuevaCita || cacheInicial) return
     let vigente = true
     setCargandoCita(true)
     Promise.all([cargarMedicosAgenda(), cargarPacientesParaCita(), cargarClinicaActiva()])
@@ -127,16 +152,45 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
         setMedicoId((anterior) => anterior ?? medicosResult.filas[0]?.id ?? null)
         setCitaError(medicosResult.error ?? '')
         setCargandoCita(false)
+        // Sin médicos no hay agenda que cargar: liberamos el modal para que sí
+        // aparezca y muestre el aviso de que no hay médicos registrados.
+        if (medicosResult.filas.length === 0) setCitaLista(true)
       })
     return () => { vigente = false }
-  }, [esNuevaCita])
+  }, [esNuevaCita, cacheInicial])
 
-  // Cada vez que cambia el médico, se recalcula su disponibilidad real.
+  /** Cambia de médico usando la caché si la tiene; si no, la pide a Supabase. */
+  const cambiarMedico = (nuevoId: number) => {
+    setMedicoId(nuevoId)
+    setHorarioSeleccionado('')
+
+    const guardada = leerCacheCita()?.agendas[nuevoId]
+    if (guardada) {
+      setDisponibilidad(guardada.filas)
+      setFechaSeleccionada(guardada.filas[0]?.fecha ?? '')
+      setCitaError(guardada.error ?? '')
+      setCargandoAgenda(false)
+      setCitaLista(true)
+      return
+    }
+
+    const medico = medicos.find((m) => m.id === nuevoId)
+    setCargandoAgenda(true)
+    cargarDisponibilidad(nuevoId, medico?.duracionConsulta ?? 20).then((resultado) => {
+      setDisponibilidad(resultado.filas)
+      setFechaSeleccionada(resultado.filas[0]?.fecha ?? '')
+      setCitaError(resultado.error ?? '')
+      setCargandoAgenda(false)
+      setCitaLista(true)
+    })
+  }
+
+  // Agenda inicial cuando no había caché (el resto ya lo resuelve `cambiarMedico`).
   useEffect(() => {
     if (!esNuevaCita || medicoId === null) return
+    if (leerCacheCita()?.agendas[medicoId]) return
     let vigente = true
     setCargandoAgenda(true)
-    setHorarioSeleccionado('')
     const medico = medicos.find((m) => m.id === medicoId)
     cargarDisponibilidad(medicoId, medico?.duracionConsulta ?? 20).then((resultado) => {
       if (!vigente) return
@@ -144,6 +198,7 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
       setFechaSeleccionada(resultado.filas[0]?.fecha ?? '')
       setCitaError(resultado.error ?? '')
       setCargandoAgenda(false)
+      setCitaLista(true)
     })
     return () => { vigente = false }
   }, [esNuevaCita, medicoId, medicos])
@@ -165,7 +220,7 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
       clinicaId,
       fecha: fechaSeleccionada,
       hora: horarioSeleccionado,
-      motivo: value,
+      motivo: 'Consulta general',
       duracionConsulta: medicoSeleccionado.duracionConsulta,
     })
     setCargandoCita(false)
@@ -176,6 +231,8 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
     // Refresca la disponibilidad para que el horario recién usado desaparezca.
     const frescos = await cargarDisponibilidad(medicoId, medicoSeleccionado.duracionConsulta)
     setDisponibilidad(frescos.filas)
+    // Se guarda en caché para que al reabrir el modal ese horario ya figure ocupado.
+    actualizarAgendaEnCache(medicoId, frescos.filas, frescos.error)
 
     // Avisa al resto de la app para que vuelva a leer el módulo desde Supabase.
     window.dispatchEvent(new CustomEvent('datos-actualizados'))
@@ -183,13 +240,13 @@ export function ClinicModal({ title, onClose, onSave }: { title: string; onClose
   }
 
 
-const descripcion = esUsuarios
-    ? 'Crea cuentas de acceso para el personal de la clínica.'
-    : esBusqueda
-      ? 'Busca por nombre, identificación o teléfono.'
-      : esNuevaCita
-        ? 'Ingresa los datos y revisa la disponibilidad antes de guardar.'
-        : 'Completa la información para continuar con esta acción.'
+  // Guard defensivo: se coloca DESPUÉS de todos los hooks para no romper las
+  // Rules of Hooks. `openModal` ya filtra, pero así el modal nunca se dibuja vacío.
+  if (!esNuevaCita && !esBusqueda && !esUsuarios) return null
+
+  // "Nueva cita" no se dibuja hasta tener médicos, pacientes y agenda: así
+  // aparece de una sola vez ya completo, sin parpadear estados intermedios.
+  if (esNuevaCita && !citaLista) return null
 
   return (
     <div
@@ -209,7 +266,6 @@ const descripcion = esUsuarios
             <X size={18} />
           </button>
         </div>
-        <p className="mt-2 text-sm text-slate-500">{descripcion}</p>
 
         <div className="mt-5 flex flex-col gap-3">
           {esUsuarios && (
@@ -238,45 +294,32 @@ const descripcion = esUsuarios
             />
           )}
 
-          {!esUsuarios && !esBusqueda && (
-            <>
-              <input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                aria-label="Nombre o descripción"
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                placeholder="Nombre o descripción"
-              />
-              <textarea
-                aria-label="Observaciones"
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                placeholder="Observaciones"
-                rows={3}
-              />
+          {esNuevaCita && !cargandoCita && (
+            <BuscadorPacienteCita
+              pacientes={pacientesCita}
+              seleccionadoId={pacienteId}
+              onSeleccionar={(id) => setPacienteId(id === 0 ? null : id)}
+            />
+          )}
 
-              {esNuevaCita && (
-                <SelectorCita
-                  cargando={cargandoCita}
-                  cargandoAgenda={cargandoAgenda}
-                  medicos={medicos}
-                  medicoId={medicoId}
-                  onMedico={setMedicoId}
-                  pacientes={pacientesCita}
-                  pacienteId={pacienteId}
-                  onPaciente={setPacienteId}
-                  dias={disponibilidad}
-                  diaActual={diaSeleccionado}
-                  fecha={fechaSeleccionada}
-                  onFecha={(f) => {
-                    setFechaSeleccionada(f)
-                    setHorarioSeleccionado('')
-                  }}
-                  horario={horarioSeleccionado}
-                  onHorario={setHorarioSeleccionado}
-                  error={citaError}
-                />
-              )}
-            </>
+          {esNuevaCita && !cargandoCita && (
+            <SelectorCita
+              cargando={cargandoCita}
+              cargandoAgenda={cargandoAgenda}
+              medicos={medicos}
+              medicoId={medicoId}
+              onMedico={cambiarMedico}
+              dias={disponibilidad}
+              diaActual={diaSeleccionado}
+              fecha={fechaSeleccionada}
+              onFecha={(f) => {
+                setFechaSeleccionada(f)
+                setHorarioSeleccionado('')
+              }}
+              horario={horarioSeleccionado}
+              onHorario={setHorarioSeleccionado}
+              error={citaError}
+            />
           )}
         </div>
 
@@ -293,10 +336,9 @@ const descripcion = esUsuarios
               type="button"
               onClick={esNuevaCita ? confirmarCita : () => onSave(value)}
               disabled={esNuevaCita ? !puedeGuardarCita : false}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {esNuevaCita && cargandoCita && <Loader2 size={14} className="animate-spin" />}
-              {esNuevaCita && cargandoCita ? 'Guardando...' : 'Guardar'}
+              Guardar
             </button>
           </div>
         )}

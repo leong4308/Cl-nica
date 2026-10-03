@@ -313,6 +313,90 @@ export async function cargarModulo(nombre: string): Promise<{ filas: Row[]; erro
   return { filas: [], error: null }
 }
 
+/** Valores de los cuatro indicadores de la pantalla de inicio, por etiqueta. */
+export type EstadisticasResumen = Record<string, { value: string; meta: string }>
+
+/** Fila de "Médicos en turno" en el panel lateral. */
+export type MedicoTurno = { nombre: string; especialidad: string; estado: string }
+
+/** Ocupación de camas del panel lateral. */
+export type ResumenCamas = { ocupadas: number; total: number; libres: number }
+
+/**
+ * Conteos del resumen. Vive aquí (y no en el componente) para poder precargarlos
+ * junto con el resto de datos y que el panel se pinte sin esperas.
+ */
+export async function cargarResumenEstadisticas(): Promise<{
+  filas: EstadisticasResumen
+  error: string | null
+}> {
+  const supabase = createClient()
+  const inicioDelDia = new Date()
+  inicioDelDia.setHours(0, 0, 0, 0)
+  const finDelDia = new Date(inicioDelDia)
+  finDelDia.setDate(inicioDelDia.getDate() + 1)
+
+  const [citas, pacientes, camas, ordenes] = await Promise.all([
+    supabase.from('citas').select('id', { count: 'exact', head: true })
+      .gte('inicio', inicioDelDia.toISOString()).lt('inicio', finDelDia.toISOString()),
+    supabase.from('perfiles_pacientes').select('id', { count: 'exact', head: true }).eq('esta_activo', true),
+    supabase.from('camas').select('id', { count: 'exact', head: true }),
+    supabase.from('ordenes_medicas').select('id', { count: 'exact', head: true }).in('estado', ['prescrita', 'en_proceso']),
+  ])
+
+  return {
+    error: citas.error?.message ?? pacientes.error?.message ?? camas.error?.message ?? ordenes.error?.message ?? null,
+    filas: {
+      'Citas de hoy': { value: String(citas.count ?? 0), meta: 'Datos en tiempo real' },
+      'Pacientes activos': { value: (pacientes.count ?? 0).toLocaleString('es-MX'), meta: 'Pacientes activos' },
+      'Camas ocupadas': { value: String(camas.count ?? 0), meta: 'Ocupación actual' },
+      'Órdenes pendientes': { value: String(ordenes.count ?? 0).padStart(2, '0'), meta: 'Requieren atención' },
+    },
+  }
+}
+
+/** Médicos activos para el panel lateral "Médicos en turno". */
+export async function cargarMedicosTurno(): Promise<{ filas: MedicoTurno[]; error: string | null }> {
+  const { filas, error } = await consultar<{
+    especialidad: string
+    usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null
+  }>(
+    createClient().from('perfiles_medicos')
+      .select('especialidad, usuarios!inner(nombre_completo)')
+      .eq('esta_activo', true)
+  )
+  return {
+    error,
+    filas: filas.map((doctor) => {
+      const usuario = Array.isArray(doctor.usuarios) ? doctor.usuarios[0] : doctor.usuarios
+      return {
+        nombre: usuario?.nombre_completo ?? 'Médico',
+        especialidad: doctor.especialidad,
+        estado: 'Disponible',
+      }
+    }),
+  }
+}
+
+/** Ocupación de camas para el panel lateral "Camas e internación". */
+export async function cargarResumenCamas(): Promise<{ filas: ResumenCamas; error: string | null }> {
+  const supabase = createClient()
+  const [total, ocupadas] = await Promise.all([
+    supabase.from('camas').select('id', { count: 'exact', head: true }),
+    supabase.from('camas').select('id', { count: 'exact', head: true }).eq('esta_ocupada', true),
+  ])
+  const totalCamas = total.count ?? 0
+  const ocupadasCamas = ocupadas.count ?? 0
+  return {
+    error: total.error?.message ?? ocupadas.error?.message ?? null,
+    filas: {
+      ocupadas: ocupadasCamas,
+      total: totalCamas,
+      libres: Math.max(totalCamas - ocupadasCamas, 0),
+    },
+  }
+}
+
 export type MedicoAgenda = {
   id: number
   nombre: string

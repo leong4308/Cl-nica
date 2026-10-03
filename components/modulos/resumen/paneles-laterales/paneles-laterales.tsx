@@ -2,21 +2,26 @@
 
 import { useEffect, useState } from 'react'
 import { Bed, Stethoscope } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { cargarMedicosTurno, cargarResumenCamas } from '@/lib/supabase/datos'
+import { leerCamas, leerMedicosTurno } from '@/lib/supabase/cache-modulos'
 
 type MedicoEnTurno = { nombre: string; especialidad: string; estado: string }
 
 export function MedicosEnTurno() {
-  const [doctoresEnTurno, setDoctoresEnTurno] = useState<MedicoEnTurno[]>([])
+  // Viene precargado, así que el panel no arranca vacío.
+  const [doctoresEnTurno, setDoctoresEnTurno] = useState<MedicoEnTurno[]>(() => leerMedicosTurno() ?? [])
 
   useEffect(() => {
-    const cargarMedicos = async () => {
-      const supabase = createClient()
-      const medicos = await supabase.from('perfiles_medicos').select('especialidad, usuarios!inner(nombre_completo)').eq('esta_activo', true)
-      if (!medicos.data) return
-      setDoctoresEnTurno(medicos.data.map((doctor) => { const usuario = Array.isArray(doctor.usuarios) ? doctor.usuarios[0] : doctor.usuarios; return { nombre: usuario?.nombre_completo ?? 'Médico', especialidad: doctor.especialidad, estado: 'Disponible' } }))
+    let vigente = true
+    const cargarMedicos = () => {
+      void cargarMedicosTurno().then((resultado) => {
+        if (!vigente || resultado.error) return
+        setDoctoresEnTurno(resultado.filas)
+      })
     }
-    void cargarMedicos()
+    cargarMedicos()
+    window.addEventListener('datos-actualizados', cargarMedicos)
+    return () => { vigente = false; window.removeEventListener('datos-actualizados', cargarMedicos) }
   }, [])
 
   return (
@@ -33,20 +38,20 @@ export function MedicosEnTurno() {
 }
 
 export function CamasInternacion({ onVerCamas }: { onVerCamas: () => void }) {
-  const [camasResumen, setCamasResumen] = useState({ ocupadas: 0, total: 0, libres: 0 })
+  // También precargado: la ocupación se ve en el primer render.
+  const [camasResumen, setCamasResumen] = useState(() => leerCamas() ?? { ocupadas: 0, total: 0, libres: 0 })
 
   useEffect(() => {
-    const cargarCamas = async () => {
-      const supabase = createClient()
-      const [total, ocupadas] = await Promise.all([
-        supabase.from('camas').select('id', { count: 'exact', head: true }),
-        supabase.from('camas').select('id', { count: 'exact', head: true }).eq('esta_ocupada', true),
-      ])
-      const totalCamas = total.count ?? 0
-      const ocupadasCamas = ocupadas.count ?? 0
-      setCamasResumen({ ocupadas: ocupadasCamas, total: totalCamas, libres: Math.max(totalCamas - ocupadasCamas, 0) })
+    let vigente = true
+    const cargarCamas = () => {
+      void cargarResumenCamas().then((resultado) => {
+        if (!vigente || resultado.error) return
+        setCamasResumen(resultado.filas)
+      })
     }
-    void cargarCamas()
+    cargarCamas()
+    window.addEventListener('datos-actualizados', cargarCamas)
+    return () => { vigente = false; window.removeEventListener('datos-actualizados', cargarCamas) }
   }, [])
 
   const porcentaje = camasResumen.total ? Math.round((camasResumen.ocupadas / camasResumen.total) * 100) : 0

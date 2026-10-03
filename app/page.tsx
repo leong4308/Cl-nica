@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { Dashboard } from '@/components/modulos/resumen/dashboard'
 import { ModulePage } from '@/components/modulos/citas/module-page'
@@ -16,6 +16,8 @@ import {
   type CitaPanel,
   type EstadoCita,
 } from '@/lib/supabase/datos'
+import { precargarCita } from '@/lib/supabase/cache-cita'
+import { precargarModulos } from '@/lib/supabase/cache-modulos'
 
 /** Cierra el modal de citas y avisa del resultado. */
 type CitaEnEdicion = { cita: CitaPanel; accion: AccionCita } | null
@@ -29,12 +31,33 @@ export default function Page() {
   const [notice, setNotice] = useState('')
   const [perfil, setPerfil] = useState<{ nombre: string; rol: RolUsuario }>({ nombre: 'Usuario', rol: 'paciente' })
 
+  // Precarga módulos, paneles y agendas nada más entrar. Con esto cambiar de
+  // pestaña y abrir los modales queda instantáneo, sin estados intermedios.
+  useEffect(() => {
+    if (!authenticated) return
+    precargarModulos()
+    precargarCita()
+    // Cada vez que se crea o cambia una cita, todo se recalcula en segundo plano
+    // para que ninguna vista muestre datos viejos.
+    const refrescar = () => { precargarModulos(); precargarCita() }
+    window.addEventListener('datos-actualizados', refrescar)
+    return () => window.removeEventListener('datos-actualizados', refrescar)
+  }, [authenticated])
+
   const notify = (message: string) => {
     setNotice(message)
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-  const openModal = (title: string) => setModal(title)
+  /** Títulos de modal con un formulario real implementado. Cualquier otro
+ *  botón (Registrar médico, Nuevo paciente, Filtros, Detalle, Editar…) no
+ *  abre nada, en lugar de mostrar un formulario genérico. */
+const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita']
+
+const openModal = (title: string) => {
+  if (!MODALES_CON_FORMULARIO.includes(title)) return
+  setModal(title)
+}
   const navigate = (label: string) => { setActive(label); setMenuOpen(false); setModal(null) }
 
   /** Aplica un cambio de estado a la cita y devuelve el error, o null si salió bien. */

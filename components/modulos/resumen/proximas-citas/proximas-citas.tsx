@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Clock3, Loader2 } from 'lucide-react'
+import { AlertCircle, Clock3 } from 'lucide-react'
 import type { ClinicActions } from '../../compartidos/types'
 import { RowActions } from '../../compartidos/ui'
 import { cargarCitasPanel, type CitaPanel } from '@/lib/supabase/datos'
+import { guardarPanel, leerPanel } from '@/lib/supabase/cache-modulos'
 
 /** Minutos de cortesía para el check-in antes de pasar la cita a "Reagendar". */
 const MINUTOS_CORTESIA = 10
@@ -54,20 +55,32 @@ type PropsPanel = ClinicActions & {
 
 export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
   const [filtroActivo, setFiltroActivo] = useState<Filtro>('Actuales')
-  const [citas, setCitas] = useState<CitaPanel[]>([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // La lista ya viene precargada al entrar, así que el panel pinta de inmediato.
+  const panelInicial = leerPanel()
+  const [citas, setCitas] = useState<CitaPanel[]>(panelInicial?.filas ?? [])
+  const [cargando, setCargando] = useState(panelInicial === null)
+  const [error, setError] = useState<string | null>(panelInicial?.error ?? null)
 
   const ahoraMs = ahora.getTime()
 
   useEffect(() => {
     let vigente = true
     const leer = () => {
+      const guardado = leerPanel()
+      if (guardado) {
+        setCitas(guardado.filas)
+        setError(guardado.error)
+        setCargando(false)
+      } else {
+        setCargando(true)
+      }
+      // Aun con la caché se relee: el resumen debe reflejar lo recién guardado.
       cargarCitasPanel().then((resultado) => {
         if (!vigente) return
         setCitas(resultado.filas)
         setError(resultado.error)
         setCargando(false)
+        guardarPanel(resultado.filas, resultado.error)
       })
     }
     leer()
@@ -91,7 +104,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
     if (Number.isNaN(horas) || Number.isNaN(minutos)) return valor
     return `${horas % 12 || 12}:${String(minutos).padStart(2, '0')} ${horas >= 12 ? 'PM' : 'AM'}`
   }
-return (
+  return (
     <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 px-5 py-4">
         <div className="flex items-center justify-between gap-3">
@@ -111,11 +124,10 @@ return (
               key={item.etiqueta}
               onClick={() => setFiltroActivo(item.etiqueta)}
               aria-pressed={filtroActivo === item.etiqueta}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${
-                filtroActivo === item.etiqueta
+              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${filtroActivo === item.etiqueta
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-700'
-              }`}
+                }`}
             >
               {item.etiqueta} ({cuenta(item.estado)})
             </button>
@@ -125,9 +137,8 @@ return (
             type="button"
             onClick={() => setFiltroActivo('Reagendar')}
             aria-pressed={filtroActivo === 'Reagendar'}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${
-              filtroActivo === 'Reagendar' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'
-            }`}
+            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${filtroActivo === 'Reagendar' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'
+              }`}
           >
             Reagendar ({cuenta('Reagendar')})
           </button>
@@ -141,13 +152,12 @@ return (
           return (
             <div
               key={`${cita.inicio}-${index}`}
-              className={`grid gap-3 px-4 py-3 sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:items-center ${
-                necesitaReagenda
+              className={`grid gap-3 px-4 py-3 sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:items-center ${necesitaReagenda
                   ? 'border-l-4 border-red-400 bg-red-50/40'
                   : estaPendiente
                     ? 'border-l-4 border-amber-300 bg-amber-50/40'
                     : ''
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Clock3 className={`size-4 ${necesitaReagenda ? 'text-red-500' : estaPendiente ? 'text-amber-500' : 'text-slate-400'}`} />
@@ -188,11 +198,7 @@ return (
           )
         })}
 
-        {cargando && (
-          <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-slate-400">
-            <Loader2 size={18} className="animate-spin" /> Consultando Supabase...
-          </div>
-        )}
+        {cargando && <div className="px-5 py-10" />}
         {!cargando && error && (
           <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
             <AlertCircle size={20} className="text-amber-500" />

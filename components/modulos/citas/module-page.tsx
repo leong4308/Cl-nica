@@ -1,33 +1,46 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { AlertCircle, Download, Filter, Loader2, Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertCircle, Download, Filter, Plus } from 'lucide-react'
 import { modules } from '../compartidos/data'
 import type { ClinicActions, Row } from '../compartidos/types'
 import { ActionButton, RowActions, Stat, Status } from '../compartidos/ui'
 import { cargarModulo } from '@/lib/supabase/datos'
+import { guardarModulo, leerModulo } from '@/lib/supabase/cache-modulos'
+
+/** Filas ya leídas, junto con el módulo al que pertenecen y su refresco. */
+type DatosModulo = { modulo: string; filas: Row[]; error: string | null }
 
 export function ModulePage({ active, notify, openModal }: ClinicActions & { active: string }) {
-  const [filas, setFilas] = useState<Row[]>([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
   const config = modules[active]
 
-  // Vuelve a leer el módulo activo. Se dispara al cambiar de pestaña y cada vez
-  // que se guarda algo (por ejemplo una cita nueva) para ver el dato real.
+  // Lo último pintado. Al cambiar de pestaña se resuelve contra la caché, así
+  // que la tabla aparece de inmediato sin pasar por un estado vacío.
+  const [datos, setDatos] = useState<DatosModulo | null>(null)
+  const versionPrevia = useRef(version)
+
+  // Al cambiar de pestaña la caché ya tiene el dato y se pinta al instante; al
+  // guardar algo sí hay que releer de Supabase para ver el dato real.
   useEffect(() => {
+    const esRefresco = versionPrevia.current !== version
+    versionPrevia.current = version
+    if (!esRefresco && leerModulo(active)) return
+
     let vigente = true
-    setCargando(true)
-    setError(null)
     cargarModulo(active).then((resultado) => {
       if (!vigente) return
-      setFilas(resultado.filas)
-      setError(resultado.error)
-      setCargando(false)
+      setDatos({ modulo: active, filas: resultado.filas, error: resultado.error })
+      guardarModulo(active, resultado.filas, resultado.error)
     })
     return () => { vigente = false }
   }, [active, version])
+
+  // Datos a pintar: los del módulo activo, ya sea recién leídos o de la caché.
+  const cacheado = leerModulo(active)
+  const filas = datos?.modulo === active ? datos.filas : (cacheado?.filas ?? [])
+  const error = datos?.modulo === active ? datos.error : (cacheado?.error ?? null)
+  const cargando = datos?.modulo !== active && cacheado === null
 
   useEffect(() => {
     function alGuardar() { setVersion((v) => v + 1) }
@@ -66,7 +79,7 @@ export function ModulePage({ active, notify, openModal }: ClinicActions & { acti
           <ActionButton icon={Download} onClick={() => notify(`Listado de ${active} exportado`)}>Exportar</ActionButton>
         </div>
 
-        {cargando && <div className="flex items-center justify-center gap-2 px-5 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Consultando Supabase...</div>}
+        {cargando && <div className="px-5 py-16" />}
 
         {!cargando && error && <div className="flex flex-col items-center gap-2 px-5 py-16 text-center"><AlertCircle size={22} className="text-amber-500" /><p className="text-sm font-semibold text-slate-700">No se pudieron cargar los datos</p><p className="max-w-md text-xs text-slate-400">{error}</p></div>}
 
