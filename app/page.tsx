@@ -8,7 +8,9 @@ import { BarraLateral } from '@/components/modulos/barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
 import { cargarPerfilSesion, cerrarSesion } from '@/lib/supabase/sesion'
 import { ETIQUETA_ROL, type RolUsuario } from '@/lib/supabase/tipos-rol'
-import { ClinicModal } from '@/components/modulos/compartidos/modal'
+import { ModalUsuarios } from '@/components/modulos/compartidos/modal-usuarios'
+import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
+import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
 import { ModalAccionCita, type AccionCita } from '@/components/modulos/compartidos/modal-cita'
 import { LoginForm } from '@/components/login/login-form'
 import {
@@ -128,11 +130,24 @@ const openModal = (title: string) => {
         </div>
       )}
 
-      {modal && (
-        <ClinicModal
-          title={modal}
+      {/* Cada modal vive en la carpeta de su botón; el de Usuarios, que se abre
+          desde el menú, sigue en compartidos. */}
+      {modal === 'Nueva cita' && (
+        <ModalNuevaCita
           onClose={() => setModal(null)}
-          onSave={(value) => { notify(value ? `${modal} guardado correctamente` : `${modal} listo para completar`); setModal(null) }}
+          onSave={(value) => { notify(value ? 'Nueva cita guardado correctamente' : 'Nueva cita listo para completar'); setModal(null) }}
+        />
+      )}
+      {modal === 'Buscar paciente' && (
+        <ModalBuscarPaciente
+          onClose={() => setModal(null)}
+          onSave={(value) => { notify(value ? 'Buscar paciente guardado correctamente' : 'Buscar paciente listo para completar'); setModal(null) }}
+        />
+      )}
+      {modal === 'Usuarios' && (
+        <ModalUsuarios
+          onClose={() => setModal(null)}
+          onSave={(value) => { notify(value ? 'Usuarios guardado correctamente' : 'Usuarios listo para completar'); setModal(null) }}
         />
       )}
 

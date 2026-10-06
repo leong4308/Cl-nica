@@ -46,7 +46,13 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
       .select('id, inicio, estado, motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
-      .order('inicio', { ascending: true })
+      // De la más reciente a la más antigua. Esta consulta no filtra por día
+      // (a diferencia del panel de check-in), así que el tope de 100 filas
+      // siempre recortaba el FINAL de la lista: ordenando de más viejo a más
+      // nuevo, bastaban 100 citas históricas para que una cita recién guardada
+      // quedara fuera de la tabla. Con este orden lo que se recorta es el pasado
+      // y lo nuevo siempre se ve.
+      .order('inicio', { ascending: false })
       .limit(100)
   )
   return {
@@ -90,12 +96,34 @@ export type CitaPanel = {
  * `cargarCitas` solo devuelve textos para la tabla; aquí hace falta el instante
  * exacto para saber si la cita ya pasó, sigue en curso o va con retraso.
  */
+/** Instante en ISO del inicio del día local. Sirve para acotar consultas por día
+ *  sin depender de la zona horaria del servidor, que puede ser otra. */
+function inicioDiaLocal(d: Date): string {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).toISOString()
+}
+
+/** Días que abarca el panel de check-in: el de hoy y los siguientes.
+ *
+ * Antes la consulta se ceñía al día en curso. Como la agenda de los médicos
+ * solo corre de lunes a viernes, el panel salía siempre vacío el fin de
+ * semana aunque se acabaran de agendar citas para el lunes, y el personal
+ * veía "no hay citas registradas" sin saber que sí las había. */
+const DIAS_VENTANA_PANEL = 7
+
 export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: string | null }> {
   const supabase = createClient()
+  const hoy = new Date()
+  const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + DIAS_VENTANA_PANEL)
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
       .select('id, inicio, estado, motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))')
       .order('inicio', { ascending: true })
+      // Hoy y los días siguientes, nunca el pasado: el panel es de lo que
+      // viene. Al acotar por ventana el orden ascendente se mantiene, así que
+      // el tope de 100 filas solo recortaría el final y una cita recién
+      // agendada para mañana siempre queda dentro.
+      .gte('inicio', inicioDiaLocal(hoy))
+      .lt('inicio', inicioDiaLocal(fin))
       .limit(100)
   )
   return {
@@ -143,7 +171,13 @@ export async function reagendarCita(
   fecha: string,
   hora: string,
 ): Promise<{ error: string | null }> {
-  const { inicio, fin } = rangoIso(fecha, hora, duracionConsulta)
+  let rango: { inicio: string; fin: string }
+  try {
+    rango = rangoIso(fecha, hora, duracionConsulta)
+  } catch {
+    return { error: 'El horario seleccionado no es válido. Vuelve a elegirlo.' }
+  }
+  const { inicio, fin } = rango
   const { error } = await createClient()
     .from('citas')
     .update({ inicio, fin, estado: 'confirmada' })
@@ -220,24 +254,25 @@ export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string
 
 type InternacionFila = {
   id: number; fecha_ingreso: string; estado: string
-  habbitaciones: { numero: string } | { numero: string }[] | null
+  habitaciones: { numero: string } | { numero: string }[] | null
   camas: { numero: string; esta_ocupada: boolean } | { numero: string; esta_ocupada: boolean }[] | null
   perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
 }
-
 
 export async function cargarInternacion(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
   const { filas, error } = await consultar<InternacionFila>(
     supabase.from('internaciones')
-      .select('id, fecha_ingreso, estado, habbitaciones(numero), camas(numero, esta_ocupada), perfiles_pacientes(usuarios(nombre_completo))')
+      // El recurso incrustado se llama `habitaciones`: con doble "b" PostgREST
+      // responde 400 (PGRST200) y el módulo de Internación se queda sin datos.
+      .select('id, fecha_ingreso, estado, habitaciones(numero), camas(numero, esta_ocupada), perfiles_pacientes(usuarios(nombre_completo))')
       .order('fecha_ingreso', { ascending: false })
       .limit(100)
   )
   return {
     error,
     filas: filas.map((internacion) => {
-      const habitacion = Array.isArray(internacion.habbitaciones) ? internacion.habbitaciones[0] : internacion.habbitaciones
+      const habitacion = Array.isArray(internacion.habitaciones) ? internacion.habitaciones[0] : internacion.habitaciones
       const cama = Array.isArray(internacion.camas) ? internacion.camas[0] : internacion.camas
       return [
         `${habitacion?.numero ?? '—'} · Cama ${cama?.numero ?? '—'}`,
@@ -406,9 +441,8 @@ export type MedicoAgenda = {
 
 export type DiaDisponible = {
   fecha: string
+  /** Nombre del día en español, p. ej. "Lunes". */
   etiqueta: string
-  /** Fecha ya formateada para mostrar (p. ej. "05 oct"). */
-  fechaCorta: string
   slots: string[]
 }
 
@@ -418,6 +452,23 @@ const NOMBRE_DIA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viern
 function fechaLocal(iso: string): Date {
   const [anio, mes, dia] = iso.split('-').map(Number)
   return new Date(anio, mes - 1, dia)
+}
+
+/**
+ * Nombre del día de una fecha "AAAA-MM-DD", siempre el día real del calendario.
+ *
+ * Las tarjetas del selector muestran SOLO este nombre: antes ponían "Hoy" o
+ * "Mañana" y debajo la fecha corta ("05 oct"), lo que ocupaba dos líneas y
+ * mezclaba dos ideas en la misma tarjeta. Ahora la etiqueta es el día tal cual
+ * aparece en el calendario.
+ *
+ * No hay desfase: el rótulo va en el mismo orden que `Date.getDay()`, que es la
+ * convención de `agenda_medicos.dia_semana` con la que se calcula la
+ * disponibilidad. Desplazar el rótulo solo haría que un día se anunciara con
+ * el nombre de otro sin cambiar los horarios que realmente se ofrecen.
+ */
+function nombreDia(fecha: string): string {
+  return NOMBRE_DIA[fechaLocal(fecha).getDay()]
 }
 
 function aIso(d: Date): string {
@@ -433,19 +484,43 @@ function formato12h(hora: string): string {
   return `${hora12}:${String(m).padStart(2, '0')} ${periodo}`
 }
 
-/** Minutos desde medianoche, para comparar horas de Supabase. */
+/** Minutos desde medianoche, para comparar horas de Supabase.
+ *  Acepta los dos formatos que conviven en la app: el de la base de datos
+ *  ("14:30") y el que ve y elige el usuario en la interfaz ("2:30 PM"). Antes
+ *  solo entendía el primero, así que al guardar una cita el cálculo daba NaN y
+ *  `toISOString()` reventaba con "Invalid time value". */
 function aMinutos(hora: string): number {
-  const [h, m] = hora.split(':').map(Number)
-  return h * 60 + m
+  const coincide = hora.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i)
+  if (!coincide) return Number.NaN
+
+  let horas = Number(coincide[1])
+  const minutos = Number(coincide[2])
+  const periodo = coincide[3]?.toLowerCase()
+  if (periodo === 'pm' && horas !== 12) horas += 12
+  if (periodo === 'am' && horas === 12) horas = 0
+
+  // La expresión regular acepta "25:00" y "09:75" porque solo mira la forma.
+  // Sin este rango, `new Date(y, m, d, 25, 0)` no revienta: normaliza al día
+  // siguiente y la cita se guardaría en la fecha equivocada sin avisar.
+  if (minutos < 0 || minutos > 59 || horas < 0 || horas > 23) return Number.NaN
+
+  return horas * 60 + minutos
 }
 
 /** Rango [inicio, fin) en UTC (ISO-8601 con Z) para guardar en timestamptz.
  *  Importante: se convierte con toISOString() para que Postgres no interprete
- *  la hora como UTC. Sin el offset, una cita de 9:00 se guardaría 6 horas antes. */
+ *  la hora como UTC. Sin el offset, una cita de 9:00 se guardaría 6 horas antes.
+ *  Si la fecha o la hora no tienen sentido lanza un error legible, en vez de
+ *  dejar que `toISOString()` reviente con un RangeError incomprensible. */
 function rangoIso(fecha: string, hora: string, duracionMin: number): { inicio: string; fin: string } {
   const minutos = aMinutos(hora)
   const [anio, mes, dia] = fecha.split('-').map(Number)
+
   const base = new Date(anio, mes - 1, dia, Math.floor(minutos / 60), minutos % 60)
+  if (!Number.isFinite(anio) || !Number.isFinite(minutos) || Number.isNaN(base.getTime())) {
+    throw new Error(`Fecha u hora no válida: "${fecha} ${hora}"`)
+  }
+
   const fin = new Date(base.getTime() + duracionMin * 60_000)
   return { inicio: base.toISOString(), fin: fin.toISOString() }
 }
@@ -484,11 +559,17 @@ export async function cargarMedicosAgenda(): Promise<{ filas: MedicoAgenda[]; er
  * Calcula los próximos días con agenda libre para un médico.
  * Cruza `agenda_medicos` (horarios del médico) con `citas` (lo ya ocupado)
  * y descarta los horarios que se traslapan con una cita existente.
+ *
+ * `diasVista` son 7 a propósito: exactamente una semana completa. Antes iba
+ * en 10 y el modal mostraba diez tarjetas seguidas, así que la semana se
+ * cortaba a mitad (lunes, martes, miércoles… y vuelta a empezar) y nunca se
+ * veía el ciclo lunes→domingo cerrado. Con 7 días consecutivos siempre se ve
+ * la semana entera, sin repetir ni recortar.
  */
 export async function cargarDisponibilidad(
   medicoId: number,
   duracionConsulta: number,
-  diasVista = 10,
+  diasVista = 7,
 ): Promise<{ filas: DiaDisponible[]; error: string | null }> {
   const supabase = createClient()
 
@@ -562,24 +643,18 @@ export async function cargarDisponibilidad(
     // El día actual solo ofrece horas que todavía no pasaron.
     const filtrados = fecha === aIso(hoy)
       ? slots.filter((slot) => {
-          const [texto, periodo] = slot.split(' ')
-          const [h, m] = texto.split(':').map(Number)
-          let horas = h % 12
-          if (periodo === 'PM' && h !== 12) horas += 12
-          return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), horas, m) > new Date()
-        })
+        const [texto, periodo] = slot.split(' ')
+        const [h, m] = texto.split(':').map(Number)
+        let horas = h % 12
+        if (periodo === 'PM' && h !== 12) horas += 12
+        return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), horas, m) > new Date()
+      })
       : slots
 
     if (filtrados.length === 0) continue
 
-    const etiqueta = fecha === aIso(hoy)
-      ? 'Hoy'
-      : fecha === aIso(new Date(hoy.getTime() + 86_400_000))
-        ? 'Mañana'
-        : NOMBRE_DIA[diaSemana]
-    const fechaCorta = fechaLocal(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
-    filas.push({ fecha, etiqueta, fechaCorta, slots: filtrados })
-    if (filas.length >= 5) break
+    // La tarjeta muestra únicamente el nombre del día ("Lunes", "Miércoles"...).
+    filas.push({ fecha, etiqueta: nombreDia(fecha), slots: filtrados })
   }
 
   return { filas, error: null }
@@ -620,7 +695,13 @@ export type DatosNuevaCita = {
 
 /** Crea una cita en Supabase. La base de datos rechaza los traslapes. */
 export async function crearCita(datos: DatosNuevaCita): Promise<{ id: number | null; error: string | null }> {
-  const { inicio, fin } = rangoIso(datos.fecha, datos.hora, datos.duracionConsulta)
+  let rango: { inicio: string; fin: string }
+  try {
+    rango = rangoIso(datos.fecha, datos.hora, datos.duracionConsulta)
+  } catch {
+    return { id: null, error: 'El horario seleccionado no es válido. Vuelve a elegirlo.' }
+  }
+  const { inicio, fin } = rango
   const supabase = createClient()
 
   const { data, error } = await supabase

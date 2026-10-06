@@ -1,9 +1,22 @@
 import { KeyRound, LifeBuoy, LogOut, Settings, User, Wrench } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export const fechaEncabezado = 'Martes, 24 de septiembre de 2024'
+/**
+ * Fecha y saludo de la barra superior.
+ *
+ * Antes eran constantes fijas ('Martes, 24 de septiembre de 2024' y 'Buenos
+ * días'), así que el encabezado mostraba una fecha de 2024 aunque el resumen de
+ * abajo mostrara la correcta, y el saludo no cambiaba nunca. Ahora se calculan
+ * con la misma regla que `dashboard.tsx`.
+ */
+export function fechaEncabezado(ahora: Date): string {
+  return ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
 
-export const saludoEncabezado = 'Buenos días'
+export function saludoEncabezado(ahora: Date): string {
+  const hora = ahora.getHours()
+  return hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+}
 
 export type OpcionMenu = { etiqueta: string; icono: LucideIcon; modal: string }
 

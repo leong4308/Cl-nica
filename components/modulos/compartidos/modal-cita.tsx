@@ -93,6 +93,11 @@ export function ModalAccionCita({
 
   const titulo = accion === 'reagendar' ? 'Reagendar cita' : 'Detalle de la cita'
 
+  // Día marcado y sus horarios: el bloque de horas se pinta aparte y solo si ese
+  // día trae alguno, para que no quede una rejilla vacía bajo los días.
+  const diaElegido = dias.find((d) => d.fecha === fecha)
+  const slotsDelDia = diaElegido?.slots ?? []
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-cita-title" onMouseDown={onClose}>
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
@@ -128,21 +133,28 @@ export function ModalAccionCita({
                 <p className="mt-2 text-xs text-slate-400">Este médico no tiene horarios libres por ahora.</p>
               ) : (
                 <>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  {/* Días y horas en bloques separados, con rótulo y línea que los
+                      corta: seguidas se leían como una sola rejilla de 12 botones. */}
+                  <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Día</p>
+                  <div className="mt-1.5 grid grid-cols-3 gap-2">
                     {dias.map((dia) => (
                       <button type="button" key={dia.fecha} onClick={() => { setFecha(dia.fecha); setHora('') }} aria-pressed={fecha === dia.fecha} className={`rounded-lg border px-2 py-2 text-center text-xs ${fecha === dia.fecha ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}>
                         <span className="block font-semibold text-slate-800">{dia.etiqueta}</span>
-                        <span className="mt-0.5 block text-[11px] text-slate-500">{dia.fechaCorta}</span>
                       </button>
                     ))}
                   </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {dias.find((d) => d.fecha === fecha)?.slots.map((slot) => (
-                      <button type="button" key={slot} onClick={() => setHora(slot)} aria-pressed={hora === slot} className={`rounded-lg border px-2 py-2 text-xs font-medium ${hora === slot ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'}`}>
-                        {slot}
-                      </button>
-                    ))}
-                  </div>
+                  {slotsDelDia.length > 0 && (
+                    <div className="mt-4 border-t border-slate-200 pt-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Hora del {diaElegido?.etiqueta}</p>
+                      <div className="mt-1.5 grid grid-cols-3 gap-2">
+                        {slotsDelDia.map((slot) => (
+                          <button type="button" key={slot} onClick={() => setHora(slot)} aria-pressed={hora === slot} className={`rounded-lg border px-2 py-2 text-xs font-medium ${hora === slot ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'}`}>
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

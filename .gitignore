@@ -23,6 +23,10 @@ next-env.d.ts.tsbuildinfo
 coverage/
 .eslintcache
 
+# Playwright (traces, screenshots y .last-run.json de cada corrida)
+test-results/
+playwright-report/
+
 # Deployment
 .vercel
 

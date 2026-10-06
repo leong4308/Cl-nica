@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle, Download, Filter, Plus } from 'lucide-react'
 import { modules } from '../compartidos/data'
 import type { ClinicActions, Row } from '../compartidos/types'
@@ -18,15 +18,13 @@ export function ModulePage({ active, notify, openModal }: ClinicActions & { acti
   // Lo último pintado. Al cambiar de pestaña se resuelve contra la caché, así
   // que la tabla aparece de inmediato sin pasar por un estado vacío.
   const [datos, setDatos] = useState<DatosModulo | null>(null)
-  const versionPrevia = useRef(version)
 
-  // Al cambiar de pestaña la caché ya tiene el dato y se pinta al instante; al
-  // guardar algo sí hay que releer de Supabase para ver el dato real.
+  // Pinta al instante desde la caché, pero SIEMPRE relee de Supabase para no
+  // dejar filas viejas. Antes, si la caché tenía algo, se rendía con un `return`
+  // y la tabla se quedaba con datos viejos para siempre: al guardar una cita
+  // desde Resumen, la recarga en segundo plano apenas alcanzaba a actualizar la
+  // caché y al entrar a la pestaña ya se pintaba esa versión antigua.
   useEffect(() => {
-    const esRefresco = versionPrevia.current !== version
-    versionPrevia.current = version
-    if (!esRefresco && leerModulo(active)) return
-
     let vigente = true
     cargarModulo(active).then((resultado) => {
       if (!vigente) return

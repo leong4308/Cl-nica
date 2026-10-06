@@ -9,7 +9,15 @@ const iniciales = (nombre: string) => nombre.split(' ').filter(Boolean).slice(0,
 
 export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion, usuario }: { onAbrirMenu: () => void; onAbrirModal: (title: string) => void; onCerrarSesion: () => void; usuario: { nombre: string; rol: RolUsuario } }) {
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [ahora, setAhora] = useState(() => new Date())
   const contenedor = useRef<HTMLDivElement>(null)
+
+  // La fecha y el saludo se refrescan igual que en el resumen, para no dejar
+  // una fecha vieja clavada en la barra.
+  useEffect(() => {
+    const intervalo = window.setInterval(() => setAhora(new Date()), 60_000)
+    return () => window.clearInterval(intervalo)
+  }, [])
 
   useEffect(() => {
     if (!menuAbierto) return
@@ -33,8 +41,8 @@ export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion, usuar
       <div className="flex items-center gap-4">
         <button type="button" className="lg:hidden" onClick={onAbrirMenu} aria-label="Abrir menú"><Menu size={21} /></button>
         <div>
-          <p className="text-[11px] text-slate-400">{fechaEncabezado}</p>
-          <h1 className="text-[21px] font-bold tracking-tight">{saludoEncabezado}, {usuario.nombre.split(' ')[0]}</h1>
+          <p className="text-[11px] text-slate-400">{fechaEncabezado(ahora)}</p>
+          <h1 className="text-[21px] font-bold tracking-tight">{saludoEncabezado(ahora)}, {usuario.nombre.split(' ')[0]}</h1>
         </div>
       </div>
 
