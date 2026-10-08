@@ -6,9 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test pruebas/panel.test.mjs pruebas/supabase.test.mjs",
-    "test:unit": "node --test pruebas/panel.test.mjs",
-    "test:db": "node --test pruebas/supabase.test.mjs",
+    "test": "node --test tests/panel.test.mjs tests/supabase.test.mjs",
+    "test:unit": "node --test tests/panel.test.mjs",
+    "test:db": "node --test tests/supabase.test.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },

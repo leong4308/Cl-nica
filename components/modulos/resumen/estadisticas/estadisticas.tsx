@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { dashboardStats } from '../../compartidos/data'
+import { dashboardStats } from './stats-iniciales'
 import { Stat } from '../../compartidos/ui'
 import { cargarResumenEstadisticas } from '@/lib/supabase/datos'
 import { leerEstadisticas } from '@/lib/supabase/cache-modulos'

@@ -1,3 +1,6 @@
 export { ModalNuevaCita } from './modal-nueva-cita'
+export { BotonNuevaCita } from './boton-nueva-cita'
+export { BotonCancelarCita } from './cancelar-cita/boton-cancelar-cita'
+export { BotonGuardarCita } from './guardar-cita/boton-guardar-cita'
 export { BuscadorPacienteCita } from './buscador-paciente-cita'
 export { SelectorCita } from './selector-cita'

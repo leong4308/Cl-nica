@@ -1,3 +1,7 @@
 export { AccionesRapidas } from './acciones-rapidas'
+export { BotonBuscarPaciente } from './buscar-paciente'
+export { BotonNuevaCita } from './nueva-cita'
+export { BotonRegistrarPaciente } from './registrar-paciente'
+export { BotonVerResultadosPendientes } from './ver-resultados-pendientes'
 export { ModalBuscarPaciente } from './buscar-paciente'
 export { ModalNuevaCita } from './nueva-cita'

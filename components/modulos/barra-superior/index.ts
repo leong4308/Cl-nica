@@ -1,2 +1,5 @@
 export { BarraSuperior } from './barra-superior'
 export { fechaEncabezado, saludoEncabezado } from './datos-encabezado'
+export { BotonNotificaciones } from './notificaciones'
+export { BotonAbrirMenu } from './abrir-menu'
+export { BotonAvatarMenu, BotonCerrarSesion, BotonOpcionMenu } from './menu-usuario'

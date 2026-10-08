@@ -16,6 +16,6 @@
  *      (app/page.tsx) y despacharlo desde el bloque de modales.
  *
  * No confundir con "Nuevo paciente", que es la acción del módulo Pacientes
- * (components/modulos/compartidos/data.ts) y abre otra cosa.
+ * (`citas/configuracion-modulos.ts` → `Pacientes.action`) y abre otra cosa.
  */
-export {}
+export { BotonRegistrarPaciente } from './boton-registrar-paciente'

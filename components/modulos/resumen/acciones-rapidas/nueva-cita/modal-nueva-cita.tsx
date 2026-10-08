@@ -12,6 +12,8 @@ import {
 } from '@/lib/supabase/datos'
 import { actualizarAgendaEnCache, leerCacheCita } from '@/lib/supabase/cache-cita'
 import { ModalMarco } from '../../../compartidos/modal-marco'
+import { BotonCancelarCita } from './cancelar-cita/boton-cancelar-cita'
+import { BotonGuardarCita } from './guardar-cita/boton-guardar-cita'
 import { BuscadorPacienteCita } from './buscador-paciente-cita'
 import { SelectorCita } from './selector-cita'
 
@@ -176,22 +178,8 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
       onClose={onClose}
       footer={
         <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={guardandoCita}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={confirmarCita}
-            disabled={!puedeGuardarCita}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {guardandoCita ? 'Guardando…' : 'Guardar'}
-          </button>
+          <BotonCancelarCita deshabilitado={guardandoCita} onCancelar={onClose} />
+          <BotonGuardarCita deshabilitado={!puedeGuardarCita} guardando={guardandoCita} onGuardar={confirmarCita} />
         </div>
       }
       aviso={

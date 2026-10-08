@@ -1,7 +1,10 @@
 'use client'
 
-import { HeartPulse, X } from 'lucide-react'
-import { insigniasMenu, itemsAdministracion, navItems } from './items-menu'
+import { HeartPulse } from 'lucide-react'
+import { insigniasMenu, itemsAdministracion, navItems } from './navegacion/items-menu'
+import { BotonAdminLateral } from './admin-lateral/boton-admin-lateral'
+import { BotonCerrarBarra } from './cerrar-barra/boton-cerrar-barra'
+import { BotonNavLateral } from './nav-lateral/boton-nav-lateral'
 
 type BarraLateralProps = {
   activo: string
@@ -17,18 +20,18 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
       <div className="flex h-[82px] items-center gap-3 border-b border-slate-100 px-7">
         <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white"><HeartPulse size={23} /></div>
         <div><b className="text-[17px] tracking-tight">Clínica Nova</b><p className="text-[10px] font-medium tracking-widest text-slate-400">SISTEMA MÉDICO</p></div>
-        <button type="button" className="ml-auto lg:hidden" onClick={onCerrar} aria-label="Cerrar"><X size={18} /></button>
+        <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
 
       <nav className="flex flex-col gap-1 px-4 pt-7">
         <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Menú principal</p>
-        {navItems.map(([label, Icon]) => <button type="button" key={label} onClick={() => onNavegar(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium ${activo === label ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}><Icon size={18} strokeWidth={1.8} /><span className="flex-1">{label}</span>{insigniasMenu[label] && <small className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px]">{insigniasMenu[label]}</small>}</button>)}
+        {navItems.map(([label, Icon]) => <BotonNavLateral key={label} etiqueta={label} Icono={Icon} activo={activo === label} insignia={insigniasMenu[label]} onNavegar={onNavegar} />)}
       </nav>
 
       <div className="mt-8 px-4">
         <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Administración</p>
         <div className="flex flex-col gap-1">
-          {itemsAdministracion.filter((item) => !item.soloAdmin || esAdmin).map(({ label, icono: Icono }) => <button type="button" key={label} onClick={() => onAbrirModal(label)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-500 hover:bg-slate-50"><Icono size={18} />{label}</button>)}
+          {itemsAdministracion.filter((item) => !item.soloAdmin || esAdmin).map(({ label, icono: Icono }) => <BotonAdminLateral key={label} etiqueta={label} Icono={Icono} onAbrirModal={onAbrirModal} />)}
         </div>
       </div>
     </aside>

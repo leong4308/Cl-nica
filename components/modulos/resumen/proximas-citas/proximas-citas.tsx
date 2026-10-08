@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, Clock3 } from 'lucide-react'
 import type { ClinicActions } from '../../compartidos/types'
-import { RowActions } from '../../compartidos/ui'
+import { BotonVerAgendaCompleta } from './ver-agenda-completa'
+import { BotonActuales } from './actuales'
+import { BotonPendientes } from './pendientes'
+import { BotonReagendar } from './reagendar'
+import { AccionesCitaFila } from './acciones-fila'
 import { cargarCitasPanel, type CitaPanel } from '@/lib/supabase/datos'
 import { guardarPanel, leerPanel } from '@/lib/supabase/cache-modulos'
 
@@ -54,6 +58,41 @@ const FILTROS = [
 ] as const satisfies ReadonlyArray<{ etiqueta: string; estado: EstadoPanel }>
 
 type Filtro = (typeof FILTROS)[number]['etiqueta']
+
+/**
+ * Botones de filtro de pestaña del panel.
+ *
+ * Viven en `proximas-citas/filtros/` porque es donde se pintan: cambian el
+ * `filtroActivo` local, no navegan ni abren modal.
+ */
+function BotonesFiltros({
+  filtroActivo, alElegir, cuenta,
+}: {
+  filtroActivo: Filtro
+  alElegir: (filtro: Filtro) => void
+  cuenta: (estado: EstadoPanel) => number
+}) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 pb-1">
+      <BotonActuales
+        total={cuenta('Confirmada')}
+        activo={filtroActivo === 'Actuales'}
+        onElegir={() => alElegir('Actuales')}
+      />
+      <BotonPendientes
+        total={cuenta('Pendiente')}
+        activo={filtroActivo === 'Pendientes'}
+        onElegir={() => alElegir('Pendientes')}
+      />
+      <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />
+      <BotonReagendar
+        total={cuenta('Reagendar')}
+        activo={filtroActivo === 'Reagendar'}
+        onElegir={() => alElegir('Reagendar')}
+      />
+    </div>
+  )
+}
 
 type PropsPanel = ClinicActions & {
   ahora: Date
@@ -168,37 +207,10 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
             <h3 className="text-sm font-bold">Próximas citas y check-in</h3>
             <p className="mt-0.5 text-xs text-slate-400">Hoy, {hoyLegible} · próximas y check-in</p>
           </div>
-          <button type="button" onClick={() => navigate('Citas')} className="hidden text-xs font-semibold text-blue-600 sm:block">
-            Ver agenda completa →
-          </button>
+          <BotonVerAgendaCompleta onVerAgenda={() => navigate('Citas')} />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 pb-1">
-          {FILTROS.filter((item) => item.etiqueta !== 'Reagendar').map((item) => (
-            <button
-              type="button"
-              key={item.etiqueta}
-              onClick={() => setFiltroActivo(item.etiqueta)}
-              aria-pressed={filtroActivo === item.etiqueta}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${filtroActivo === item.etiqueta
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-            >
-              {item.etiqueta} ({cuenta(item.estado)})
-            </button>
-          ))}
-          <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />
-          <button
-            type="button"
-            onClick={() => setFiltroActivo('Reagendar')}
-            aria-pressed={filtroActivo === 'Reagendar'}
-            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${filtroActivo === 'Reagendar' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'
-              }`}
-          >
-            Reagendar ({cuenta('Reagendar')})
-          </button>
-        </div>
+        <BotonesFiltros filtroActivo={filtroActivo} alElegir={setFiltroActivo} cuenta={cuenta} />
       </div>
 
       <div>
@@ -243,28 +255,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
                           Esperando check-in
                         </span>
                       )}
-                      <RowActions
-                        onView={() => onAccion(cita, 'detalle')}
-                        {...(muestraAcciones ? { onEdit: () => onAccion(cita, 'reagendar') } : {})}
-                      />
-                      {muestraAcciones && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onAccion(cita, 'detalle')}
-                            className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
-                          >
-                            Confirmar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onAccion(cita, 'reagendar')}
-                            className="rounded-md bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-100"
-                          >
-                            Reagendar
-                          </button>
-                        </>
-                      )}
+                      <AccionesCitaFila cita={cita} muestraAcciones={muestraAcciones} onAccion={onAccion} />
                     </div>
                   </div>
                 )

@@ -16,6 +16,6 @@
  *      (app/page.tsx) y despacharlo desde el bloque de modales.
  *
  * Referencia del módulo del que salen los datos:
- * components/modulos/compartidos/data.ts → `Laboratorio`.
+ * components/modulos/citas/configuracion-modulos.ts → entrada `Laboratorio`.
  */
-export {}
+export { BotonVerResultadosPendientes } from './boton-ver-resultados-pendientes'

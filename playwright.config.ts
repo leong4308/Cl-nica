@@ -10,7 +10,7 @@ import { defineConfig, devices } from '@playwright/test'
  * que ya existen en Supabase (ver components/login/login-form.tsx).
  */
 export default defineConfig({
-  testDir: './pruebas/e2e',
+  testDir: './tests/e2e',
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

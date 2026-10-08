@@ -1,16 +1,25 @@
 'use client'
 
-import { Plus, Search } from 'lucide-react'
-import { quickLinks } from '../../compartidos/data'
 import type { ClinicActions } from '../../compartidos/types'
-import { ActionButton } from '../../compartidos/ui'
+import { BotonBuscarPaciente } from './buscar-paciente'
+import { BotonNuevaCita } from './nueva-cita'
+import { BotonRegistrarPaciente } from './registrar-paciente'
+import { BotonVerResultadosPendientes } from './ver-resultados-pendientes'
 
+/**
+ * Los 4 botones de acciones rápidas, cada uno desde su carpeta:
+ *  - `Buscar paciente` → `buscar-paciente/`
+ *  - `Nueva cita`      → `nueva-cita/`
+ *  - `Registrar paciente` → `registrar-paciente/`
+ *  - `Ver resultados pendientes` → `ver-resultados-pendientes/`
+ */
 export function AccionesRapidas({ openModal }: ClinicActions) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <ActionButton icon={Search} onClick={() => openModal('Buscar paciente')}>Buscar paciente</ActionButton>
-      <ActionButton primary icon={Plus} onClick={() => openModal('Nueva cita')}>Nueva cita</ActionButton>
-      {quickLinks.slice(0, 3).map((item) => <button type="button" key={item} onClick={() => openModal(item)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">{item}</button>)}
+      <BotonBuscarPaciente onAbrirModal={openModal} />
+      <BotonNuevaCita onAbrirModal={openModal} />
+      <BotonRegistrarPaciente onAbrirModal={openModal} />
+      <BotonVerResultadosPendientes onAbrirModal={openModal} />
     </div>
   )
 }

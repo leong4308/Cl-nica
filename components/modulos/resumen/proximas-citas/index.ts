@@ -1,1 +1,8 @@
 export { ProximasCitas } from './proximas-citas'
+export { BotonVerAgendaCompleta } from './ver-agenda-completa'
+export { BotonActuales } from './actuales'
+export { BotonPendientes } from './pendientes'
+export { BotonReagendar } from './reagendar'
+export { AccionesCitaFila, BotonConfirmarFila, BotonReagendarFila } from './acciones-fila'
+export { BotonAccionDetalle } from './detalle-cita'
+export { BotonesDiaReagenda, BotonesHoraReagenda, BotonCancelarReagenda, BotonGuardarReagenda } from './reagendar-cita'

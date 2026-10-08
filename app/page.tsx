@@ -1,17 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
 import { Dashboard } from '@/components/modulos/resumen/dashboard'
 import { ModulePage } from '@/components/modulos/citas/module-page'
 import { BarraLateral } from '@/components/modulos/barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
+import { BotonCerrarAviso, BotonCerrarMenu } from './botones-pagina'
 import { cargarPerfilSesion, cerrarSesion } from '@/lib/supabase/sesion'
-import { ETIQUETA_ROL, type RolUsuario } from '@/lib/supabase/tipos-rol'
-import { ModalUsuarios } from '@/components/modulos/compartidos/modal-usuarios'
+import { type RolUsuario } from '@/lib/supabase/tipos-rol'
+import { ModalUsuarios } from '@/components/modulos/barra-lateral/usuarios'
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
-import { ModalAccionCita, type AccionCita } from '@/components/modulos/compartidos/modal-cita'
+import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/proximas-citas/modal-accion-cita'
 import { LoginForm } from '@/components/login/login-form'
 import {
   actualizarEstadoCita,
@@ -91,7 +91,7 @@ const openModal = (title: string) => {
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] text-slate-900">
-      {menuOpen && <button type="button" aria-label="Cerrar menú" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden" />}
+      {menuOpen && <BotonCerrarMenu onCerrar={() => setMenuOpen(false)} />}
 
       <BarraLateral
         activo={active}
@@ -126,12 +126,12 @@ const openModal = (title: string) => {
       {notice && (
         <div role="status" className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-xl">
           {notice}
-          <button type="button" onClick={() => setNotice('')} aria-label="Cerrar aviso"><X size={14} /></button>
+          <BotonCerrarAviso onCerrar={() => setNotice('')} />
         </div>
       )}
 
       {/* Cada modal vive en la carpeta de su botón; el de Usuarios, que se abre
-          desde el menú, sigue en compartidos. */}
+          desde el menú, vive en barra-lateral/usuarios. */}
       {modal === 'Nueva cita' && (
         <ModalNuevaCita
           onClose={() => setModal(null)}
