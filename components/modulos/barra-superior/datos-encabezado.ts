@@ -1,14 +1,6 @@
 import { KeyRound, LifeBuoy, LogOut, Settings, User, Wrench } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-/**
- * Fecha y saludo de la barra superior.
- *
- * Antes eran constantes fijas ('Martes, 24 de septiembre de 2024' y 'Buenos
- * días'), así que el encabezado mostraba una fecha de 2024 aunque el resumen de
- * abajo mostrara la correcta, y el saludo no cambiaba nunca. Ahora se calculan
- * con la misma regla que `dashboard.tsx`.
- */
 export function fechaEncabezado(ahora: Date): string {
   return ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }

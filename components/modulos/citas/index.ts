@@ -1,2 +1,11 @@
 export const citasModule = { name: 'Citas', routeKey: 'Citas' } as const
 export { ModulePage as CitasPage } from './module-page'
+export { ModalDetalleCita } from './detalle'
+export { ModalEditarCita } from './editar'
+export { ModalConfirmarEliminacion } from './confirmar-eliminacion'
+export { BotonNuevaCitaModulo } from './nueva-cita'
+export { BotonExportarModulo } from './exportar'
+export { BotonFiltrarModulo } from './filtrar'
+export { BotonAccionModulo } from './boton-accion'
+export { AccionesFilaModulo } from './acciones-fila'
+export { Status } from './estado'

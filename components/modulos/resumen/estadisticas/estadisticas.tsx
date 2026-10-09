@@ -7,8 +7,6 @@ import { cargarResumenEstadisticas } from '@/lib/supabase/datos'
 import { leerEstadisticas } from '@/lib/supabase/cache-modulos'
 
 export function Estadisticas() {
-  // Los conteos llegan precargados: los indicadores muestran su valor real en el
-  // primer render, en vez de "Cargando".
   const [estadisticas, setEstadisticas] = useState(() => {
     const valores = leerEstadisticas()
     return valores

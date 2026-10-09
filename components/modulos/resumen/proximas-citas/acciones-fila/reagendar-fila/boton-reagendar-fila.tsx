@@ -1,9 +1,3 @@
-/**
- * Botón "Reagendar" por fila del panel.
- *
- * Vive en `proximas-citas/acciones-fila/reagendar-fila/`: abre el modal de
- * acciones, que vive en `proximas-citas/modal-accion-cita.tsx`.
- */
 export function BotonReagendarFila({ onReagendar }: { onReagendar: () => void }) {
   return (
     <button

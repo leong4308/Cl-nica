@@ -1,9 +1,3 @@
-/**
- * Botón "Actuales (n)" del panel de próximas citas.
- *
- * Vive en `proximas-citas/actuales/`: cambia el filtro local con
- * `onElegir`, no abre modal.
- */
 export function BotonActuales({
   total, activo, onElegir,
 }: {

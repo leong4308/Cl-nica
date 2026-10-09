@@ -1,6 +1,3 @@
--- Clínica Nova · Esquema completo de base de datos para Supabase
--- Idempotente: puede ejecutarse más de una vez sin borrar datos.
-
 create extension if not exists btree_gist;
 
 do $$ begin create type public.rol_usuario as enum ('admin','medico','recepcionista','paciente','enfermero'); exception when duplicate_object then null; end $$;
@@ -173,7 +170,6 @@ create table if not exists public.solicitudes_analisis (
   observaciones text
 );
 
--- Índices principales
 create index if not exists idx_usuarios_auth_user_id on public.usuarios(auth_user_id);
 create index if not exists idx_citas_paciente_id on public.citas(paciente_id);
 create index if not exists idx_citas_medico_inicio on public.citas(medico_id, inicio);
@@ -184,7 +180,6 @@ create index if not exists idx_episodios_internacion on public.episodios_medicos
 create index if not exists idx_ordenes_episodio on public.ordenes_medicas(episodio_id);
 create index if not exists idx_solicitudes_orden on public.solicitudes_analisis(orden_medica_id);
 
--- Seguridad RLS
 alter table public.usuarios enable row level security;
 alter table public.clinicas enable row level security;
 alter table public.perfiles_medicos enable row level security;
@@ -225,7 +220,6 @@ create policy citas_authenticated_update on public.citas for update to authentic
 drop policy if exists catalogo_authenticated_select on public.catalogo_analisis;
 create policy catalogo_authenticated_select on public.catalogo_analisis for select to authenticated using (true);
 
--- Verificación rápida
 select table_name
 from information_schema.tables
 where table_schema = 'public'
@@ -236,3 +230,4 @@ where table_schema = 'public'
     'catalogo_analisis','solicitudes_analisis'
   )
 order by table_name;
+

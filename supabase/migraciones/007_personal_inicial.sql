@@ -1,4 +1,3 @@
--- ─── Médicos ───
 insert into public.usuarios (correo, nombre_completo, rol, telefono)
 values
   ('medico1@clinicanova.com', 'Dra. Ana López Martínez',    'medico', '555-1001'),
@@ -28,7 +27,6 @@ where m.esta_activo = true
   and m.id not in (select medico_id from public.agenda_medicos)
 on conflict (medico_id, dia_semana, hora_inicio) do nothing;
 
--- ─── Enfermeros ───
 insert into public.usuarios (correo, nombre_completo, rol, telefono)
 values
   ('enfermero1@clinicanova.com', 'Luis Fernando Ortiz',    'enfermero', '555-2001'),
@@ -47,7 +45,6 @@ where u.correo in (
 )
 on conflict do nothing;
 
--- ─── Recepcionistas ───
 insert into public.usuarios (correo, nombre_completo, rol, telefono)
 values
   ('recepcion1@clinicanova.com', 'Claudia Beatriz Núñez',   'recepcionista', '555-3001'),
@@ -57,7 +54,6 @@ values
   ('recepcion5@clinicanova.com', 'Lucía Alejandra Ponce',  'recepcionista', '555-3005')
 on conflict (correo) do nothing;
 
--- ─── Pacientes ───
 insert into public.usuarios (correo, nombre_completo, rol, telefono)
 values
   ('paciente1@demo.com', 'María Fernanda Ruiz',      'paciente', '555-4001'),
@@ -79,7 +75,6 @@ join (values
 ) as v(correo, nac, gen, tel) on v.correo = u.correo
 on conflict (usuario_id) do nothing;
 
--- ─── Verificación ───
 select rol, count(*) as total
 from public.usuarios
 where esta_activo = true

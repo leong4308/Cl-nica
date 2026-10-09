@@ -2,13 +2,6 @@
 
 import type { CitaPanel } from '@/lib/supabase/datos'
 
-/**
- * Botón de acción del modal "Detalle de la cita".
- *
- * Vive en `proximas-citas/detalle-cita/` porque solo se usa en la vista de
- * detalle del modal de acciones (`modal-accion-cita.tsx`): Confirmar /
- * Registrar asistencia / No asistió / Cancelar cita.
- */
 export function BotonAccionDetalle({
   etiqueta, color, cargando, onClick,
 }: {

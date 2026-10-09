@@ -1,11 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 
-/**
- * Botón "Cerrar sesión" del menú de usuario.
- *
- * Vive en `barra-superior/menu-usuario/cerrar-sesion/`: cierra la sesión,
- * no abre modal.
- */
 export function BotonCerrarSesion({
   etiqueta, Icono, onSalir,
 }: {

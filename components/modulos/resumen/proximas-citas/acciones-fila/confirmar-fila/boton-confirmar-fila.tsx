@@ -1,9 +1,3 @@
-/**
- * Botón "Confirmar" por fila del panel (pestaña Reagendar).
- *
- * Vive en `proximas-citas/acciones-fila/confirmar-fila/` junto a
- * `AccionesCitaFila`, que lo pinta solo en la pestaña "Reagendar".
- */
 export function BotonConfirmarFila({ onConfirmar }: { onConfirmar: () => void }) {
   return (
     <button

@@ -19,24 +19,10 @@ import { SelectorCita } from './selector-cita'
 
 type PropsModalNuevaCita = {
   onClose: () => void
-  /** Entrega el resumen de la cita creada para que `app/page.tsx` lo notifique. */
   onSave: (value: string) => void
 }
 
-/**
- * Modal de "Nueva cita": paciente + médico + día + hora.
- *
- * Todo lo que alimenta a este modal vive en esta misma carpeta
- * (`acciones-rapidas/nueva-cita/`), salvo `ModalMarco`, que es la carcasa que
- * comparten todos los modales de la app.
- *
- * Los horarios que se pintan salen de `lib/supabase/datos.ts` a partir de la
- * agenda del médico en `agenda_medicos` (2 ventanas de tarde, 14 huecos de
- * 25 min por día).
- */
 export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
-  // La caché se lee de forma síncrona durante el render: si los datos ya
-  // estaban precargados al entrar a la app, el modal aparece completo de una.
   const cacheInicial = leerCacheCita()
   const medicoInicial = cacheInicial?.medicos[0]?.id ?? null
   const agendaInicial =
@@ -53,15 +39,9 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
   const [citaError, setCitaError] = useState('')
   const [cargandoCita, setCargandoCita] = useState(!cacheInicial)
   const [cargandoAgenda, setCargandoAgenda] = useState(false)
-  // Con la caché llena el modal se dibuja desde el primer render; sin ella
-  // espera a que termine la carga, para no aparecer a medias.
   const [citaLista, setCitaLista] = useState(cacheInicial !== null)
-  // Guardar es un estado aparte de "cargar": si se reutilizara `cargandoCita`, el
-  // modal se quedaría sin campos mientras corre la escritura y saltaría el aviso
-  // de "Falta elegir la fecha y la hora" aunque ya estuviera todo elegido.
   const [guardandoCita, setGuardandoCita] = useState(false)
 
-  // Carga inicial: médicos, pacientes y clínica. Solo si no vinieron en caché.
   useEffect(() => {
     if (cacheInicial) return
     let vigente = true
@@ -75,14 +55,11 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
         setMedicoId((anterior) => anterior ?? medicosResult.filas[0]?.id ?? null)
         setCitaError(medicosResult.error ?? '')
         setCargandoCita(false)
-        // Sin médicos no hay agenda que cargar: liberamos el modal para que sí
-        // aparezca y muestre el aviso de que no hay médicos registrados.
         if (medicosResult.filas.length === 0) setCitaLista(true)
       })
     return () => { vigente = false }
   }, [cacheInicial])
 
-  /** Cambia de médico usando la caché si la tiene; si no, la pide a Supabase. */
   const cambiarMedico = (nuevoId: number) => {
     setMedicoId(nuevoId)
     setHorarioSeleccionado('')
@@ -108,7 +85,6 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
     })
   }
 
-  // Agenda inicial cuando no había caché (el resto ya lo resuelve `cambiarMedico`).
   useEffect(() => {
     if (medicoId === null) return
     if (leerCacheCita()?.agendas[medicoId]) return
@@ -125,7 +101,6 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
     })
     return () => { vigente = false }
   }, [medicoId, medicos])
-
 
   const medicoSeleccionado = medicos.find((m) => m.id === medicoId) ?? null
   const puedeGuardarCita =
@@ -152,24 +127,15 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
       return
     }
 
-    // Avisa al resto de la app para que vuelva a leer el módulo desde Supabase.
     window.dispatchEvent(new CustomEvent('datos-actualizados'))
 
-    // Cierra de inmediato: si se esperara aquí a releer la disponibilidad, el
-    // modal se quedaría abierto medio segundo sin motivo.
     onSave(`Cita #${resultado.id} · ${medicoSeleccionado.nombre} · ${fechaSeleccionada} · ${horarioSeleccionado}`)
 
-    // El horario recién usado se libera en segundo plano, solo para la caché:
-    // así el modal ya está cerrado y no se llama a setState sobre un componente
-    // desmontado.
     void cargarDisponibilidad(medicoId, medicoSeleccionado.duracionConsulta).then((frescos) => {
       actualizarAgendaEnCache(medicoId, frescos.filas, frescos.error)
     })
   }
 
-  // "Nueva cita" no se dibuja hasta tener médicos, pacientes y agenda: así
-  // aparece de una sola vez ya completo, sin parpadear estados intermedios.
-  // Va DESPUÉS de todos los hooks para no romper las Rules of Hooks.
   if (!citaLista) return null
 
   return (

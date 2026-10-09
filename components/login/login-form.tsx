@@ -11,8 +11,6 @@ interface LoginFormProps {
   onSuccess: () => void
 }
 
-/** Cuentas con las que se entra al sistema. Ambas existen en Supabase Auth,
- *  no son datos inventados en el código. */
 const CUENTA_ADMIN = 'admin@admin.com'
 const CUENTA_MEDICO = 'doc@doc.com'
 const CLAVE = '123456'

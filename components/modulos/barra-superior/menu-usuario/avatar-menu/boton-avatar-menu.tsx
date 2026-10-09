@@ -1,11 +1,5 @@
 import { ChevronDown } from 'lucide-react'
 
-/**
- * Botón del avatar que abre/cierra el menú de usuario.
- *
- * Vive en `barra-superior/menu-usuario/avatar-menu/`: alterna `menuAbierto`
- * en `barra-superior.tsx`, no abre modal.
- */
 export function BotonAvatarMenu({
   nombre, abierto, onAlternar,
 }: {

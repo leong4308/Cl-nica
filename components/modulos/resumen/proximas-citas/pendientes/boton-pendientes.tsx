@@ -1,9 +1,3 @@
-/**
- * Botón "Pendientes (n)" del panel de próximas citas.
- *
- * Vive en `proximas-citas/pendientes/`: cambia el filtro local con
- * `onElegir`, no abre modal.
- */
 export function BotonPendientes({
   total, activo, onElegir,
 }: {

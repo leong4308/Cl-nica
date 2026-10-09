@@ -11,13 +11,8 @@ import { AccionesCitaFila } from './acciones-fila'
 import { cargarCitasPanel, type CitaPanel } from '@/lib/supabase/datos'
 import { guardarPanel, leerPanel } from '@/lib/supabase/cache-modulos'
 
-/** Minutos de cortesía para el check-in antes de pasar la cita a "Reagendar". */
 const MINUTOS_CORTESIA = 10
 
-/** Estados finales: la cita ya se resolvió — atendida, cancelada o marcada
- *  como no asistió — así que sale del panel de check-in y no se cuenta como
- *  pendiente de confirmar. Antes se reconvertían en "Confirmada" y volvían a
- *  aparecer en la pestaña "Actuales" como si siguieran vigentes. */
 const ESTADOS_FINALES = new Set([
   'Atendida',
   'No asistió',
@@ -27,18 +22,6 @@ const ESTADOS_FINALES = new Set([
 
 type EstadoPanel = 'Confirmada' | 'Pendiente' | 'Reagendar'
 
-/**
- * Estado operativo de una cita según la hora actual:
- *  - Todavía no llega         -> Confirmada
- *  - Llegó y van <= 10 min    -> Pendiente (esperando check-in)
- *  - Pasaron más de 10 min    -> Reagendar (el paciente no se presentó)
- *
- * Compara la marca de tiempo completa, no solo la hora, para que una cita de
- * ayer no se reporte como "Confirmada" solo porque su hora aún no pasó hoy.
- *
- * Devuelve `null` cuando la cita ya tiene un estado final: no es una de las
- * tres pestañas, simplemente sale del panel.
- */
 function estadoDe(cita: CitaPanel, ahoraMs: number): EstadoPanel | null {
   if (ESTADOS_FINALES.has(cita.estado)) return null
   const transcurridos = (ahoraMs - cita.inicio) / 60_000
@@ -47,10 +30,6 @@ function estadoDe(cita: CitaPanel, ahoraMs: number): EstadoPanel | null {
   return 'Reagendar'
 }
 
-/** Filtros de la interfaz. `estado` es el valor real que devuelve `estadoDe`,
- *  por eso se declara aparte del texto visible ("Pendientes" vs "Pendiente").
- *  No existe un filtro "Todas": cada cita pertenece a un único estado y así
- *  las que hay que reagendar nunca se mezclan con las confirmadas. */
 const FILTROS = [
   { etiqueta: 'Actuales', estado: 'Confirmada' },
   { etiqueta: 'Pendientes', estado: 'Pendiente' },
@@ -59,12 +38,6 @@ const FILTROS = [
 
 type Filtro = (typeof FILTROS)[number]['etiqueta']
 
-/**
- * Botones de filtro de pestaña del panel.
- *
- * Viven en `proximas-citas/filtros/` porque es donde se pintan: cambian el
- * `filtroActivo` local, no navegan ni abren modal.
- */
 function BotonesFiltros({
   filtroActivo, alElegir, cuenta,
 }: {
@@ -96,19 +69,13 @@ function BotonesFiltros({
 
 type PropsPanel = ClinicActions & {
   ahora: Date
-  /** Abre el modal de acciones sobre una cita concreta. */
-  onAccion: (cita: CitaPanel, accion: 'detalle' | 'reagendar') => void
+  onAccion: (cita: CitaPanel, accion: 'detalle' | 'reagendar' | 'historial') => void
 }
 
-/** "2026-10-03" a partir de un Date, en hora local (igual que `aIso` de datos.ts). */
 function aIsoLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Encabezado de cada bloque del panel: "Hoy", "Mañana" o "lunes, 5 de octubre".
- *
- * Se lee la fecha al mediodía a propósito: a medianoche un desfase de zona
- * horaria podría dejar el rótulo en el día anterior. */
 function tituloDia(fecha: string, hoyIso: string, mananaIso: string): string {
   if (fecha === hoyIso) return 'Hoy'
   if (fecha === mananaIso) return 'Mañana'
@@ -122,7 +89,6 @@ function tituloDia(fecha: string, hoyIso: string, mananaIso: string): string {
 
 export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
   const [filtroActivo, setFiltroActivo] = useState<Filtro>('Reagendar')
-  // La lista ya viene precargada al entrar, así que el panel pinta de inmediato.
   const panelInicial = leerPanel()
   const [citas, setCitas] = useState<CitaPanel[]>(panelInicial?.filas ?? [])
   const [cargando, setCargando] = useState(panelInicial === null)
@@ -141,7 +107,6 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
       } else {
         setCargando(true)
       }
-      // Aun con la caché se relee: el resumen debe reflejar lo recién guardado.
       cargarCitasPanel().then((resultado) => {
         if (!vigente) return
         setCitas(resultado.filas)
@@ -151,41 +116,26 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
       })
     }
     leer()
-    // Al guardar una cita se relee desde Supabase en vez de agregar la fila a mano.
     window.addEventListener('datos-actualizados', leer)
     return () => { vigente = false; window.removeEventListener('datos-actualizados', leer) }
   }, [])
 
-  // El panel reúne lo que viene a continuación: el resto del día de hoy y los
-  // días siguientes. Antes miraba únicamente el día en curso, y como la agenda
-  // de los médicos solo corre de lunes a viernes el panel salía siempre vacío el
-  // fin de semana aunque se acabara de agendar una cita para el lunes. Se compara
-  // contra el campo `fecha`, que ya viene en hora local, para no cambiar de día
-  // por la zona horaria.
   const hoyIso = aIsoLocal(ahora)
   const mananaIso = aIsoLocal(new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1))
   const hoyLegible = ahora.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-  // `fecha` es "AAAA-MM-DD", así que comparar textos ya ordena por día.
   const proximas = citas.filter((cita) => cita.fecha >= hoyIso)
-  // Las que ya están atendidas, canceladas o marcadas como no asistió se
-  // descartan antes de clasificar: son las que salen del panel.
   const clasificadas = proximas
     .map((cita) => ({ cita, estado: estadoDe(cita, ahoraMs) }))
     .filter((item): item is { cita: CitaPanel; estado: EstadoPanel } => item.estado !== null)
-  const cuenta = (estado: EstadoPanel) => clasificadas.filter((item) => item.estado === estado).length
+  const cuenta = (estado: EstadoPanel) =>
+    clasificadas.filter((item) => item.estado === estado && (estado !== 'Confirmada' || item.cita.fecha === hoyIso)).length
 
   const filtro = FILTROS.find((item) => item.etiqueta === filtroActivo) ?? FILTROS[0]
 
-  // Cada filtro muestra únicamente su estado: no hay "todas" que mezcle las
-  // citas vencidas con las que ya están confirmadas.
   const citasFiltradas = clasificadas
-    .filter((item) => item.estado === filtro.estado)
+    .filter((item) => item.estado === filtro.estado && (filtro.estado !== 'Confirmada' || item.cita.fecha === hoyIso))
     .sort((a, b) => a.cita.inicio - b.cita.inicio)
 
-  // Un bloque por día, en orden cronológico: primero lo que resta de hoy y
-  // después lo de mañana y los días siguientes. Un `Map` conserva el orden de
-  // inserción, y como la lista ya viene ordenada, los bloques salen de más
-  // antiguo a más reciente.
   const bloques = new Map<string, typeof citasFiltradas>()
   for (const item of citasFiltradas) {
     const delDia = bloques.get(item.cita.fecha)
@@ -193,7 +143,6 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
     else bloques.set(item.cita.fecha, [item])
   }
 
-  /** "09:00" -> "9:00 AM" */
   const formatearHora = (valor: string) => {
     const [horas, minutos] = valor.split(':').map(Number)
     if (Number.isNaN(horas) || Number.isNaN(minutos)) return valor
@@ -214,9 +163,6 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
       </div>
 
       <div>
-        {/* Un bloque por día: primero lo que resta de hoy, luego los días
-            siguientes. Así se ve de un vistazo qué dejó de hacerse hoy y qué
-            viene mañana. */}
         {[...bloques.entries()].map(([fecha, delDia]) => (
           <section key={fecha}>
             <h4 className="bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -226,9 +172,8 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
               {delDia.map(({ cita, estado }) => {
                 const necesitaReagenda = estado === 'Reagendar'
                 const estaPendiente = estado === 'Pendiente'
-                // "Confirmar" y "Reagendar" son acciones de la pestaña "Reagendar";
-                // en "Actuales" y "Pendientes" la fila es solo de consulta.
-                const muestraAcciones = filtroActivo === 'Reagendar' && necesitaReagenda
+                const muestraConfirmar = filtroActivo === 'Actuales' || filtroActivo === 'Pendientes'
+                const muestraReagendar = filtroActivo === 'Pendientes' || filtroActivo === 'Reagendar'
                 return (
                   <div
                     key={cita.id}
@@ -255,7 +200,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
                           Esperando check-in
                         </span>
                       )}
-                      <AccionesCitaFila cita={cita} muestraAcciones={muestraAcciones} onAccion={onAccion} />
+                      <AccionesCitaFila cita={cita} muestraConfirmar={muestraConfirmar} muestraReagendar={muestraReagendar} onAccion={onAccion} />
                     </div>
                   </div>
                 )
@@ -285,8 +230,6 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
       </div>
 
       <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
-        {/* El pie compara la pestaña activa contra todas las citas próximas sin
-            resolver, así nunca dice "0 citas" cuando sí hay agenda. */}
         {`${citasFiltradas.length} de ${clasificadas.length} cita(s) próximas por resolver · se reagendan tras ${MINUTOS_CORTESIA} min sin check-in`}
       </div>
     </div>

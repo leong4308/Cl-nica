@@ -1,10 +1,3 @@
-/**
- * Botón "Guardar" del pie del modal de "Nueva cita".
- *
- * Vive en `acciones-rapidas/nueva-cita/guardar-cita/`: se pinta en
- * `modal-nueva-cita.tsx`. Valida el paciente, el médico y la hora antes
- * de escribir; si falta algo deja el aviso amarillo.
- */
 export function BotonGuardarCita({
   deshabilitado, guardando, onGuardar,
 }: {

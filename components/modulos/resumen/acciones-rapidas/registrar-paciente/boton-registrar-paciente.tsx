@@ -1,10 +1,3 @@
-/**
- * Botón "Registrar paciente" de las acciones rápidas.
- *
- * Vive en `acciones-rapidas/registrar-paciente/`.
- * Hoy abre el modal que ya no tiene (ver `index.ts` de esa carpeta), por lo
- * que pulsarlo no hace nada hasta que se implemente el modal.
- */
 export function BotonRegistrarPaciente({ onAbrirModal }: { onAbrirModal: (title: string) => void }) {
   return (
     <button

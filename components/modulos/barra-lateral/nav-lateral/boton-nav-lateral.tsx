@@ -1,12 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 
-/**
- * Botón de navegación de la barra lateral (Resumen, Citas, Pacientes…).
- *
- * Vive en `barra-lateral/botones/nav-lateral/`: la lista de etiquetas viene
- * de `barra-lateral/navegacion/items-menu.ts`, pero este `<button>` la pinta
- * (`barra-lateral.tsx`). Llama a `onNavegar(etiqueta)`.
- */
 export function BotonNavLateral({
   etiqueta, Icono, activo, insignia, onNavegar,
 }: {

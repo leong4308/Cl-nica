@@ -11,20 +11,7 @@ type PropsModalBuscarPaciente = {
   onSave: (value: string) => void
 }
 
-/**
- * Modal de "Buscar paciente": busca por nombre, identificación o teléfono y
- * resalta al elegir uno.
- *
- * Hereda un detalle del comportamiento original: NO dibuja pie con Cancelar /
- * Guardar, solo la ✕ de la cabecera y el clic fuera del recuadro cierran.
- *
- * `onSave` se mantiene en la firma por similitud con los demás modales, pero
- * hoy no se invoca: al seleccionar un paciente solo se pinta la confirmación
- * azul dentro del modal.
- */
 export function ModalBuscarPaciente({ onClose }: PropsModalBuscarPaciente) {
-  // Los pacientes vienen precargados con los módulos, así que el buscador abre
-  // con resultados ya disponibles.
   const pacientesIniciales = leerModulo('Pacientes')
   const [pacientes, setPacientes] = useState<{ nombre: string; identificacion: string; pass: string; telefono: string; estado: string }[]>(
     () => (pacientesIniciales?.filas ?? []).map((fila) => ({

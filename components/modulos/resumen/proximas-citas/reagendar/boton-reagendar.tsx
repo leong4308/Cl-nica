@@ -1,10 +1,3 @@
-/**
- * Pestaña "Reagendar (n)" del panel de próximas citas.
- *
- * Vive en `proximas-citas/reagendar/`: separada de `actuales/` y
- * `pendientes/` porque lleva el estilo rojo de alerta; marca las citas
- * que pasaron su hora sin check-in. Cambia el filtro con `onElegir`.
- */
 export function BotonReagendar({
   total, activo, onElegir,
 }: {

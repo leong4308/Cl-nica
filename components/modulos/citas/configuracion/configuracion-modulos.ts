@@ -1,17 +1,6 @@
 import { CalendarDays, ClipboardList, FileText, FlaskConical, Stethoscope, UsersRound, Bed } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-/**
- * Configuración de la página de módulos: título, descripción, columnas y el
- * rótulo del botón principal de cada módulo (`action`).
- *
- * Estaba en `compartidos/data.ts` junto con las tarjetas del dashboard y los
- * enlaces rápidos; aquí vive con `module-page.tsx`, que es el único que lo lee.
- *
- * `action` es el que se le pasa a `openModal` desde el botón principal de la
- * tabla. Hoy solo `'Nueva cita'` tiene formulario: los demás (`Nuevo paciente`,
- * `Registrar médico`…) quedan fuera de `MODALES_CON_FORMULARIO` y no abren nada.
- */
 export type ModuleConfig = {
   icon: LucideIcon
   eyebrow: string

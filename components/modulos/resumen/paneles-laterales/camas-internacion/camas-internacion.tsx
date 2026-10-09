@@ -4,17 +4,9 @@ import { useEffect, useState } from 'react'
 import { Bed } from 'lucide-react'
 import { cargarResumenCamas } from '@/lib/supabase/datos'
 import { leerCamas } from '@/lib/supabase/cache-modulos'
-import { BotonVerCamas } from './boton-ver-camas'
+import { BotonVerCamas } from './ver-camas-internaciones'
 
-/**
- * Panel "Camas e internación" del resumen.
- *
- * Vive en `paneles-laterales/camas-internacion/` con su botón
- * "Ver camas e internaciones →" (`boton-ver-camas.tsx`), que navega al
- * módulo Internación. Solo lo consume `resumen/dashboard.tsx`.
- */
 export function CamasInternacion({ onVerCamas }: { onVerCamas: () => void }) {
-  // También precargado: la ocupación se ve en el primer render.
   const [camasResumen, setCamasResumen] = useState(() => leerCamas() ?? { ocupadas: 0, total: 0, libres: 0 })
 
   useEffect(() => {

@@ -7,15 +7,7 @@ import { leerMedicosTurno } from '@/lib/supabase/cache-modulos'
 
 type MedicoEnTurno = { nombre: string; especialidad: string; estado: string }
 
-/**
- * Panel "Médicos en turno" del resumen.
- *
- * Vive en `paneles-laterales/medicos-en-turno/` porque es donde se pinta:
- * no es compartido, solo lo consume `resumen/dashboard.tsx`. No tiene
- * botones: es solo lectura desde Supabase.
- */
 export function MedicosEnTurno() {
-  // Viene precargado, así que el panel no arranca vacío.
   const [doctoresEnTurno, setDoctoresEnTurno] = useState<MedicoEnTurno[]>(() => leerMedicosTurno() ?? [])
 
   useEffect(() => {

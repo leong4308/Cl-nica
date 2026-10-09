@@ -6,17 +6,6 @@ import { BotonCancelarUsuarios } from './cancelar-usuarios/boton-cancelar-usuari
 import { BotonGuardarUsuarios } from './guardar-usuarios/boton-guardar-usuarios'
 import { BotonCrearUsuario } from './crear-usuario/boton-crear-usuario'
 
-/**
- * Modal de Usuarios: alta de cuentas de acceso desde la barra lateral.
- *
- * NO es una de las 4 acciones rápidas del dashboard, por eso vive en
- * `compartidos/` y no en `acciones-rapidas/`.
- *
- * Nota de comportamiento heredado: el pie "Guardar" de este modal solo cierra
- * (llama a `onSave('')`). La escritura real la hace el botón "Crear usuario"
- * de `FormularioUsuario`, que corre contra `/api/admin/users`.
- */
-
 const USUARIO_VACIO = {
   nombre: '', email: '', password: '', rol: 'medico',
   especialidad: '', cedula: '', duracion: '20', fechaNacimiento: '', genero: '', telefono: '',

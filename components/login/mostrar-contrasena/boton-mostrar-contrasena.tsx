@@ -2,12 +2,6 @@
 
 import { Eye, EyeOff } from 'lucide-react'
 
-/**
- * Botón "Mostrar / Ocultar contraseña" del login.
- *
- * Vive en `login/mostrar-contrasena/` porque es donde se pinta
- * (`login-form.tsx`): alterna el tipo del campo entre `password` y `text`.
- */
 export function BotonMostrarContrasena({
   visible, onAlternar,
 }: {

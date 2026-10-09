@@ -1,9 +1,3 @@
-/**
- * Botón "Cancelar" del pie del modal de Usuarios.
- *
- * Vive en `barra-lateral/usuarios/cancelar-usuarios/`: se pinta en
- * `modal-usuarios.tsx` y solo cierra el modal.
- */
 export function BotonCancelarUsuarios({
   deshabilitado, onCancelar,
 }: {

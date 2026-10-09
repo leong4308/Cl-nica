@@ -1,10 +1,3 @@
-/**
- * Botones de hora de la vista "Reagendar cita" (uno por slot del día).
- *
- * Vive en `proximas-citas/reagendar-cita/hora-reagenda/`: se pinta en
- * `modal-accion-cita.tsx`. Eligen la hora de la agenda real del médico con
- * `onHora`; no abren otro modal. Para los días ver `dia-reagenda/`.
- */
 export function BotonesHoraReagenda({
   etiquetaDia, slots, hora, onHora,
 }: {

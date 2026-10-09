@@ -22,7 +22,6 @@ export async function POST(request: Request) {
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
 
-  // Solo un administrador puede crear cuentas de personal.
   const { data: solicitante } = await admin
     .from('usuarios')
     .select('rol')

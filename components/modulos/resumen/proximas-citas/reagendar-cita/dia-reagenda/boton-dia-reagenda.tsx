@@ -2,13 +2,6 @@
 
 import type { DiaDisponible } from '@/lib/supabase/datos'
 
-/**
- * Botones de día de la vista "Reagendar cita" (uno por día de la agenda).
- *
- * Vive en `proximas-citas/reagendar-cita/dia-reagenda/`: se pinta en
- * `modal-accion-cita.tsx`. Eligen la fecha de la agenda real del médico con
- * `onFecha`; no abren otro modal. Para las horas ver `hora-reagenda/`.
- */
 export function BotonesDiaReagenda({
   dias, fecha, onFecha,
 }: {

@@ -1,10 +1,3 @@
-/**
- * Botón "Crear usuario" del formulario de Usuarios.
- *
- * Vive en `barra-lateral/usuarios/crear-usuario/`: corre contra
- * `/api/admin/users` (no abre modal). Es quien realmente escribe el
- * usuario nuevo.
- */
 export function BotonCrearUsuario({
   guardando, onCrear,
 }: {

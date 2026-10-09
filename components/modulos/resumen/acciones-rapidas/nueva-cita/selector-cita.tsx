@@ -18,13 +18,10 @@ type PropsSelectorCita = {
   error: string
 }
 
-/** Selector de médico y horario libre. Todo viene de Supabase.
- *  El paciente se elige con `BuscadorPacienteCita`, que se muestra arriba. */
 export function SelectorCita({
   cargando, cargandoAgenda, medicos, medicoId, onMedico,
   dias, diaActual, fecha, onFecha, horario, onHorario, error,
 }: PropsSelectorCita) {
-  // Mientras carga no se muestra nada: así el modal no aparece a medias.
   if (cargando) return null
 
   if (medicos.length === 0) {
@@ -54,15 +51,10 @@ export function SelectorCita({
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
         <p className="text-xs font-semibold text-slate-700">Fechas y horarios disponibles</p>
 
-        {/* Al cambiar de médico se mantiene lo que había, atenuado y sin clics,
-            en vez de dejar el recuadro vacío mientras llega la nueva agenda. */}
         {dias.length === 0 ? (
           <p className="mt-3 text-xs text-slate-400">Este médico no tiene horarios libres por ahora.</p>
         ) : (
           <div className={cargandoAgenda ? 'pointer-events-none opacity-40 transition-opacity' : 'transition-opacity'}>
-            {/* Los días y las horas van en bloques separados, con su rótulo y una
-                línea que los corta: en dos rejillas de 3 columnas seguidas se leía
-                como una sola lista mezclada. */}
             <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Día</p>
             <div className="mt-1.5 grid grid-cols-3 gap-2">
               {dias.map((dia) => (

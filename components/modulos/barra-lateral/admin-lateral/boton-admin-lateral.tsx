@@ -1,11 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 
-/**
- * Botón de administración de la barra lateral ("Usuarios").
- *
- * Vive en `barra-lateral/botones/admin-lateral/`: llama a
- * `onAbrirModal(etiqueta)` al pulsarlo (abre el modal de Usuarios).
- */
 export function BotonAdminLateral({
   etiqueta, Icono, onAbrirModal,
 }: {

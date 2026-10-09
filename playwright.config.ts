@@ -1,14 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/**
- * Pruebas de extremo a extremo contra la app real (Next.js en producción).
- * Requieren un build previo: `pnpm build`.
- *
- *   pnpm test:e2e
- *
- * Levanta el servidor él mismo en el puerto 3210 y usa las cuentas de prueba
- * que ya existen en Supabase (ver components/login/login-form.tsx).
- */
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 45_000,

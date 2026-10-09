@@ -1,13 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 
-/**
- * Botón de opción del menú de usuario (Mi perfil, Cambiar contraseña…).
- *
- * Vive en `barra-superior/menu-usuario/opcion-menu/`: llama a
- * `onElegir(modal)`. Cada opción espera su carpeta de destino
- * (`mi-perfil/`, `cambiar-contrasena/`, `preferencias/`, `ayuda-soporte/`),
- * que hoy `openModal()` de `app/page.tsx` aún no renderiza.
- */
 export function BotonOpcionMenu({
   etiqueta, Icono, modal, onElegir,
 }: {

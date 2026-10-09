@@ -1,10 +1,3 @@
-/**
- * Botón "Guardar nueva fecha" del pie de la vista "Reagendar cita".
- *
- * Vive en `proximas-citas/reagendar-cita/guardar-reagenda/`: se pinta en
- * `modal-accion-cita.tsx`. Confirmar solo funciona si ya se eligió día y
- * hora (`deshabilitado`).
- */
 export function BotonGuardarReagenda({
   deshabilitado, onGuardar,
 }: {

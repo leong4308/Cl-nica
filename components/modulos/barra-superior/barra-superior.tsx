@@ -12,8 +12,6 @@ export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion, usuar
   const [ahora, setAhora] = useState(() => new Date())
   const contenedor = useRef<HTMLDivElement>(null)
 
-  // La fecha y el saludo se refrescan igual que en el resumen, para no dejar
-  // una fecha vieja clavada en la barra.
   useEffect(() => {
     const intervalo = window.setInterval(() => setAhora(new Date()), 60_000)
     return () => window.clearInterval(intervalo)

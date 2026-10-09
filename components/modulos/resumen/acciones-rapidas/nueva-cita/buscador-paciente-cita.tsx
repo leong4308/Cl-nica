@@ -11,11 +11,6 @@ type PropsBuscadorCita = {
   onSeleccionar: (id: number) => void
 }
 
-/**
- * Buscador de paciente para "Nueva cita".
- * A diferencia del buscador general, devuelve el `id` del paciente porque es
- * el valor que necesita `citas.paciente_id` en Supabase.
- */
 export function BuscadorPacienteCita({ pacientes, seleccionadoId, onSeleccionar }: PropsBuscadorCita) {
   const [texto, setTexto] = useState('')
   const [activo, setActivo] = useState(0)

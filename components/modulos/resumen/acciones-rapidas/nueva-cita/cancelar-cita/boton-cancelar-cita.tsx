@@ -1,9 +1,3 @@
-/**
- * Botón "Cancelar" del pie del modal de "Nueva cita".
- *
- * Vive en `acciones-rapidas/nueva-cita/cancelar-cita/`: se pinta en
- * `modal-nueva-cita.tsx` y solo cierra el modal (no guarda nada).
- */
 export function BotonCancelarCita({
   deshabilitado, onCancelar,
 }: {
