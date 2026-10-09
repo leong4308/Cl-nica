@@ -1,12 +1,3 @@
-/**
- * Pruebas de la lógica pura del panel de check-in.
- *
- * No reimplementa nada: EXTRAE las funciones reales del .tsx/.ts que se
- * despliegan, las transpila y las ejecuta. Si alguien edita `estadoDe` o
- * `tituloDia` en el componente, estas pruebas lo detectan.
- *
- * Uso: node --test tests/
- */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -14,7 +5,6 @@ import ts from 'typescript'
 
 const RAIZ = new URL('..', import.meta.url)
 
-/** Devuelve el índice justo después del paréntesis que abre en `i`. */
 function finDeParentesis(fuente, i) {
   let profundidad = 0
   for (; i < fuente.length; i++) {
@@ -27,17 +17,11 @@ function finDeParentesis(fuente, i) {
   return fuente.length
 }
 
-/**
- * Tras cerrar los parámetros de una arrow function la expresión no termina:
- * sigue el `=> { cuerpo }`. Se mira lo que hay justo después (saltando espacios)
- * para no cortar la declaración a la mitad.
- */
 function sigueExpresion(fuente, desde) {
   const resto = fuente.slice(desde).replace(/^[ \t]*/, '')
   return /^(=>|:)/.test(resto)
 }
 
-/** Salta espacios y comentarios y devuelve el índice del siguiente carácter real. */
 function siguienteToken(fuente, desde) {
   let i = desde
   for (;;) {
@@ -56,11 +40,6 @@ function siguienteToken(fuente, desde) {
   }
 }
 
-/**
- * ¿La expresión sigue después de este punto? Sin esto, `const X = new Set([`
- * se cortaría en el salto de línea y se tragaría la declaración al bloque
- * completo de `estadoDe`, `aIsoLocal` y `tituloDia`.
- */
 function continuaExpresion(fuente, desde) {
   const i = siguienteToken(fuente, desde)
   if (i === -1) return false
@@ -68,7 +47,6 @@ function continuaExpresion(fuente, desde) {
   return /^(as|satisfies|instanceof)\b/.test(fuente.slice(i, i + 12))
 }
 
-/** Devuelve el fin de una expresión que empieza en `i`, equilibrando llaves. */
 function finDeExpresion(fuente, i) {
   let profundidad = 0
   for (; i < fuente.length; i++) {
@@ -82,15 +60,6 @@ function finDeExpresion(fuente, i) {
   return fuente.length
 }
 
-/**
- * Extrae una declaración real del fuente.
- *
- * `function X(...) { ... }` se localize por sus paréntesis de parámetros: buscar
- * un `=` a partir de ahí es un error, porque el cuerpo suele traer template
- * literals (`${...}`) y el `=` aparecería dentro de ellos.
- * `const X = <expr>` sí se ancla en el `=`, y si el valor es un escalar
- * (`const X = 10`) se corta al final de la línea.
- */
 function extraer(fuente, nombre) {
   const fn = new RegExp(`function ${nombre}\\s*\\(`).exec(fuente)
   if (fn) {
@@ -110,13 +79,6 @@ function extraer(fuente, nombre) {
   throw new Error(`No se encontró la declaración de "${nombre}"`)
 }
 
-/**
- * Localiza la llave que abre el cuerpo de una función, ya pasada la lista de
- * parámetros. Ojo: el tipo de retorno puede ser un objeto, como en
- * `rangoIso(...): { inicio: string; fin: string } {`, y su llave se confunde
- * con el cuerpo. Si tras la primera llave equilibrada viene otra llave, la
- * primera era el tipo y el cuerpo es la segunda.
- */
 function cuerpoDeFuncion(fuente, desde) {
   let i = siguienteToken(fuente, desde)
   while (i !== -1 && fuente[i] !== '{' && fuente[i] !== ';') i = siguienteToken(fuente, i + 1)
@@ -126,7 +88,6 @@ function cuerpoDeFuncion(fuente, desde) {
   return fuente[k] === '{' ? k : i
 }
 
-/** Carga declaraciones reales desde un archivo del proyecto y las ejecuta. */
 function cargar(archivo, nombres) {
   const fuente = readFileSync(new URL(archivo, RAIZ), 'utf8')
   const codigo = nombres.map((n) => extraer(fuente, n)).join('\n\n')
@@ -146,14 +107,9 @@ const { horaDe, aMinutos, rangoIso, nombreDia } = cargar(
 
 const AHORA = new Date('2026-10-03T09:20:00')
 
-/**
- * CitaPanel cuyo inicio cae `minutos` respecto a AHORA.
- * Negativo = en el pasado (la cita ya empezó), positivo = en el futuro.
- */
 const cita = (minutos, estado = 'Pendiente') => ({ estado, inicio: AHORA.getTime() + minutos * 60_000 })
 const estadoEn = (minutos, estado) => estadoDe(cita(minutos, estado), AHORA.getTime())
 
-// ---------------------------------------------------------------------------
 test('estadoDe: la frontera de los 10 minutos es exacta', () => {
   assert.equal(estadoEn(60), 'Confirmada', 'una hora en el futuro es Actual')
   assert.equal(estadoEn(1), 'Confirmada', 'un minuto en el futuro sigue siendo Actual')
@@ -216,8 +172,6 @@ test('rangoIso: arma el intervalo en hora local sin corrimiento', () => {
 })
 
 test('rangoIso: rechaza horas imposibles en vez de corrumpir el día', () => {
-  // "25:00" pasaría el filtro de forma y `new Date(y, m, d, 25, 0)` se
-  // normalizaría al día siguiente: la cita se guardaría en otra fecha.
   assert.throws(() => rangoIso('2026-10-05', '25:00', 30), /no válida/)
   assert.throws(() => rangoIso('2026-10-05', '09:75', 30), /no válida/)
   assert.throws(() => rangoIso('2026-10-05', '13:00 PM', 30), /no válida/, '13 PM no es una hora válida')
@@ -235,8 +189,6 @@ test('rangoIso: acepta el formato de 12 h que muestra la interfaz', () => {
 })
 
 test('nombreDia: solo el nombre del día, sin "Hoy"/"Mañana" ni fecha', () => {
-  // 2026-10-05 es lunes. Las tarjetas del selector muestran únicamente el día
-  // real del calendario, en el orden en que lo devuelve Date.getDay().
   assert.equal(nombreDia('2026-10-05'), 'Lunes', 'lunes, 5 de octubre')
   assert.equal(nombreDia('2026-10-06'), 'Martes')
   assert.equal(nombreDia('2026-10-07'), 'Miércoles', 'la e lleva tilde')
@@ -245,12 +197,9 @@ test('nombreDia: solo el nombre del día, sin "Hoy"/"Mañana" ni fecha', () => {
   assert.equal(nombreDia('2026-10-10'), 'Sábado')
   assert.equal(nombreDia('2026-10-11'), 'Domingo', 'la semana cierra en domingo')
 
-  // Ninguna fecha puede salir como "Hoy" o "Mañana": el rótulo depende solo del
-  // calendario, no de cuándo se mire la pantalla.
   assert.equal(nombreDia('2026-10-03'), 'Sábado')
   assert.equal(nombreDia('2026-10-04'), 'Domingo')
 
-  // Siete días consecutivos = los siete nombres, sin repetir ni saltarse uno.
   const semana = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']
     .map(nombreDia)
   assert.deepEqual(semana, ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'])
@@ -269,7 +218,6 @@ test('FILTROS: sin "todas" y con los tres estados del flujo', () => {
 })
 
 test('agrupado por día: bloques cronológicos y citas ordenadas', () => {
-  // Replica el agrupado del componente para validar el contrato completo.
   const mk = (iso, h, m) => ({
     estado: 'Pendiente',
     inicio: new Date(`${iso}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`).getTime(),

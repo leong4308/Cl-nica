@@ -1,12 +1,3 @@
-/**
- * Aplica la migración 015 (jornada de tarde, 14 citas de 25 min, de lunes a domingo).
- *
- * PostgREST no permite DDL, así que en vez de correr el .sql: borra la agenda
- * anterior e inserta los bloques reales. Los `medico_id` se resuelven por nombre
- * (lo único estable entre entornos), igual que hace la migración.
- *
- * Idempotente. Uso: node tests/aplicar-horarios.mjs
- */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 
@@ -22,28 +13,10 @@ const env = Object.fromEntries(
 const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
 const salida = []
 const DIAS = [0, 1, 2, 3, 4, 5, 6]
-/** Ver supabase/migraciones/013_intervalo_25_min.sql: debe coincidir con
- *  `perfiles_medicos.duracion_consulta`. Si difieren, la pantalla ofrece
- *  horarios que se traslapan entre sí. */
 const DURACION_SLOT = 25
 
-/** Las 2 ventanas "HH:MM-HH:MM" que comparten los 6 médicos.
- *
- *  Jornada de tarde cada 25 min, de lunes a domingo, con la comida fuera:
- *
- *    13:00-14:15    3 citas   1:00 PM ... 1:50 PM
- *    15:30-20:05   11 citas   3:30 PM ... 7:40 PM
- *                               = 14 citas por médico por día
- *
- *  No se ofrece nada entre las 1:50 PM y las 3:30 PM.
- *
- *  El fin de 14:15 y el inicio de 15:30 no son arbitrarios: son los únicos que
- *  dejan fuera a las 2:15 PM y a las 3:05 PM. Ver
- *  supabase/migraciones/015_horario_continuo.sql. */
 const VENTANAS = ['13:00-14:15', '15:30-20:05']
 
-/** nombre exacto en public.usuarios.nombre_completo -> sus ventanas.
- *  Todos los médicos comparten la misma jornada. */
 const HORARIOS = {
   'Dr. Carlos Mendoza': VENTANAS,
   'Dra. Ana López Martínez': VENTANAS,
@@ -58,7 +31,6 @@ const { data: medicos, error: eMedicos } = await db
   .select('id, usuario_id, esta_activo, usuarios(nombre_completo)')
 if (eMedicos) throw eMedicos
 
-// Resuelve nombre -> id de perfiles_medicos, igual que el `join` del .sql.
 const porNombre = new Map()
 for (const m of medicos.filter((m) => m.esta_activo)) {
   const u = Array.isArray(m.usuarios) ? m.usuarios[0] : m.usuarios
