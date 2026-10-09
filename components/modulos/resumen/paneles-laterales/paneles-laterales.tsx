@@ -17,6 +17,10 @@ export function MedicosEnTurno() {
       setDoctoresEnTurno(medicos.data.map((doctor) => { const usuario = Array.isArray(doctor.usuarios) ? doctor.usuarios[0] : doctor.usuarios; return { nombre: usuario?.nombre_completo ?? 'Médico', especialidad: doctor.especialidad, estado: 'Disponible' } }))
     }
     void cargarMedicos()
+
+    const recargar = () => void cargarMedicos()
+    window.addEventListener('datos-actualizados', recargar)
+    return () => window.removeEventListener('datos-actualizados', recargar)
   }, [])
 
   return (

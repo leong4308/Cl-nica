@@ -31,6 +31,14 @@ export function Estadisticas() {
       setEstadisticas((actuales) => actuales.map((stat) => (valores[stat.label] ? { ...stat, ...valores[stat.label] } : stat)))
     }
     void cargarEstadisticas()
+
+    const recargar = () => void cargarEstadisticas()
+    window.addEventListener('cita-actualizada', recargar)
+    window.addEventListener('datos-actualizados', recargar)
+    return () => {
+      window.removeEventListener('cita-actualizada', recargar)
+      window.removeEventListener('datos-actualizados', recargar)
+    }
   }, [])
 
   return (
