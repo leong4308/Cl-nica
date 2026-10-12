@@ -1,8 +1,9 @@
-import { Bed, ClipboardList, FlaskConical, LayoutDashboard, UsersRound } from 'lucide-react'
+import { Bed, Calendar, ClipboardList, FlaskConical, LayoutDashboard, UsersRound } from 'lucide-react'
 
 export const navItemsEnfermero = [
   ['Resumen', LayoutDashboard],
   ['Pacientes', UsersRound],
+  ['Citas', Calendar],
   ['Internación', Bed],
   ['Órdenes médicas', ClipboardList],
   ['Laboratorio', FlaskConical],

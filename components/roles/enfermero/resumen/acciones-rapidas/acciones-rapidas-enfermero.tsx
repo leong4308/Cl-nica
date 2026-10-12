@@ -1,6 +1,6 @@
 'use client'
 
-import { Bed, Search, UserPlus } from 'lucide-react'
+import { Bed, CalendarPlus, Search, UserPlus } from 'lucide-react'
 import type { ClinicActions } from '@/components/modulos/compartidos/types'
 
 export function AccionesRapidasEnfermero({
@@ -16,6 +16,15 @@ export function AccionesRapidasEnfermero({
       >
         <UserPlus size={16} />
         Ingreso urgente de paciente
+      </button>
+
+      <button
+        type="button"
+        onClick={() => openModal('Nueva cita')}
+        className="inline-flex items-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-3.5 py-2.5 text-xs font-semibold text-teal-700 shadow-sm transition-all hover:bg-teal-100 active:scale-95"
+      >
+        <CalendarPlus size={16} className="text-teal-600" />
+        Nueva cita
       </button>
 
       <button
