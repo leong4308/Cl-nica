@@ -17,7 +17,11 @@ export function BotonNavLateral({
     >
       <Icono size={18} strokeWidth={1.8} />
       <span className="flex-1">{etiqueta}</span>
-      {insignia && <small className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px]">{insignia}</small>}
+      {insignia !== undefined && insignia !== '' && (
+        <small className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${activo ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+          {insignia}
+        </small>
+      )}
     </button>
   )
 }

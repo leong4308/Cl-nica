@@ -904,3 +904,21 @@ export async function eliminarCita(id: number): Promise<{ error: string | null }
   window.dispatchEvent(new CustomEvent('datos-actualizados'))
   return { error: null }
 }
+
+export async function cargarInsigniasMenu(): Promise<Record<string, string>> {
+  const supabase = createClient()
+  const [citasRes, internacionesRes, camasRes] = await Promise.all([
+    supabase.from('citas').select('id', { count: 'exact', head: true }),
+    supabase.from('internaciones').select('id', { count: 'exact', head: true }).eq('estado', 'activa'),
+    supabase.from('camas').select('id', { count: 'exact', head: true }).eq('esta_ocupada', true),
+  ])
+
+  const totalCitas = citasRes.count ?? 0
+  const totalInternaciones = (internacionesRes.count ?? 0) || (camasRes.count ?? 0)
+
+  return {
+    Citas: String(totalCitas),
+    Internación: String(totalInternaciones),
+  }
+}
+

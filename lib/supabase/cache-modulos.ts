@@ -1,5 +1,6 @@
 import {
   cargarCitasPanel,
+  cargarInsigniasMenu,
   cargarMedicosTurno,
   cargarModulo,
   cargarResumenCamas,
@@ -28,6 +29,7 @@ let panel: ResultadoPanel | null = null
 let estadisticas: EstadisticasResumen | null = null
 let medicosTurno: MedicoTurno[] | null = null
 let camas: ResumenCamas | null = null
+let insignias: Record<string, string> = {}
 let contadorGeneracion = 0
 
 export function leerModulo(nombre: string): ResultadoModulo | null {
@@ -45,6 +47,13 @@ export function leerMedicosTurno(): MedicoTurno[] | null {
 export function leerCamas(): ResumenCamas | null {
   return camas
 }
+export function leerInsignias(): Record<string, string> {
+  return insignias
+}
+
+export function guardarInsignias(nuevas: Record<string, string>): void {
+  insignias = { ...insignias, ...nuevas }
+}
 
 export function guardarModulo(nombre: string, filas: ResultadoModulo['filas'], error: string | null): void {
   if (error) return
@@ -60,12 +69,13 @@ export function precargarModulos(): Promise<void> {
   const generacion = ++contadorGeneracion
 
   return (async () => {
-    const [resultadosModulos, panelRes, estadisticasRes, medicosRes, camasRes] = await Promise.all([
+    const [resultadosModulos, panelRes, estadisticasRes, medicosRes, camasRes, insigniasRes] = await Promise.all([
       Promise.all(NOMBRES_MODULOS.map(async (nombre) => [nombre, await cargarModulo(nombre)] as const)),
       cargarCitasPanel(),
       cargarResumenEstadisticas(),
       cargarMedicosTurno(),
       cargarResumenCamas(),
+      cargarInsigniasMenu(),
     ])
 
     if (generacion !== contadorGeneracion) return
@@ -77,5 +87,7 @@ export function precargarModulos(): Promise<void> {
     if (!estadisticasRes.error) estadisticas = estadisticasRes.filas
     if (!medicosRes.error) medicosTurno = medicosRes.filas
     if (!camasRes.error) camas = camasRes.filas
+    insignias = insigniasRes
   })().catch(() => undefined)
 }
+
