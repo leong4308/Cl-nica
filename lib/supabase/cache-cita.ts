@@ -3,6 +3,7 @@ import {
   cargarDisponibilidad,
   cargarMedicosAgenda,
   cargarPacientesParaCita,
+  filtrarDiasVigentes,
   type DiaDisponible,
   type MedicoAgenda,
 } from './datos'
@@ -18,7 +19,16 @@ let cache: CacheCita | null = null
 let enCurso: Promise<void> | null = null
 
 export function leerCacheCita(): CacheCita | null {
-  return cache
+  if (!cache) return null
+  return {
+    ...cache,
+    agendas: Object.fromEntries(
+      Object.entries(cache.agendas).map(([id, ag]) => [
+        Number(id),
+        { ...ag, filas: filtrarDiasVigentes(ag.filas) },
+      ]),
+    ),
+  }
 }
 
 export function precargarCita(): Promise<void> {
@@ -56,7 +66,12 @@ export function precargarCita(): Promise<void> {
 export function leerAgendaEnCache(
   medicoId: number,
 ): { filas: DiaDisponible[]; error: string | null } | null {
-  return cache?.agendas[medicoId] ?? null
+  const guardada = cache?.agendas[medicoId]
+  if (!guardada) return null
+  return {
+    ...guardada,
+    filas: filtrarDiasVigentes(guardada.filas),
+  }
 }
 
 export function actualizarAgendaEnCache(
@@ -67,3 +82,23 @@ export function actualizarAgendaEnCache(
   if (!cache) return
   cache = { ...cache, agendas: { ...cache.agendas, [medicoId]: { filas, error } } }
 }
+
+export function ocuparSlotEnCache(medicoId: number, fecha: string, slot: string): void {
+  if (!cache?.agendas[medicoId]) return
+  const agenda = cache.agendas[medicoId]
+  const nuevasFilas = agenda.filas
+    .map((dia) => {
+      if (dia.fecha !== fecha) return dia
+      return {
+        ...dia,
+        slots: dia.slots.filter((s) => s !== slot),
+      }
+    })
+    .filter((dia) => dia.slots.length > 0)
+
+  cache.agendas[medicoId] = {
+    ...agenda,
+    filas: nuevasFilas,
+  }
+}
+

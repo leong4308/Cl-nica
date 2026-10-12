@@ -10,7 +10,7 @@ import {
   type DiaDisponible,
   type MedicoAgenda,
 } from '@/lib/supabase/datos'
-import { actualizarAgendaEnCache, leerCacheCita } from '@/lib/supabase/cache-cita'
+import { actualizarAgendaEnCache, leerCacheCita, ocuparSlotEnCache } from '@/lib/supabase/cache-cita'
 import { ModalMarco } from '../../../compartidos/modal-marco'
 import { BotonCancelarCita } from './cancelar-cita/boton-cancelar-cita'
 import { BotonGuardarCita } from './guardar-cita/boton-guardar-cita'
@@ -126,6 +126,17 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
       setCitaError(resultado.error)
       return
     }
+
+    ocuparSlotEnCache(medicoId, fechaSeleccionada, horarioSeleccionado)
+    setDisponibilidad((prev) =>
+      prev
+        .map((dia) =>
+          dia.fecha === fechaSeleccionada
+            ? { ...dia, slots: dia.slots.filter((s) => s !== horarioSeleccionado) }
+            : dia,
+        )
+        .filter((dia) => dia.slots.length > 0),
+    )
 
     window.dispatchEvent(new CustomEvent('datos-actualizados'))
 

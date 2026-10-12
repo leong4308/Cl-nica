@@ -11,7 +11,7 @@ import {
   type DiaDisponible,
   type HistorialPaciente,
 } from '@/lib/supabase/datos'
-import { actualizarAgendaEnCache, leerAgendaEnCache } from '@/lib/supabase/cache-cita'
+import { actualizarAgendaEnCache, leerAgendaEnCache, ocuparSlotEnCache } from '@/lib/supabase/cache-cita'
 import { BotonAccionDetalle } from './detalle-cita'
 import { BotonCerrarModal } from './cerrar-modal'
 import { BotonesDiaReagenda, BotonesHoraReagenda, BotonCancelarReagenda, BotonGuardarReagenda } from './reagendar-cita'
@@ -137,6 +137,9 @@ export function ModalAccionCita({
     }
     const ok = await ejecutar('reagendar', async (c) => {
       const resultado = await reagendarCita(c.id, c.medicoId, c.duracionConsulta, fecha, hora)
+      if (!resultado.error) {
+        ocuparSlotEnCache(c.medicoId, fecha, hora)
+      }
       return resultado.error
     })
     if (ok) onClose()

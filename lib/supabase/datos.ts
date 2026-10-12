@@ -145,6 +145,9 @@ export async function reagendarCita(
     return { error: 'El horario seleccionado no es válido. Vuelve a elegirlo.' }
   }
   const { inicio, fin } = rango
+  if (new Date(inicio).getTime() <= Date.now()) {
+    return { error: 'No se puede reagendar una cita a un horario que ya transcurrió.' }
+  }
   const { error } = await createClient()
     .from('citas')
     .update({ inicio, fin, estado: 'confirmada' })
@@ -470,6 +473,7 @@ export type DiaDisponible = {
 }
 
 const NOMBRE_DIA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 function fechaLocal(iso: string): Date {
   const [anio, mes, dia] = iso.split('-').map(Number)
@@ -478,6 +482,48 @@ function fechaLocal(iso: string): Date {
 
 function nombreDia(fecha: string): string {
   return NOMBRE_DIA[fechaLocal(fecha).getDay()]
+}
+
+export function formatearEtiquetaDia(fecha: string): string {
+  const [anio, mes, dia] = fecha.split('-').map(Number)
+  const d = new Date(anio, mes - 1, dia)
+  const diaSem = NOMBRE_DIA[d.getDay()]
+  const mesNom = MESES_CORTOS[mes - 1]
+
+  const hoy = new Date()
+  const fechaHoy = aIso(hoy)
+
+  const maniana = new Date(hoy)
+  maniana.setDate(hoy.getDate() + 1)
+  const fechaManiana = aIso(maniana)
+
+  if (fecha === fechaHoy) {
+    return `Hoy (${dia} ${mesNom})`
+  }
+  if (fecha === fechaManiana) {
+    return `Mañana (${dia} ${mesNom})`
+  }
+  return `${diaSem} ${dia} ${mesNom}`
+}
+
+export function filtrarDiasVigentes(dias: DiaDisponible[]): DiaDisponible[] {
+  const ahora = new Date()
+  const fechaHoy = aIso(ahora)
+
+  return dias
+    .map((dia) => {
+      if (dia.fecha !== fechaHoy) return dia
+      const slotsVigentes = dia.slots.filter((slot) => {
+        const min = aMinutos(slot)
+        if (Number.isNaN(min)) return false
+        const h = Math.floor(min / 60)
+        const m = min % 60
+        const slotFecha = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), h, m)
+        return slotFecha.getTime() > ahora.getTime()
+      })
+      return { ...dia, slots: slotsVigentes }
+    })
+    .filter((dia) => dia.slots.length > 0)
 }
 
 function aIso(d: Date): string {
@@ -585,8 +631,12 @@ export async function cargarDisponibilidad(
     ventana.push(aIso(dia))
   }
 
-  const desde = `${ventana[0]}T00:00:00`
-  const hasta = `${ventana[ventana.length - 1]}T23:59:59`
+  const dInicio = fechaLocal(ventana[0])
+  dInicio.setHours(0, 0, 0, 0)
+  const dFin = fechaLocal(ventana[ventana.length - 1])
+  dFin.setHours(23, 59, 59, 999)
+  const desde = dInicio.toISOString()
+  const hasta = dFin.toISOString()
   const ocupadas = await consultar<{ inicio: string; fin: string }>(
     supabase
       .from('citas')
@@ -625,17 +675,17 @@ export async function cargarDisponibilidad(
 
     const filtrados = fecha === aIso(hoy)
       ? slots.filter((slot) => {
-        const [texto, periodo] = slot.split(' ')
-        const [h, m] = texto.split(':').map(Number)
-        let horas = h % 12
-        if (periodo === 'PM' && h !== 12) horas += 12
-        return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), horas, m) > new Date()
+        const minutosSlot = aMinutos(slot)
+        if (Number.isNaN(minutosSlot)) return false
+        const horas = Math.floor(minutosSlot / 60)
+        const minutos = minutosSlot % 60
+        return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), horas, minutos) > new Date()
       })
       : slots
 
     if (filtrados.length === 0) continue
 
-    filas.push({ fecha, etiqueta: nombreDia(fecha), slots: filtrados })
+    filas.push({ fecha, etiqueta: formatearEtiquetaDia(fecha), slots: filtrados })
   }
 
   return { filas, error: null }
@@ -682,6 +732,9 @@ export async function crearCita(datos: DatosNuevaCita): Promise<{ id: number | n
     return { id: null, error: 'El horario seleccionado no es válido. Vuelve a elegirlo.' }
   }
   const { inicio, fin } = rango
+  if (new Date(inicio).getTime() <= Date.now()) {
+    return { id: null, error: 'No se puede agendar una cita en un horario que ya transcurrió.' }
+  }
   const supabase = createClient()
 
   const { data, error } = await supabase
@@ -814,6 +867,9 @@ export async function actualizarCita(
     return { error: 'La fecha u hora seleccionadas no son válidas.' }
   }
   const { inicio, fin } = rango
+  if (new Date(inicio).getTime() <= Date.now()) {
+    return { error: 'No se puede reagendar una cita a un horario que ya transcurrió.' }
+  }
   const supabase = createClient()
   const { error } = await supabase
     .from('citas')

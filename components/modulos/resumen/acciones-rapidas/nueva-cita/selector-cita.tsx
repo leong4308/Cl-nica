@@ -77,7 +77,7 @@ export function SelectorCita({
             {!!diaActual?.slots.length && (
               <div className="mt-4 border-t border-slate-200 pt-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Hora del {diaActual.etiqueta}
+                  Horarios disponibles ({diaActual.etiqueta})
                 </p>
                 <div className="mt-1.5 grid grid-cols-3 gap-2">
                   {diaActual.slots.map((slot) => (
