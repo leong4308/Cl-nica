@@ -7,7 +7,19 @@ import { BotonNotificaciones } from './notificaciones'
 import { BotonAbrirMenu } from './abrir-menu'
 import { BotonAvatarMenu, BotonOpcionMenu, BotonCerrarSesion } from './menu-usuario'
 
-export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion, usuario }: { onAbrirMenu: () => void; onAbrirModal: (title: string) => void; onCerrarSesion: () => void; usuario: { nombre: string; rol: RolUsuario } }) {
+export function BarraSuperior({
+  onAbrirMenu,
+  onAbrirModal,
+  onCerrarSesion,
+  usuario,
+  onCambiarVistaRol,
+}: {
+  onAbrirMenu: () => void
+  onAbrirModal: (title: string) => void
+  onCerrarSesion: () => void
+  usuario: { nombre: string; rol: RolUsuario }
+  onCambiarVistaRol?: (nuevoRol: RolUsuario) => void
+}) {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [ahora, setAhora] = useState(() => new Date())
   const contenedor = useRef<HTMLDivElement>(null)
@@ -55,12 +67,39 @@ export function BarraSuperior({ onAbrirMenu, onAbrirModal, onCerrarSesion, usuar
             <div role="menu" className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
               <div className="border-b border-slate-100 px-4 py-2.5">
                 <b className="block truncate text-[13px] text-slate-800">{usuario.nombre}</b>
-                <span className="text-[11px] text-slate-400">{ETIQUETA_ROL[usuario.rol]}</span>
+                <span className="text-[11px] font-semibold text-blue-600">{ETIQUETA_ROL[usuario.rol]}</span>
               </div>
 
               {opcionesMenuUsuario.map(({ etiqueta, icono: Icono, modal }) => (
                 <BotonOpcionMenu key={etiqueta} etiqueta={etiqueta} Icono={Icono} modal={modal} onElegir={elegirOpcion} />
               ))}
+
+              {onCambiarVistaRol && (
+                <div className="border-t border-slate-100 px-3 py-2 bg-slate-50/70">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Vista previa de rol
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {(['admin', 'recepcionista', 'enfermero'] as RolUsuario[]).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setMenuAbierto(false)
+                          onCambiarVistaRol(r)
+                        }}
+                        className={`text-left text-xs px-2 py-1 rounded-md font-medium transition-colors ${
+                          usuario.rol === r
+                            ? 'bg-blue-600 text-white font-semibold'
+                            : 'text-slate-600 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        {ETIQUETA_ROL[r]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="my-1 border-t border-slate-100" />
 

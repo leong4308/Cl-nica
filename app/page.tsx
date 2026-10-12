@@ -11,6 +11,7 @@ import { type RolUsuario } from '@/lib/supabase/tipos-rol'
 import { ModalUsuarios } from '@/components/modulos/barra-lateral/usuarios'
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
+import { ModalRegistrarPaciente } from '@/components/modulos/resumen/acciones-rapidas/registrar-paciente'
 import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/proximas-citas/modal-accion-cita'
 import { LoginForm } from '@/components/login/login-form'
 import {
@@ -23,6 +24,8 @@ import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
+import { InterfazRecepcionista } from '@/components/roles/recepcionista'
+import { InterfazEnfermero } from '@/components/roles/enfermero'
 
 type CitaEnEdicion = { cita: CitaPanel; accion: AccionCita } | null
 
@@ -49,7 +52,7 @@ export default function Page() {
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita']
+const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente']
 const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar']
 
 const openModal = (title: string) => {
@@ -97,6 +100,39 @@ const openModal = (title: string) => {
     return <LoginForm onSuccess={async () => { setPerfil(await cargarPerfilSesion()); setAuthenticated(true) }} />
   }
 
+  const handleCerrarSesion = async () => {
+    await cerrarSesion()
+    setAuthenticated(false)
+    setMenuOpen(false)
+    setModal(null)
+    setCitaAbierta(null)
+  }
+
+  const handleCambiarVistaRol = (nuevoRol: RolUsuario) => {
+    setPerfil((prev) => ({ ...prev, rol: nuevoRol }))
+    setActive('Resumen')
+  }
+
+  if (perfil.rol === 'recepcionista') {
+    return (
+      <InterfazRecepcionista
+        usuario={perfil}
+        onCerrarSesion={handleCerrarSesion}
+        onCambiarVistaRol={handleCambiarVistaRol}
+      />
+    )
+  }
+
+  if (perfil.rol === 'enfermero') {
+    return (
+      <InterfazEnfermero
+        usuario={perfil}
+        onCerrarSesion={handleCerrarSesion}
+        onCambiarVistaRol={handleCambiarVistaRol}
+      />
+    )
+  }
+
   return (
     <main className="min-h-screen bg-[#f7f9fc] text-slate-900">
       {menuOpen && <BotonCerrarMenu onCerrar={() => setMenuOpen(false)} />}
@@ -114,14 +150,9 @@ const openModal = (title: string) => {
         <BarraSuperior
           onAbrirMenu={() => setMenuOpen(true)}
           onAbrirModal={openModal}
-          onCerrarSesion={async () => {
-            await cerrarSesion()
-            setAuthenticated(false)
-            setMenuOpen(false)
-            setModal(null)
-            setCitaAbierta(null)
-          }}
+          onCerrarSesion={handleCerrarSesion}
           usuario={perfil}
+          onCambiarVistaRol={handleCambiarVistaRol}
         />
 
         <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-9">
@@ -155,6 +186,15 @@ const openModal = (title: string) => {
           citaId={Number(modal.split(': ')[1])}
           onClose={() => setModal(null)}
           onConfirm={() => onEliminarCita(Number(modal.split(': ')[1]))}
+        />
+      )}
+      {(modal === 'Registrar paciente' || modal === 'Nuevo paciente') && (
+        <ModalRegistrarPaciente
+          onClose={() => setModal(null)}
+          onSave={(nombre) => {
+            notify(`Paciente "${nombre}" registrado correctamente`)
+            setModal(null)
+          }}
         />
       )}
       {modal === 'Buscar paciente' && (

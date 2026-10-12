@@ -11,13 +11,18 @@ interface LoginFormProps {
   onSuccess: () => void
 }
 
-const CUENTA_ADMIN = 'admin@admin.com'
-const CUENTA_MEDICO = 'doc@doc.com'
+const CUENTAS_DEMO = [
+  { rol: 'Administrador', correo: 'admin@admin.com' },
+  { rol: 'Médico', correo: 'doc@doc.com' },
+  { rol: 'Recepcionista', correo: 'recepcion1@clinicanova.com' },
+  { rol: 'Enfermero', correo: 'enfermero1@clinicanova.com' },
+] as const
+
 const CLAVE = '123456'
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState(CUENTA_ADMIN)
+  const [email, setEmail] = useState<string>(CUENTAS_DEMO[0].correo)
   const [password, setPassword] = useState(CLAVE)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -58,7 +63,39 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <div className="flex size-11 items-center justify-center rounded-2xl bg-[#1a56db] text-white shadow-sm"><HeartPulse size={22} /></div>
           <div><p className="text-lg font-semibold tracking-tight">Clínica Nova</p><p className="text-[10px] font-medium tracking-[.18em] text-[#64748b]">SISTEMA MÉDICO</p></div>
         </div>
-        <div className="mb-8"><p className="mb-2 text-sm font-medium text-[#0e9f6e]">Bienvenido de nuevo</p><h2 className="text-3xl font-semibold tracking-tight text-[#0b1b33]">Inicia sesión</h2><p className="mt-2 text-sm text-[#64748b]">Accede a tu panel de gestión clínica.</p><div className="mt-5 rounded-xl border border-[#c9d8f5] bg-[#e8f0ff] px-4 py-3 text-xs text-[#344054]"><p>Administrador: <span className="font-medium">{CUENTA_ADMIN}</span></p><p className="mt-1">Médico: <span className="font-medium">{CUENTA_MEDICO}</span></p><p>Contraseña: <span className="font-medium">{CLAVE}</span></p><p className="mt-2 text-[11px] text-[#64748b]">El resto del personal se registra desde el módulo Usuarios.</p></div></div>
+        <div className="mb-8">
+          <p className="mb-2 text-sm font-medium text-[#0e9f6e]">Bienvenido de nuevo</p>
+          <h2 className="text-3xl font-semibold tracking-tight text-[#0b1b33]">Inicia sesión</h2>
+          <p className="mt-2 text-sm text-[#64748b]">Accede a tu panel de gestión clínica.</p>
+
+          <div className="mt-5 rounded-xl border border-[#c9d8f5] bg-[#e8f0ff] p-3.5 text-xs text-[#344054]">
+            <p className="font-semibold text-blue-900 mb-2">Credenciales demo de acceso:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {CUENTAS_DEMO.map((c) => (
+                <button
+                  key={c.correo}
+                  type="button"
+                  onClick={() => {
+                    setEmail(c.correo)
+                    setPassword(CLAVE)
+                    setError('')
+                  }}
+                  className={`text-left p-2 rounded-lg border transition-colors ${
+                    email === c.correo
+                      ? 'border-blue-500 bg-blue-100/80 text-blue-900 font-semibold shadow-xs'
+                      : 'border-blue-200/60 bg-white/80 hover:bg-white text-slate-700'
+                  }`}
+                >
+                  <p className="text-[10px] uppercase font-bold text-blue-600">{c.rol}</p>
+                  <p className="truncate text-[11px] font-mono mt-0.5">{c.correo}</p>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2.5 text-[11px] text-[#475467]">
+              Contraseña única: <span className="font-mono font-semibold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-blue-200">{CLAVE}</span> (Haz clic en cualquiera para auto-completar).
+            </p>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <label className="flex flex-col gap-2 text-sm font-medium text-[#344054]">Correo electrónico<div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748b]" size={18} /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nombre@clinicanova.com" className="h-12 w-full rounded-xl border border-[#d6e0ef] bg-[#f8fbff] pl-11 pr-4 outline-none transition focus:border-[#1a56db] focus:ring-4 focus:ring-[#1a56db]/10" /></div></label>
