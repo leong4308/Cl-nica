@@ -6,7 +6,6 @@ import { modules } from './configuracion'
 import type { ClinicActions, Row } from '../compartidos/types'
 import { Stat } from '../compartidos/ui'
 import { Status } from './estado'
-import { BotonFiltrarModulo } from './filtrar'
 import { BotonExportarModulo } from './exportar'
 import { AccionesFilaModulo } from './acciones-fila'
 import { BotonNuevaCitaModulo } from './nueva-cita'
@@ -92,15 +91,18 @@ export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicA
           <h2 className="text-[27px] font-bold tracking-tight">{config.title}</h2>
           <p className="mt-1 text-sm text-slate-400">{config.description}</p>
         </div>
-        <div className="flex gap-2">
-          <BotonFiltrarModulo modulo={active} onAbrirModal={openModal} />
-          {botonPrincipal}
-        </div>
+        {botonPrincipal && (
+          <div className="flex gap-2">
+            {botonPrincipal}
+          </div>
+        )}
       </div>
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Stat icon={Icon} label="Registros totales" value={cargando ? '—' : String(filas.length)} meta="Desde Supabase" tone="blue" />
-        <Stat icon={Icon} label="Estado de conexión" value={error ? 'Error' : 'Activo'} meta={error ? 'Revisa tus políticas RLS' : 'Consulta en vivo'} tone={error ? 'orange' : 'green'} />
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Stat icon={Icon} label="Registros totales" value={cargando ? '—' : String(filas.length)} meta="Total en el sistema" tone="blue" />
+        {active !== 'Citas' && (
+          <Stat icon={Icon} label="Estado de conexión" value={error ? 'Error' : 'Activo'} meta={error ? 'Revisa tus políticas RLS' : 'Consulta en vivo'} tone={error ? 'orange' : 'green'} />
+        )}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -134,7 +136,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicA
                 </button>
               )}
             </div>
-            <BotonExportarModulo modulo={active} onAvisar={notify} />
+            <BotonExportarModulo modulo={active} filas={filasFiltradas} onAvisar={notify} />
           </div>
         </div>
 
