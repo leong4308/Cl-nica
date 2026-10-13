@@ -144,6 +144,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
   }
 
   const formatearHora = (valor: string) => {
+    if (/am|pm/i.test(valor)) return valor
     const [horas, minutos] = valor.split(':').map(Number)
     if (Number.isNaN(horas) || Number.isNaN(minutos)) return valor
     return `${horas % 12 || 12}:${String(minutos).padStart(2, '0')} ${horas >= 12 ? 'PM' : 'AM'}`

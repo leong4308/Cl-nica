@@ -156,9 +156,9 @@ test('formatearHora: 12 h con AM/PM correctos', () => {
   assert.equal(formatearHora('—'), '—', 'un valor inválido se devuelve tal cual')
 })
 
-test('horaDe (datos.ts): formato 24 h parseable', () => {
+test('horaDe (datos.ts): formato 12 h con AM/PM', () => {
   const h = horaDe('2026-10-03T15:30:00')
-  assert.match(h, /^\d{2}:\d{2}$/, `debe ser HH:MM sin AM/PM, llegó "${h}"`)
+  assert.equal(h, '3:30 PM')
 })
 
 test('rangoIso: arma el intervalo en hora local sin corrimiento', () => {

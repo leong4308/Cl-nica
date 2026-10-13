@@ -15,7 +15,19 @@ const nombreDe = (relacion: unknown): string => {
   return valor.nombre_completo ?? '—'
 }
 
-const horaDe = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+export function horaDe(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    let h = d.getHours()
+    const m = d.getMinutes().toString().padStart(2, '0')
+    const periodo = h >= 12 ? 'PM' : 'AM'
+    const hora12 = h % 12 === 0 ? 12 : h % 12
+    return `${hora12}:${m} ${periodo}`
+  } catch {
+    return ''
+  }
+}
 const fechaDe = (iso: string) => new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
 
 const ETIQUETA_ESTADO_CITA: Record<string, string> = {

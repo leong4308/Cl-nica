@@ -9,6 +9,7 @@ export type CitaExportar = {
 }
 
 function formatoHora12(horaStr: string, inicioIso?: string): string {
+  if (/am|pm/i.test(horaStr)) return horaStr
   if (inicioIso) {
     try {
       const d = new Date(inicioIso)
@@ -27,7 +28,7 @@ function formatoHora12(horaStr: string, inicioIso?: string): string {
   const partes = horaStr.split(':')
   if (partes.length === 2) {
     let h = parseInt(partes[0], 10)
-    const m = partes[1]
+    const m = partes[1].slice(0, 2)
     if (!isNaN(h)) {
       const ampm = h >= 12 ? 'PM' : 'AM'
       h = h % 12
