@@ -94,6 +94,7 @@ const openModal = (title: string) => {
     navigate,
     addAppointment: (appointment: string[]) => window.dispatchEvent(new CustomEvent('cita-creada', { detail: appointment })),
     onAccion: (cita: CitaPanel, accion: AccionCita) => setCitaAbierta({ cita, accion }),
+    rol: perfil.rol,
   }
 
   if (!authenticated) {

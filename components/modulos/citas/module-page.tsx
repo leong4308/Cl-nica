@@ -16,7 +16,7 @@ import { guardarModulo, leerModulo } from '@/lib/supabase/cache-modulos'
 
 type DatosModulo = { modulo: string; filas: Row[]; error: string | null }
 
-export function ModulePage({ active, notify, openModal }: ClinicActions & { active: string }) {
+export function ModulePage({ active, notify, openModal, rol }: ClinicActions & { active: string }) {
   const [version, setVersion] = useState(0)
   const config = modules[active]
 
@@ -46,9 +46,14 @@ export function ModulePage({ active, notify, openModal }: ClinicActions & { acti
   if (!config) return null
   const Icon = config.icon
 
-  const botonPrincipal = config.action === 'Nueva cita'
-    ? <BotonNuevaCitaModulo onAbrirModal={openModal} />
-    : <BotonAccionModulo etiqueta={config.action} onAbrirModal={openModal} />
+  const esMedico = rol === 'medico'
+  const accionOcultaParaMedico = esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')
+
+  const botonPrincipal = accionOcultaParaMedico
+    ? null
+    : config.action === 'Nueva cita'
+      ? <BotonNuevaCitaModulo onAbrirModal={openModal} />
+      : <BotonAccionModulo etiqueta={config.action} onAbrirModal={openModal} />
   return (
     <section>
       <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
