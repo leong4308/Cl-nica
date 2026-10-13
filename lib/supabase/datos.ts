@@ -430,7 +430,7 @@ export async function cargarResumenEstadisticas(): Promise<{
     supabase.from('citas').select('id', { count: 'exact', head: true })
       .gte('inicio', inicioDelDia.toISOString()).lt('inicio', finDelDia.toISOString()),
     supabase.from('perfiles_pacientes').select('id', { count: 'exact', head: true }).eq('esta_activo', true),
-    supabase.from('camas').select('id', { count: 'exact', head: true }),
+    supabase.from('camas').select('id', { count: 'exact', head: true }).eq('esta_ocupada', true),
     supabase.from('ordenes_medicas').select('id', { count: 'exact', head: true }).in('estado', ['prescrita', 'en_proceso']),
   ])
 
@@ -440,7 +440,7 @@ export async function cargarResumenEstadisticas(): Promise<{
       'Citas de hoy': { value: String(citas.count ?? 0), meta: 'Datos en tiempo real' },
       'Pacientes activos': { value: (pacientes.count ?? 0).toLocaleString('es-MX'), meta: 'Pacientes activos' },
       'Camas ocupadas': { value: String(camas.count ?? 0), meta: 'Ocupación actual' },
-      'Órdenes pendientes': { value: String(ordenes.count ?? 0).padStart(2, '0'), meta: 'Requieren atención' },
+      'Órdenes pendientes': { value: String(ordenes.count ?? 0), meta: 'Requieren atención' },
     },
   }
 }

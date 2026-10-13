@@ -219,7 +219,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
         {!cargando && !error && citasFiltradas.length === 0 && (
           <div className="px-5 py-10 text-center text-sm text-slate-400">
             {citas.length === 0
-              ? 'No hay citas registradas en la base de datos.'
+              ? 'No hay citas programadas para hoy ni los próximos días.'
               : proximas.length === 0
                 ? `No hay citas a partir de hoy (${hoyLegible}).`
                 : clasificadas.length === 0

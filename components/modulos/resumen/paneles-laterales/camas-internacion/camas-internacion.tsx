@@ -32,7 +32,10 @@ export function CamasInternacion({ onVerCamas }: { onVerCamas: () => void }) {
       </div>
       <div className="mt-4 flex items-end justify-between">
         <div><p className="text-2xl font-bold">{camasResumen.ocupadas} <span className="text-sm font-normal text-slate-400">/ {camasResumen.total}</span></p><p className="text-xs text-slate-500">{porcentaje}% de ocupación</p></div>
-        <div className="text-right text-xs"><p className="font-semibold text-emerald-600">{camasResumen.libres} libres</p><p className="text-slate-400">1 UCI libre</p></div>
+        <div className="text-right text-xs">
+          <p className="font-semibold text-emerald-600">{camasResumen.libres} libres</p>
+          <p className="text-slate-400">{camasResumen.total > 0 ? `${camasResumen.ocupadas} en uso` : 'Sin camas registradas'}</p>
+        </div>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${porcentaje}%` }} /></div>
       <BotonVerCamas onVerCamas={onVerCamas} />

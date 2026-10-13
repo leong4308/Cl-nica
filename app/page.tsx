@@ -12,6 +12,7 @@ import { ModalUsuarios } from '@/components/modulos/barra-lateral/usuarios'
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
 import { ModalRegistrarPaciente } from '@/components/modulos/resumen/acciones-rapidas/registrar-paciente'
+import { ModalResultadosPendientes } from '@/components/modulos/resumen/acciones-rapidas/ver-resultados-pendientes/modal-resultados-pendientes'
 import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/proximas-citas/modal-accion-cita'
 import { LoginForm } from '@/components/login/login-form'
 import {
@@ -52,7 +53,7 @@ export default function Page() {
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente']
+const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente', 'Ver resultados pendientes']
 const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar']
 
 const openModal = (title: string) => {
@@ -209,6 +210,9 @@ const openModal = (title: string) => {
           onClose={() => setModal(null)}
           onSave={(value) => { notify(value ? 'Usuarios guardado correctamente' : 'Usuarios listo para completar'); setModal(null) }}
         />
+      )}
+      {modal === 'Ver resultados pendientes' && (
+        <ModalResultadosPendientes onClose={() => setModal(null)} />
       )}
 
       {citaAbierta && (
