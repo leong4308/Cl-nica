@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { ModalMarco, CAMPO, ETIQUETA } from '../../../compartidos/modal-marco'
+import { ModalMarco } from '../../../compartidos/modal-marco'
+import {
+  CamposPaciente,
+  DATOS_PACIENTE_INICIALES,
+  payloadPaciente,
+  type DatosPacienteFormulario,
+} from '../../../compartidos/campos-paciente'
 
 type PropsModalRegistrarPaciente = {
   onClose: () => void
@@ -9,20 +15,20 @@ type PropsModalRegistrarPaciente = {
 }
 
 export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarPaciente) {
-  const [nombre, setNombre] = useState('')
-  const [correo, setCorreo] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [fechaNacimiento, setFechaNacimiento] = useState('')
-  const [genero, setGenero] = useState('M')
-  const [contactoEmergencia, setContactoEmergencia] = useState('')
-  const [telefonoEmergencia, setTelefonoEmergencia] = useState('')
-  const [notasMedicas, setNotasMedicas] = useState('')
+  const [datos, setDatos] = useState<DatosPacienteFormulario>(DATOS_PACIENTE_INICIALES)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const actualizarCampo = <K extends keyof DatosPacienteFormulario>(
+    campo: K,
+    valor: DatosPacienteFormulario[K],
+  ) => {
+    setDatos((prev) => ({ ...prev, [campo]: valor }))
+  }
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!nombre.trim()) {
+    if (!datos.nombre.trim()) {
       setError('El nombre completo es obligatorio.')
       return
     }
@@ -33,16 +39,7 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
       const response = await fetch('/api/pacientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: nombre.trim(),
-          correo: correo.trim() || undefined,
-          telefono: telefono.trim() || undefined,
-          fechaNacimiento: fechaNacimiento || undefined,
-          genero,
-          contactoEmergencia: contactoEmergencia.trim() || undefined,
-          telefonoEmergencia: telefonoEmergencia.trim() || undefined,
-          notasMedicas: notasMedicas.trim() || undefined,
-        }),
+        body: JSON.stringify(payloadPaciente(datos)),
       })
 
       const data = await response.json()
@@ -51,7 +48,7 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
       }
 
       window.dispatchEvent(new Event('datos-actualizados'))
-      onSave(data.nombre || nombre)
+      onSave(data.nombre || datos.nombre)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error inesperado al guardar.')
     } finally {
@@ -91,123 +88,14 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
         ) : null
       }
     >
-      <form id="form-registrar-paciente" onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div>
-          <label htmlFor="paciente-nombre" className={ETIQUETA}>
-            Nombre completo <span className="text-rose-500">*</span>
-          </label>
-          <input
-            id="paciente-nombre"
-            type="text"
-            required
-            placeholder="Ej. Juan Pérez González"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            className={CAMPO}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor="paciente-correo" className={ETIQUETA}>
-              Correo electrónico
-            </label>
-            <input
-              id="paciente-correo"
-              type="email"
-              placeholder="juan@ejemplo.com"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              className={CAMPO}
-            />
-          </div>
-          <div>
-            <label htmlFor="paciente-tel" className={ETIQUETA}>
-              Teléfono
-            </label>
-            <input
-              id="paciente-tel"
-              type="tel"
-              placeholder="55 1234 5678"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className={CAMPO}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor="paciente-fecha-nac" className={ETIQUETA}>
-              Fecha de nacimiento
-            </label>
-            <input
-              id="paciente-fecha-nac"
-              type="date"
-              value={fechaNacimiento}
-              onChange={(e) => setFechaNacimiento(e.target.value)}
-              className={CAMPO}
-            />
-          </div>
-          <div>
-            <label htmlFor="paciente-genero" className={ETIQUETA}>
-              Género
-            </label>
-            <select
-              id="paciente-genero"
-              value={genero}
-              onChange={(e) => setGenero(e.target.value)}
-              className={CAMPO}
-            >
-              <option value="M">Masculino</option>
-              <option value="F">Femenino</option>
-              <option value="O">Otro</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor="paciente-contacto-emergencia" className={ETIQUETA}>
-              Contacto de emergencia
-            </label>
-            <input
-              id="paciente-contacto-emergencia"
-              type="text"
-              placeholder="Nombre de familiar"
-              value={contactoEmergencia}
-              onChange={(e) => setContactoEmergencia(e.target.value)}
-              className={CAMPO}
-            />
-          </div>
-          <div>
-            <label htmlFor="paciente-tel-emergencia" className={ETIQUETA}>
-              Tel. emergencia
-            </label>
-            <input
-              id="paciente-tel-emergencia"
-              type="tel"
-              placeholder="55 9876 5432"
-              value={telefonoEmergencia}
-              onChange={(e) => setTelefonoEmergencia(e.target.value)}
-              className={CAMPO}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="paciente-notas" className={ETIQUETA}>
-            Notas médicas o antecedentes
-          </label>
-          <textarea
-            id="paciente-notas"
-            rows={2}
-            placeholder="Alergias, condiciones previas, etc."
-            value={notasMedicas}
-            onChange={(e) => setNotasMedicas(e.target.value)}
-            className={CAMPO}
-          />
-        </div>
+      <form id="form-registrar-paciente" onSubmit={handleSubmit}>
+        <CamposPaciente
+          datos={datos}
+          onChange={actualizarCampo}
+          prefijoId="modal-paciente"
+          disabled={cargando}
+          autoFocusNombre
+        />
       </form>
     </ModalMarco>
   )

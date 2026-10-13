@@ -176,6 +176,7 @@ export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
           pacientes={pacientesCita}
           seleccionadoId={pacienteId}
           onSeleccionar={(id) => setPacienteId(id === 0 ? null : id)}
+          onPacienteCreado={(nuevo) => setPacientesCita((prev) => [...prev, nuevo])}
         />
       )}
 

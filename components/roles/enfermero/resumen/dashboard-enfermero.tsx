@@ -27,7 +27,7 @@ export function DashboardEnfermero({
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <span className="inline-block rounded-full bg-teal-100 px-3 py-1 text-[11px] font-semibold text-teal-800">
-            Estación de Enfermería y Hospitalización
+            Enfermero
           </span>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Hola, {nombreUsuario}

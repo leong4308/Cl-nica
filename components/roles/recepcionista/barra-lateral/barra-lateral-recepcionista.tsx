@@ -52,7 +52,7 @@ export function BarraLateralRecepcionista({
         </div>
         <div>
           <b className="text-[17px] tracking-tight text-slate-900">Clínica Nova</b>
-          <p className="text-[10px] font-semibold tracking-wider text-blue-600">RECEPCIÓN Y ADMISIÓN</p>
+          <p className="text-[10px] font-semibold tracking-wider text-blue-600 uppercase">Recepcionista</p>
         </div>
         <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
@@ -72,15 +72,6 @@ export function BarraLateralRecepcionista({
           />
         ))}
       </nav>
-
-      <div className="mt-auto p-4 border-t border-slate-100">
-        <div className="rounded-xl bg-blue-50/70 p-3.5 border border-blue-100">
-          <p className="text-xs font-semibold text-blue-900">Módulo de Admisión</p>
-          <p className="mt-1 text-[11px] text-blue-700 leading-relaxed">
-            Registra nuevos pacientes y coordina citas en tiempo real con los médicos disponibles.
-          </p>
-        </div>
-      </div>
     </aside>
   )
 }

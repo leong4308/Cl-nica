@@ -52,7 +52,7 @@ export function BarraLateralEnfermero({
         </div>
         <div>
           <b className="text-[17px] tracking-tight text-slate-900">Clínica Nova</b>
-          <p className="text-[10px] font-semibold tracking-wider text-teal-600">ENFERMERÍA Y CLÍNICA</p>
+          <p className="text-[10px] font-semibold tracking-wider text-teal-600 uppercase">Enfermero</p>
         </div>
         <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
@@ -72,15 +72,6 @@ export function BarraLateralEnfermero({
           />
         ))}
       </nav>
-
-      <div className="mt-auto p-4 border-t border-slate-100">
-        <div className="rounded-xl bg-teal-50/70 p-3.5 border border-teal-100">
-          <p className="text-xs font-semibold text-teal-900">Puesto de Enfermería</p>
-          <p className="mt-1 text-[11px] text-teal-700 leading-relaxed">
-            Gestión de camas hospitalarias, toma de muestras y cumplimiento de indicaciones médicas.
-          </p>
-        </div>
-      </div>
     </aside>
   )
 }

@@ -22,6 +22,20 @@ export function ModalBuscarPaciente({ onClose }: PropsModalBuscarPaciente) {
       estado: fila[4] ?? 'Activo',
     })),
   )
+  const recargarPacientes = () => {
+    cargarPacientes().then((resultado) => {
+      if (resultado.error) return
+      setPacientes(resultado.filas.map((fila) => ({
+        nombre: fila[0] ?? '—',
+        identificacion: fila[1] ?? '—',
+        pass: '—',
+        telefono: fila[2] ?? '—',
+        estado: fila[4] ?? 'Activo',
+      })))
+      guardarModulo('Pacientes', resultado.filas, resultado.error)
+    })
+  }
+
   useEffect(() => {
     let vigente = true
     cargarPacientes().then((resultado) => {
@@ -83,6 +97,7 @@ export function ModalBuscarPaciente({ onClose }: PropsModalBuscarPaciente) {
         seleccionado={pacienteSeleccionado}
         onTeclado={manejarTeclado}
         onSeleccionar={seleccionarPaciente}
+        onPacienteCreado={recargarPacientes}
       />
     </ModalMarco>
   )
