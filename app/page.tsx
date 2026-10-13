@@ -215,6 +215,7 @@ const openModal = (title: string) => {
         <ModalAccionCita
           cita={citaAbierta.cita}
           accion={citaAbierta.accion}
+          rol={perfil.rol}
           onClose={() => setCitaAbierta(null)}
           {...accionesCita}
         />

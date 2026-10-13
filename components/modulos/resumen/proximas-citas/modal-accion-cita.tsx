@@ -1,16 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { UserRound } from 'lucide-react'
+import { CalendarClock, Send, UserRound } from 'lucide-react'
 import {
   cargarDisponibilidad,
   cargarHistorialPaciente,
   guardarExpediente,
   reagendarCita,
+  solicitarReagenda,
   type CitaPanel,
   type DiaDisponible,
   type HistorialPaciente,
 } from '@/lib/supabase/datos'
+import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { actualizarAgendaEnCache, leerAgendaEnCache, ocuparSlotEnCache } from '@/lib/supabase/cache-cita'
 import { BotonAccionDetalle } from './detalle-cita'
 import { BotonCerrarModal } from './cerrar-modal'
@@ -26,12 +28,13 @@ type PropsModalCita = {
   onRegistrar: (cita: CitaPanel) => Promise<string | null>
   onNoAsistio: (cita: CitaPanel) => Promise<string | null>
   onCancelar: (cita: CitaPanel) => Promise<string | null>
+  rol?: RolUsuario
 }
 
 type Accion = '' | 'confirmar' | 'registrar' | 'noasistio' | 'cancelar' | 'reagendar'
 
 export function ModalAccionCita({
-  cita, accion, onClose, onConfirmar, onRegistrar, onNoAsistio, onCancelar,
+  cita, accion, onClose, onConfirmar, onRegistrar, onNoAsistio, onCancelar, rol,
 }: PropsModalCita) {
   const [trabajando, setTrabajando] = useState<Accion>('')
   const [error, setError] = useState('')
@@ -42,6 +45,8 @@ export function ModalAccionCita({
   const [receta, setReceta] = useState('')
   const [notas, setNotas] = useState('')
   const [guardandoExpediente, setGuardandoExpediente] = useState(false)
+  const [enviandoSolicitud, setEnviandoSolicitud] = useState(false)
+
   useEffect(() => {
     setHistorial(null)
     setCargandoHistorial(false)
@@ -50,6 +55,7 @@ export function ModalAccionCita({
     setDiagnostico('')
     setReceta('')
     setNotas('')
+    setEnviandoSolicitud(false)
   }, [cita.id])
 
   const agendaPrecargada = accion === 'reagendar' && cita.medicoId ? leerAgendaEnCache(cita.medicoId) : null
@@ -58,8 +64,19 @@ export function ModalAccionCita({
   const [hora, setHora] = useState('')
   const [cargandoAgenda, setCargandoAgenda] = useState(agendaPrecargada === null)
 
+  // Auto-preseleccionar la fecha y hora más próxima si está disponible
   useEffect(() => {
-    if (accion !== 'reagendar' || !cita.medicoId) return
+    if (accion === 'reagendar' && dias.length > 0 && !hora) {
+      const diaConSlots = dias.find((d) => d.slots.length > 0)
+      if (diaConSlots) {
+        setFecha(diaConSlots.fecha)
+        setHora(diaConSlots.slots[0])
+      }
+    }
+  }, [accion, dias, hora])
+
+  useEffect(() => {
+    if (accion !== 'reagendar' || !cita.medicoId || rol === 'medico') return
     const guardada = leerAgendaEnCache(cita.medicoId)
     if (guardada) {
       setDias(guardada.filas)
@@ -79,7 +96,7 @@ export function ModalAccionCita({
       actualizarAgendaEnCache(cita.medicoId, resultado.filas, resultado.error)
     })
     return () => { vigente = false }
-  }, [accion, cita.medicoId, cita.duracionConsulta])
+  }, [accion, cita.medicoId, cita.duracionConsulta, rol])
 
   async function ejecutar(nombre: Accion, fn: (c: CitaPanel) => Promise<string | null>) {
     setTrabajando(nombre)
@@ -130,6 +147,18 @@ export function ModalAccionCita({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accion, cita.id])
 
+  async function enviarSolicitudReagenda() {
+    setEnviandoSolicitud(true)
+    setError('')
+    const { error: err } = await solicitarReagenda(cita.id)
+    setEnviandoSolicitud(false)
+    if (err) {
+      setError(err)
+      return
+    }
+    onClose()
+  }
+
   async function confirmarReagenda() {
     if (!fecha || !hora) {
       setError('Elige una fecha y una hora disponibles.')
@@ -145,7 +174,14 @@ export function ModalAccionCita({
     if (ok) onClose()
   }
 
-  const titulo = accion === 'reagendar' ? 'Reagendar cita' : accion === 'historial' ? `Historial médico · ${cita.paciente}` : 'Detalle de la cita'
+  const titulo =
+    accion === 'reagendar'
+      ? rol === 'medico'
+        ? 'Solicitar reagenda a recepción'
+        : 'Reagendar cita'
+      : accion === 'historial'
+        ? `Historial médico · ${cita.paciente}`
+        : 'Detalle de la cita'
 
   const diaElegido = dias.find((d) => d.fecha === fecha)
   const slotsDelDia = diaElegido?.slots ?? []
@@ -263,26 +299,86 @@ export function ModalAccionCita({
         )}
 
         {accion === 'reagendar' ? (
-          <>
-            <div className="mt-4">
-              <p className="text-xs font-semibold text-slate-700">Nueva fecha y hora</p>
-              {cargandoAgenda ? null : dias.length === 0 ? (
-                <p className="mt-2 text-xs text-slate-400">Este médico no tiene horarios libres por ahora.</p>
-              ) : (
-                <>
-                  <BotonesDiaReagenda dias={dias} fecha={fecha} onFecha={(nueva) => { setFecha(nueva); setHora('') }} />
-                  {slotsDelDia.length > 0 && (
-                    <BotonesHoraReagenda etiquetaDia={diaElegido?.etiqueta ?? ''} slots={slotsDelDia} hora={hora} onHora={setHora} />
-                  )}
-                </>
-              )}
-            </div>
+          rol === 'medico' ? (
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+                <div className="flex items-start gap-3">
+                  <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg shadow-sm ${cita.solicitaReagenda ? 'bg-amber-600 text-white' : 'bg-blue-600 text-white'}`}>
+                    <Send size={16} />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-bold ${cita.solicitaReagenda ? 'text-amber-900' : 'text-blue-900'}`}>
+                      {cita.solicitaReagenda ? 'Solicitud ya enviada a Recepción' : 'Enviar solicitud a Recepción'}
+                    </p>
+                    <p className={`mt-1 text-xs leading-relaxed ${cita.solicitaReagenda ? 'text-amber-800' : 'text-blue-700'}`}>
+                      {cita.solicitaReagenda
+                        ? 'La solicitud para reagendar esta cita ya fue enviada a la recepcionista. El personal de recepción asignará el horario más próximo disponible y contactará al paciente.'
+                        : 'Al confirmar, se enviará una notificación a la recepcionista para que contacte al paciente y le asigne el horario más próximo disponible en tu agenda.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <div className="mt-6 flex justify-end gap-2">
-              <BotonCancelarReagenda onCancelar={onClose} />
-              <BotonGuardarReagenda deshabilitado={trabajando !== '' || !hora} onGuardar={confirmarReagenda} />
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600 space-y-1">
+                <p><span className="font-semibold text-slate-800">Paciente:</span> {cita.paciente}</p>
+                <p><span className="font-semibold text-slate-800">Médico:</span> {cita.medico}</p>
+                <p><span className="font-semibold text-slate-800">Motivo:</span> {cita.motivo}</p>
+                <p><span className="font-semibold text-slate-800">Cita original:</span> {cita.fecha} · {cita.hora}</p>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={enviandoSolicitud}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {cita.solicitaReagenda ? 'Cerrar' : 'Cancelar'}
+                </button>
+                {!cita.solicitaReagenda && (
+                  <button
+                    type="button"
+                    onClick={enviarSolicitudReagenda}
+                    disabled={enviandoSolicitud}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {enviandoSolicitud ? 'Enviando...' : 'Enviar a recepción'}
+                  </button>
+                )}
+              </div>
             </div>
-          </>
+          ) : (
+            <>
+              {cita.solicitaReagenda && (
+                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  ⚠️ <strong>Solicitud médica:</strong> El {cita.medico} solicitó asignar la fecha más próxima disponible a este paciente.
+                </div>
+              )}
+              {hora && (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-800">
+                  ✓ Fecha y hora más próxima asignada automáticamente: <strong>{fecha}</strong> a las <strong>{hora}</strong>.
+                </div>
+              )}
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-700">Nueva fecha y hora</p>
+                {cargandoAgenda ? null : dias.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-400">Este médico no tiene horarios libres por ahora.</p>
+                ) : (
+                  <>
+                    <BotonesDiaReagenda dias={dias} fecha={fecha} onFecha={(nueva) => { setFecha(nueva); setHora('') }} />
+                    {slotsDelDia.length > 0 && (
+                      <BotonesHoraReagenda etiquetaDia={diaElegido?.etiqueta ?? ''} slots={slotsDelDia} hora={hora} onHora={setHora} />
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <BotonCancelarReagenda onCancelar={onClose} />
+                <BotonGuardarReagenda deshabilitado={trabajando !== '' || !hora} onGuardar={confirmarReagenda} />
+              </div>
+            </>
+          )
         ) : accion === 'historial' ? (
           <div className="mt-6 flex justify-end">
             <button type="button" onClick={onClose} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
@@ -304,3 +400,4 @@ export function ModalAccionCita({
     </div>
   )
 }
+

@@ -28,7 +28,7 @@ const ETIQUETA_ESTADO_ORDEN: Record<string, string> = {
 const ETIQUETA_ESTADO_INTERNACION: Record<string, string> = { activa: 'Ocupada', alta: 'Alta', traslado: 'Traslado' }
 
 type CitaFila = {
-  id: number; inicio: string; estado: string; motivo: string | null
+  id: number; inicio: string; estado: string; motivo: string | null; motivo_cancelacion: string | null
   paciente_id: number
   perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
   perfiles_medicos: MedicoRelacion | MedicoRelacion[] | null
@@ -73,6 +73,8 @@ export type CitaPanel = {
   paciente: string
   medico: string
   motivo: string
+  motivoCancelacion: string | null
+  solicitaReagenda: boolean
   estado: string
   inicio: number
 }
@@ -89,7 +91,7 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
   const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + DIAS_VENTANA_PANEL)
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
-      .select('id, inicio, estado, motivo, paciente_id, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))')
+      .select('id, inicio, estado, motivo, motivo_cancelacion, paciente_id, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))')
       .order('inicio', { ascending: true })
       .gte('inicio', inicioDiaLocal(hoy))
       .lt('inicio', inicioDiaLocal(fin))
@@ -112,6 +114,8 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
         paciente: nombreDe(cita.perfiles_pacientes?.usuarios),
         medico: nombreMedico ?? '—',
         motivo: cita.motivo ?? 'Sin motivo',
+        motivoCancelacion: cita.motivo_cancelacion ?? null,
+        solicitaReagenda: Boolean(cita.motivo_cancelacion && cita.motivo_cancelacion.toLowerCase().includes('reagenda')),
         estado: ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
         inicio: new Date(cita.inicio).getTime(),
       }
@@ -126,6 +130,22 @@ export async function actualizarEstadoCita(
   estado: EstadoCita,
 ): Promise<{ error: string | null }> {
   const { error } = await createClient().from('citas').update({ estado }).eq('id', id)
+  if (error) return { error: error.message }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+export async function solicitarReagenda(
+  id: number,
+  motivo: string = 'Solicitud de médico: asignar fecha más próxima',
+): Promise<{ error: string | null }> {
+  const { error } = await createClient()
+    .from('citas')
+    .update({
+      motivo_cancelacion: motivo,
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq('id', id)
   if (error) return { error: error.message }
   window.dispatchEvent(new CustomEvent('datos-actualizados'))
   return { error: null }
@@ -150,7 +170,13 @@ export async function reagendarCita(
   }
   const { error } = await createClient()
     .from('citas')
-    .update({ inicio, fin, estado: 'confirmada' })
+    .update({
+      inicio,
+      fin,
+      estado: 'confirmada',
+      motivo_cancelacion: null,
+      actualizado_en: new Date().toISOString(),
+    })
     .eq('id', id)
   if (error) {
     const mensaje = error.message.toLowerCase()

@@ -187,6 +187,7 @@ export function InterfazRecepcionista({
         <ModalAccionCita
           cita={citaAbierta.cita}
           accion={citaAbierta.accion}
+          rol={usuario.rol}
           onClose={() => setCitaAbierta(null)}
           {...accionesCita}
         />

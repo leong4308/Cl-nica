@@ -20,7 +20,19 @@ export function AccionesCitaFila({
         <BotonConfirmarFila onConfirmar={() => onAccion(cita, 'historial')} />
       )}
       {muestraReagendar && (
-        <BotonReagendarFila onReagendar={() => onAccion(cita, 'reagendar')} />
+        cita.solicitaReagenda ? (
+          <button
+            type="button"
+            onClick={() => onAccion(cita, 'reagendar')}
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs"
+            title="Solicitud enviada a recepción para asignar fecha próxima"
+          >
+            <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Enviado a recepción
+          </button>
+        ) : (
+          <BotonReagendarFila onReagendar={() => onAccion(cita, 'reagendar')} />
+        )
       )}
     </div>
   )

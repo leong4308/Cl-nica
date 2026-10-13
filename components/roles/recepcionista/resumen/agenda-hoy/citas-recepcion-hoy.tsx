@@ -46,8 +46,11 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
     setCambiandoId(null)
   }
 
+  const solicitudesReagenda = citas.filter((c) => c.solicitaReagenda)
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      {/* Cabecera */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
@@ -67,6 +70,35 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
         </button>
       </div>
 
+      {/* Banner: solicitudes de reagenda del médico */}
+      {solicitudesReagenda.length > 0 && (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-bold text-amber-900">
+                📋{' '}
+                {solicitudesReagenda.length === 1
+                  ? '1 solicitud de reagenda pendiente del médico'
+                  : `${solicitudesReagenda.length} solicitudes de reagenda pendientes del médico`}
+              </p>
+              <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
+                {solicitudesReagenda.length === 1
+                  ? `El Dr(a). ${solicitudesReagenda[0].medico} solicitó reagendar la cita de ${solicitudesReagenda[0].paciente}. Asigna la fecha más próxima disponible.`
+                  : 'Los médicos han solicitado reagendar estas citas. Asigna la fecha más próxima disponible para cada paciente.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAbrirCita(solicitudesReagenda[0], 'reagendar')}
+              className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors shadow-sm"
+            >
+              Asignar fecha más próxima →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de citas */}
       <div className="mt-5 divide-y divide-slate-100">
         {citas.length === 0 ? (
           <div className="py-12 text-center text-xs text-slate-400">
@@ -74,13 +106,23 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
           </div>
         ) : (
           citas.slice(0, 8).map((cita) => (
-            <div key={cita.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
+            <div
+              key={cita.id}
+              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0 ${
+                cita.solicitaReagenda ? 'rounded-lg bg-amber-50/60 px-2 -mx-2' : ''
+              }`}
+            >
+              {/* Info del paciente */}
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                <div
+                  className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                    cita.solicitaReagenda ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
                   <User size={16} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-slate-900">{cita.paciente}</p>
                     <span
                       className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold ${
@@ -93,13 +135,21 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
                     >
                       {cita.estado}
                     </span>
+                    {cita.solicitaReagenda && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                        <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        Reagenda solicitada por médico
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500">
-                    Dr(a). {cita.medico} · <span className="font-medium text-slate-700">{cita.motivo}</span>
+                    Dr(a). {cita.medico} ·{' '}
+                    <span className="font-medium text-slate-700">{cita.motivo}</span>
                   </p>
                 </div>
               </div>
 
+              {/* Hora y acciones */}
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                   <Clock size={14} className="text-slate-400" />
@@ -130,13 +180,23 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => onAbrirCita(cita, 'reagendar')}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  >
-                    Reagendar
-                  </button>
+                  {cita.solicitaReagenda ? (
+                    <button
+                      type="button"
+                      onClick={() => onAbrirCita(cita, 'reagendar')}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700 transition-colors shadow-sm"
+                    >
+                      Asignar fecha más próxima
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onAbrirCita(cita, 'reagendar')}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      Reagendar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
