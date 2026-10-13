@@ -28,7 +28,7 @@ const ETIQUETA_ESTADO_ORDEN: Record<string, string> = {
 const ETIQUETA_ESTADO_INTERNACION: Record<string, string> = { activa: 'Ocupada', alta: 'Alta', traslado: 'Traslado' }
 
 type CitaFila = {
-  id: number; inicio: string; estado: string; motivo: string | null; motivo_cancelacion: string | null
+  id: number; inicio: string; fin?: string; estado: string; motivo: string | null; motivo_cancelacion: string | null
   paciente_id: number
   perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
   perfiles_medicos: MedicoRelacion | MedicoRelacion[] | null
@@ -43,7 +43,7 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
   const supabase = createClient()
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
-      .select('id, inicio, estado, motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
+      .select('id, inicio, fin, estado, motivo, paciente_id, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
       .order('inicio', { ascending: false })
       .limit(100)
   )
@@ -58,6 +58,11 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
         nombreDe(medico?.usuarios),
         cita.motivo ?? 'Sin motivo',
         ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
+        String(cita.id),
+        cita.inicio,
+        cita.fin ?? cita.inicio,
+        String(cita.paciente_id ?? ''),
+        cita.estado,
       ]
     }),
   }
@@ -212,6 +217,7 @@ export async function cargarPacientes(): Promise<{ filas: Row[]; error: string |
         usuario?.telefono ?? '—',
         paciente.fecha_nacimiento ? fechaDe(paciente.fecha_nacimiento) : '—',
         paciente.esta_activo ? 'Activo' : 'Inactivo',
+        String(paciente.id),
       ]
     }),
   }
@@ -296,6 +302,27 @@ export async function guardarExpediente(datos: DatosExpediente): Promise<{ error
   return { error: null }
 }
 
+export async function cargarExpedienteCita(citaId: number): Promise<{
+  expediente: { diagnostico: string; receta: string; notas: string } | null
+  error: string | null
+}> {
+  const { data, error } = await createClient()
+    .from('expedientes')
+    .select('diagnostico, receta, notas_doctor')
+    .eq('cita_id', citaId)
+    .maybeSingle()
+  if (error) return { expediente: null, error: error.message }
+  if (!data) return { expediente: null, error: null }
+  return {
+    expediente: {
+      diagnostico: data.diagnostico ?? '',
+      receta: data.receta ?? '',
+      notas: data.notas_doctor ?? '',
+    },
+    error: null,
+  }
+}
+
 export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
   const { filas, error } = await consultar<ExpedienteFila>(
@@ -312,6 +339,7 @@ export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string
       expediente.diagnostico ?? 'Sin diagnóstico',
       '—',
       fechaDe(expediente.creado_en),
+      String(expediente.id),
     ]),
   }
 }
@@ -342,6 +370,7 @@ export async function cargarInternacion(): Promise<{ filas: Row[]; error: string
         fechaDe(internacion.fecha_ingreso),
         '—',
         ETIQUETA_ESTADO_INTERNACION[internacion.estado] ?? internacion.estado,
+        String(internacion.id),
       ]
     }),
   }
@@ -367,6 +396,7 @@ export async function cargarOrdenesMedicas(): Promise<{ filas: Row[]; error: str
       '—',
       orden.descripcion,
       ETIQUETA_ESTADO_ORDEN[orden.estado] ?? orden.estado,
+      String(orden.id),
     ]),
   }
 }
@@ -394,6 +424,7 @@ export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string
         analisis?.nombre ?? '—',
         fechaDe(solicitud.fecha_solicitud),
         solicitud.estado_analisis,
+        String(solicitud.id),
       ]
     }),
   }
@@ -735,6 +766,7 @@ export async function cargarMedicos(): Promise<{ filas: Row[]; error: string | n
         `Cédula ${medico.id}`,
         `${medico.duracion_consulta} min por consulta`,
         medico.esta_activo ? 'Disponible' : 'Inactivo',
+        String(medico.id),
       ]
     }),
   }
@@ -856,12 +888,17 @@ export async function obtenerCita(
   const { data, error } = await supabase
     .from('citas')
     .select(
-      `id, paciente_id, medico_id, clinica_id, inicio, fin, estado, motivo, motivo_cancelacion, creado_en, actualizado_en`,
+      `id, paciente_id, medico_id, clinica_id, inicio, fin, estado, motivo, motivo_cancelacion, creado_en, actualizado_en, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(duracion_consulta, usuarios(nombre_completo))`,
     )
     .eq('id', id)
     .single()
   if (error) return { cita: null, error: error.message }
   if (!data) return { cita: null, error: null }
+
+  const pacienteRel = data.perfiles_pacientes
+  const pacienteUsr = Array.isArray(pacienteRel) ? pacienteRel[0]?.usuarios : pacienteRel?.usuarios
+  const medicoRel = data.perfiles_medicos
+  const medicoUsr = Array.isArray(medicoRel) ? medicoRel[0]?.usuarios : medicoRel?.usuarios
 
   const cita = {
     id: data.id,
@@ -875,9 +912,49 @@ export async function obtenerCita(
     motivoCancelacion: data.motivo_cancelacion,
     creado_en: data.creado_en,
     actualizado_en: data.actualizado_en,
-    paciente: nombreDe((data as { perfiles_pacientes?: { usuarios?: { nombre_completo: string } | { nombre_completo: string }[] } | null } | null)?.perfiles_pacientes?.usuarios),
-    medico: nombreDe((data as { perfiles_medicos?: { usuarios?: { nombre_completo: string } | { nombre_completo: string }[] } | null } | null)?.perfiles_medicos?.usuarios),
+    paciente: nombreDe(pacienteUsr),
+    medico: nombreDe(medicoUsr),
   } as CitaDetalle
+
+  return { cita, error: null }
+}
+
+export async function obtenerCitaPanel(
+  id: number,
+): Promise<{ cita: CitaPanel | null; error: string | null }> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('citas')
+    .select(
+      `id, paciente_id, medico_id, clinica_id, inicio, fin, estado, motivo, motivo_cancelacion, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))`,
+    )
+    .eq('id', id)
+    .single()
+  if (error) return { cita: null, error: error.message }
+  if (!data) return { cita: null, error: null }
+
+  const pacienteRel = data.perfiles_pacientes
+  const pacienteUsr = Array.isArray(pacienteRel) ? pacienteRel[0]?.usuarios : pacienteRel?.usuarios
+  const medicoRel = data.perfiles_medicos
+  const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : (medicoRel as MedicoRelacion | null)
+  const medicoUsr = Array.isArray(medico?.usuarios) ? medico?.usuarios[0] : medico?.usuarios
+
+  const fechaObj = new Date(data.inicio)
+  const cita: CitaPanel = {
+    id: data.id,
+    pacienteId: data.paciente_id,
+    medicoId: medico?.id ?? data.medico_id,
+    duracionConsulta: medico?.duracion_consulta ?? 20,
+    fecha: fechaObj.toISOString().slice(0, 10),
+    hora: horaDe(data.inicio),
+    paciente: nombreDe(pacienteUsr),
+    medico: nombreDe(medicoUsr),
+    motivo: data.motivo ?? 'Sin motivo',
+    motivoCancelacion: data.motivo_cancelacion,
+    solicitaReagenda: Boolean(data.motivo_cancelacion && data.motivo_cancelacion.toLowerCase().includes('reagenda')),
+    estado: ETIQUETA_ESTADO_CITA[data.estado] ?? data.estado,
+    inicio: fechaObj.getTime(),
+  }
 
   return { cita, error: null }
 }

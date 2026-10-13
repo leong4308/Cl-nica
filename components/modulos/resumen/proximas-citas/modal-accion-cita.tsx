@@ -29,12 +29,14 @@ type PropsModalCita = {
   onNoAsistio: (cita: CitaPanel) => Promise<string | null>
   onCancelar: (cita: CitaPanel) => Promise<string | null>
   rol?: RolUsuario
+  /** Cuando es true, al abrir con accion='historial' solo carga el historial sin confirmar la cita */
+  sinConfirmar?: boolean
 }
 
 type Accion = '' | 'confirmar' | 'registrar' | 'noasistio' | 'cancelar' | 'reagendar'
 
 export function ModalAccionCita({
-  cita, accion, onClose, onConfirmar, onRegistrar, onNoAsistio, onCancelar, rol,
+  cita, accion, onClose, onConfirmar, onRegistrar, onNoAsistio, onCancelar, rol, sinConfirmar,
 }: PropsModalCita) {
   const [trabajando, setTrabajando] = useState<Accion>('')
   const [error, setError] = useState('')
@@ -110,6 +112,18 @@ export function ModalAccionCita({
     return true
   }
 
+  async function soloCargarHistorial() {
+    if (!cita.pacienteId) return
+    setCargandoHistorial(true)
+    const resultado = await cargarHistorialPaciente(cita.pacienteId)
+    setCargandoHistorial(false)
+    if (resultado.error) {
+      setError(resultado.error)
+      return
+    }
+    setHistorial(resultado.filas)
+  }
+
   async function confirmarYVerHistorial() {
     const ok = await ejecutar('confirmar', onConfirmar)
     if (!ok || !cita.pacienteId) return
@@ -143,9 +157,13 @@ export function ModalAccionCita({
 
   useEffect(() => {
     if (accion !== 'historial') return
-    confirmarYVerHistorial()
+    if (sinConfirmar) {
+      soloCargarHistorial()
+    } else {
+      confirmarYVerHistorial()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accion, cita.id])
+  }, [accion, cita.id, sinConfirmar])
 
   async function enviarSolicitudReagenda() {
     setEnviandoSolicitud(true)

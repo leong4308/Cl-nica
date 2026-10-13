@@ -54,7 +54,7 @@ export default function Page() {
   }
 
 const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente', 'Ver resultados pendientes']
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle']
 
 const openModal = (title: string) => {
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -180,6 +180,9 @@ const openModal = (title: string) => {
       {(modal !== null && modal.startsWith('Detalle: ')) && (
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
+      {(modal !== null && modal.startsWith('HistorialDetalle: ')) && (
+        <ModalDetalleCita citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
+      )}
       {(modal !== null && modal.startsWith('Editar: ')) && (
         <ModalEditarCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
@@ -220,6 +223,7 @@ const openModal = (title: string) => {
           cita={citaAbierta.cita}
           accion={citaAbierta.accion}
           rol={perfil.rol}
+          sinConfirmar={citaAbierta.accion === 'historial' && perfil.rol === 'medico'}
           onClose={() => setCitaAbierta(null)}
           {...accionesCita}
         />

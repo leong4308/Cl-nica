@@ -8,11 +8,13 @@ export function RowActions({
   onEdit,
   onAction,
   onDelete,
+  onHoverView,
 }: {
   onView: () => void
   onEdit?: () => void
   onAction?: () => void
   onDelete?: () => void
+  onHoverView?: () => void
 }) {
   return (
     <div className="flex items-center gap-1">
@@ -21,6 +23,7 @@ export function RowActions({
         aria-label="Ver detalle"
         title="Ver detalle"
         onClick={onView}
+        onMouseEnter={onHoverView}
         className="rounded-md p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
       >
         <Eye size={15} />
