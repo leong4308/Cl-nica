@@ -380,6 +380,15 @@ export function ModalDetalleCita({
 
           {tabActivo === 'consulta' && cita && (
             <div className="space-y-4">
+              {cita.motivoCancelacion?.toLowerCase().includes('reagendada por recepción') && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900 shadow-2xs">
+                  <span className="size-2 rounded-full bg-blue-600 shrink-0" />
+                  <span>
+                    <strong>Reagenda confirmada por recepción:</strong> Esta cita fue reprogramada a este nuevo horario.
+                  </span>
+                </div>
+              )}
+
               {/* Tarjeta del Motivo de Consulta */}
               <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">

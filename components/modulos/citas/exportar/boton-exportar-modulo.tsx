@@ -4,23 +4,14 @@ import { Download } from 'lucide-react'
 import { ActionButton } from '../../compartidos/ui'
 import type { Row } from '../../compartidos/types'
 import { exportarCitasPDF, type CitaExportar } from '@/lib/exportar/exportar-citas-pdf'
+import { exportarPacientesPDF, type PacienteExportar } from '@/lib/exportar/exportar-pacientes-pdf'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
-
-function normalizarTexto(txt: string): string {
-  return txt
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/^(dr\.|dra\.|doctor|doctora)\s+/i, '')
-    .trim()
-}
 
 export function BotonExportarModulo({
   modulo,
   filas = [],
   onAvisar,
   rol,
-  nombreUsuario,
 }: {
   modulo: string
   filas?: Row[]
@@ -28,53 +19,53 @@ export function BotonExportarModulo({
   rol?: RolUsuario
   nombreUsuario?: string
 }) {
-  const esMedico = rol === 'medico'
   const esAdmin = rol === 'admin'
 
-  // Regla 1: Un médico solo puede exportar dentro del módulo Citas (su propia agenda).
-  if (esMedico && modulo !== 'Citas') {
+  // El botón de exportar es exclusivo únicamente para el Administrador
+  if (!esAdmin) {
     return null
   }
 
-  // Regla 2: El padrón de Pacientes solo puede ser exportado por Administradores.
-  if (modulo === 'Pacientes' && !esAdmin) {
+  // Módulos con soporte de exportación
+  if (modulo !== 'Pacientes' && modulo !== 'Citas') {
     return null
   }
 
   const handleExportar = () => {
-    // Protección adicional en ejecución
-    if (modulo === 'Pacientes' && !esAdmin) {
-      onAvisar('Acceso restringido: solo el administrador puede exportar el padrón de pacientes')
+    if (!esAdmin) {
+      onAvisar('Acceso restringido: solo el administrador tiene permisos de exportación')
+      return
+    }
+
+    if (modulo === 'Pacientes') {
+      if (filas.length === 0) {
+        onAvisar('No hay pacientes disponibles para exportar')
+        return
+      }
+
+      const pacientesParaExportar: PacienteExportar[] = filas.map((row) => ({
+        hora: row[10] || '—',
+        nombre: row[0] ?? '',
+        identificacion: row[1] ?? '',
+        medico: row[9] || 'Por asignar',
+        motivo: row[11] || 'Consulta general',
+        telefono: row[2] ?? '',
+        nacimiento: row[3] ?? '',
+        estado: row[4] ?? '',
+      }))
+
+      onAvisar(`Generando directorio de pacientes en PDF (${pacientesParaExportar.length} pacientes)...`)
+      exportarPacientesPDF(pacientesParaExportar, rol)
       return
     }
 
     if (modulo === 'Citas') {
-      let filasExportar = filas
-
-      // Si es médico, filtrar únicamente las citas asignadas a él/ella
-      if (esMedico && nombreUsuario) {
-        const buscado = normalizarTexto(nombreUsuario)
-        filasExportar = filas.filter((row) => {
-          const nombreMedicoFila = normalizarTexto(row[2] ?? '')
-          return (
-            nombreMedicoFila.includes(buscado) ||
-            buscado.includes(nombreMedicoFila) ||
-            buscado.split(' ').some((palabra) => palabra.length > 2 && nombreMedicoFila.includes(palabra))
-          )
-        })
-
-        if (filasExportar.length === 0) {
-          onAvisar('No tienes citas asignadas en este listado para exportar')
-          return
-        }
-      }
-
-      if (filasExportar.length === 0) {
+      if (filas.length === 0) {
         onAvisar('No hay citas disponibles para exportar')
         return
       }
 
-      const citasParaExportar: CitaExportar[] = filasExportar.map((row) => ({
+      const citasParaExportar: CitaExportar[] = filas.map((row) => ({
         hora: row[0] ?? '',
         paciente: row[1] ?? '',
         medico: row[2] ?? '',
@@ -84,19 +75,20 @@ export function BotonExportarModulo({
         fin: row[7],
       }))
 
-      onAvisar(
-        esMedico
-          ? `Generando tu agenda médica en PDF (${citasParaExportar.length} citas)...`
-          : `Generando agenda médica en PDF (${citasParaExportar.length} citas)...`
-      )
-      exportarCitasPDF(citasParaExportar)
+      onAvisar(`Generando reporte general de citas (${citasParaExportar.length} citas)...`)
+      exportarCitasPDF(citasParaExportar, {
+        rol,
+      })
       return
     }
 
     onAvisar(`Listado de ${modulo} exportado`)
   }
 
-  const etiquetaBoton = esMedico && modulo === 'Citas' ? 'Exportar mi agenda' : 'Exportar'
+  const etiquetaBoton =
+    modulo === 'Pacientes'
+      ? 'Exportar directorio'
+      : 'Exportar reporte'
 
   return (
     <ActionButton icon={Download} onClick={handleExportar}>

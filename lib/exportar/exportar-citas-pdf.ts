@@ -39,7 +39,15 @@ function formatoHora12(horaStr: string, inicioIso?: string): string {
   return horaStr
 }
 
-export function exportarCitasPDF(citas: CitaExportar[]): void {
+export type OpcionesExportar = {
+  esMedico?: boolean
+  nombreMedico?: string
+  rol?: string
+}
+
+export function exportarCitasPDF(citas: CitaExportar[], opciones: OpcionesExportar = {}): void {
+  const { esMedico = false, nombreMedico = '', rol = '' } = opciones
+
   if (citas.length === 0) {
     alert('No hay citas disponibles para exportar.')
     return
@@ -48,10 +56,10 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
   // Agrupar citas por médico
   const gruposPorMedico = new Map<string, CitaExportar[]>()
   citas.forEach((cita) => {
-    const nombreMedico = cita.medico?.trim() || 'Médico no asignado'
-    const lista = gruposPorMedico.get(nombreMedico) || []
+    const nombre = cita.medico?.trim() || 'Médico no asignado'
+    const lista = gruposPorMedico.get(nombre) || []
     lista.push(cita)
-    gruposPorMedico.set(nombreMedico, lista)
+    gruposPorMedico.set(nombre, lista)
   })
 
   // Fecha actual de emisión
@@ -88,6 +96,32 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
           estiloBadge = 'background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;'
         }
 
+        if (esMedico) {
+          // Layout Personal del Médico: Con espacio para notas y observaciones clínicas
+          return `
+            <tr style="border-bottom: 1px solid #e2e8f0; ${i % 2 === 1 ? 'background-color: #f8fafc;' : ''}">
+              <td style="padding: 10px 12px; font-weight: 600; color: #0f172a; white-space: nowrap; font-size: 11px;">
+                ${hora12}
+              </td>
+              <td style="padding: 10px 12px; font-weight: 600; color: #1e293b; font-size: 12px;">
+                ${c.paciente}
+              </td>
+              <td style="padding: 10px 12px; color: #475569; font-size: 11px;">
+                ${c.motivo || 'Consulta general'}
+              </td>
+              <td style="padding: 10px 12px; text-align: center;">
+                <span style="display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; ${estiloBadge}">
+                  ${c.estado}
+                </span>
+              </td>
+              <td style="padding: 10px 12px; border-left: 1px dashed #e2e8f0; width: 140px; color: #cbd5e1; font-size: 10px;">
+                &nbsp;
+              </td>
+            </tr>
+          `
+        }
+
+        // Layout General del Administrador: 100% digital, espacioso y sin columna de firma
         return `
           <tr style="border-bottom: 1px solid #e2e8f0; ${i % 2 === 1 ? 'background-color: #f8fafc;' : ''}">
             <td style="padding: 10px 12px; font-weight: 600; color: #0f172a; white-space: nowrap; font-size: 11px;">
@@ -95,6 +129,9 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
             </td>
             <td style="padding: 10px 12px; font-weight: 600; color: #1e293b; font-size: 12px;">
               ${c.paciente}
+            </td>
+            <td style="padding: 10px 12px; font-weight: 600; color: #0369a1; font-size: 11px;">
+              ${c.medico || 'Médico no asignado'}
             </td>
             <td style="padding: 10px 12px; color: #475569; font-size: 11px;">
               ${c.motivo || 'Consulta general'}
@@ -104,20 +141,20 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
                 ${c.estado}
               </span>
             </td>
-            <td style="padding: 10px 12px; border-left: 1px dashed #cbd5e1; width: 120px; color: #94a3b8; font-size: 10px; text-align: center;">
-              _________________
-            </td>
           </tr>
         `
       })
       .join('')
 
+    const tituloSeccion = esMedico ? 'Consultas Asignadas' : 'Médico Asignado'
+    const nombreMostrado = esMedico ? (nombreMedico || medico) : medico
+
     htmlMedicos += `
       <section style="margin-bottom: 26px; page-break-inside: avoid; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #ffffff;">
         <div style="background: #f1f5f9; padding: 12px 18px; border-bottom: 2px solid #2563eb; display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px; color: #2563eb;">Médico Asignado</span>
-            <h2 style="margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: #0f172a;">${medico}</h2>
+            <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.8px; color: #2563eb;">${tituloSeccion}</span>
+            <h2 style="margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: #0f172a;">${nombreMostrado}</h2>
           </div>
           <div style="background: #ffffff; border: 1px solid #cbd5e1; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: #334155;">
             ${citasMedico.length} ${citasMedico.length === 1 ? 'paciente agendado' : 'pacientes agendados'}
@@ -127,11 +164,23 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
           <thead>
             <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">
-              <th style="padding: 9px 12px; width: 15%;">Horario</th>
-              <th style="padding: 9px 12px; width: 35%;">Nombre del Paciente</th>
-              <th style="padding: 9px 12px; width: 25%;">Motivo de Consulta</th>
-              <th style="padding: 9px 12px; width: 13%; text-align: center;">Estado</th>
-              <th style="padding: 9px 12px; width: 12%; text-align: center;">Firma / Asistencia</th>
+              ${
+                esMedico
+                  ? `
+                    <th style="padding: 9px 12px; width: 14%;">Horario</th>
+                    <th style="padding: 9px 12px; width: 34%;">Nombre del Paciente</th>
+                    <th style="padding: 9px 12px; width: 26%;">Motivo de Consulta</th>
+                    <th style="padding: 9px 12px; width: 12%; text-align: center;">Estado</th>
+                    <th style="padding: 9px 12px; width: 14%; text-align: center;">Observaciones</th>
+                  `
+                  : `
+                    <th style="padding: 9px 12px; width: 12%;">Horario</th>
+                    <th style="padding: 9px 12px; width: 32%;">Nombre del Paciente</th>
+                    <th style="padding: 9px 12px; width: 26%;">Médico que atiende</th>
+                    <th style="padding: 9px 12px; width: 20%;">Motivo de Consulta</th>
+                    <th style="padding: 9px 12px; width: 10%; text-align: center;">Estado</th>
+                  `
+              }
             </tr>
           </thead>
           <tbody>
@@ -142,12 +191,31 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
     `
   })
 
+  const esRecepcionista = rol === 'recepcionista'
+  const tituloDocumento = esMedico
+    ? 'Agenda Médica Personal'
+    : esRecepcionista
+      ? 'Agenda General de Citas - Control de Recepción'
+      : 'Reporte General de Citas y Control Clínico'
+
+  const subtituloDocumento = esMedico
+    ? `Agenda personal de consultas • Dr(a). ${nombreMedico || citas[0]?.medico || 'Médico'}`
+    : esRecepcionista
+      ? 'Sistema Integral de Gestión Médica • Control de Agenda y Asignación de Consultas'
+      : 'Sistema Integral de Gestión Médica • Control General de Agenda'
+
+  const pieDocumento = esMedico
+    ? 'Documento confidencial para uso exclusivo del profesional médico.'
+    : esRecepcionista
+      ? 'Documento confidencial para uso interno de Recepción - Clínica Nova.'
+      : 'Documento confidencial para uso interno de la administración de Clínica Nova.'
+
   const contenidoCompleto = `
     <!DOCTYPE html>
     <html lang="es">
     <head>
       <meta charset="utf-8" />
-      <title>Agenda de Citas - Clínica Nova</title>
+      <title>${tituloDocumento} - Clínica Nova</title>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <style>
         @page {
@@ -231,8 +299,8 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
       <!-- Barra superior con los botones Imprimir y Descargar -->
       <div class="no-print barra-herramientas">
         <div>
-          <h2 style="margin: 0; font-size: 14px; font-weight: 700; color: #ffffff;">Agenda Médica de Citas</h2>
-          <p style="margin: 2px 0 0 0; font-size: 11px; color: #94a3b8;">${totalCitas} citas • ${totalMedicos} ${totalMedicos === 1 ? 'médico' : 'médicos'}</p>
+          <h2 style="margin: 0; font-size: 14px; font-weight: 700; color: #ffffff;">${tituloDocumento}</h2>
+          <p style="margin: 2px 0 0 0; font-size: 11px; color: #94a3b8;">${totalCitas} citas ${esMedico ? 'asignadas' : `• ${totalMedicos} ${totalMedicos === 1 ? 'médico' : 'médicos'}`}</p>
         </div>
         <div style="display: flex; gap: 10px;">
           <button type="button" class="btn-accion btn-imprimir" onclick="window.print()">
@@ -253,14 +321,14 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
               <div style="width: 24px; height: 24px; background: #2563eb; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">+</div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">Clínica Nova</h1>
             </div>
-            <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 500;">Sistema Integral de Gestión Médica • Reporte Oficial de Citas</p>
+            <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 500;">${subtituloDocumento}</p>
           </div>
 
           <div style="text-align: right;">
             <div style="font-size: 11px; font-weight: 700; color: #0f172a; text-transform: capitalize;">${fechaHoy}</div>
             <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Hora de emisión: ${horaEmision}</div>
             <div style="font-size: 10px; color: #2563eb; font-weight: 600; margin-top: 3px;">
-              ${totalCitas} citas en total • ${totalMedicos} ${totalMedicos === 1 ? 'médico' : 'médicos'}
+              ${totalCitas} citas ${esMedico ? 'asignadas' : `en total • ${totalMedicos} ${totalMedicos === 1 ? 'médico' : 'médicos'}`}
             </div>
           </div>
         </header>
@@ -272,7 +340,7 @@ export function exportarCitasPDF(citas: CitaExportar[]): void {
 
         <!-- Pie de página -->
         <footer style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
-          <span>Documento confidencial para uso interno del personal médico y administrativo.</span>
+          <span>${pieDocumento}</span>
           <span>Clínica Nova</span>
         </footer>
       </div>

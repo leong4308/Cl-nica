@@ -174,13 +174,15 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
                 </button>
               )}
             </div>
-            <BotonExportarModulo
-              modulo={active}
-              filas={filasFiltradas}
-              onAvisar={notify}
-              rol={rol}
-              nombreUsuario={usuarioNombre}
-            />
+            {rol === 'admin' && (
+              <BotonExportarModulo
+                modulo={active}
+                filas={filasFiltradas}
+                onAvisar={notify}
+                rol={rol}
+                nombreUsuario={usuarioNombre}
+              />
+            )}
           </div>
         </div>
 

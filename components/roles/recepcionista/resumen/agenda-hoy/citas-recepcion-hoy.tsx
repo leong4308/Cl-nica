@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CalendarDays, Clock, User, UserCheck } from 'lucide-react'
-import { actualizarEstadoCita, cargarCitasPanel, type CitaPanel } from '@/lib/supabase/datos'
+import { CalendarDays, Clock, User } from 'lucide-react'
+import { cargarCitasPanel, type CitaPanel } from '@/lib/supabase/datos'
 import { leerPanel, guardarPanel } from '@/lib/supabase/cache-modulos'
 
 type PropsCitasRecepcion = {
@@ -13,7 +13,6 @@ type PropsCitasRecepcion = {
 export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepcion) {
   const [citas, setCitas] = useState<CitaPanel[]>(() => leerPanel()?.filas ?? [])
   const [cargando, setCargando] = useState(false)
-  const [cambiandoId, setCambiandoId] = useState<number | null>(null)
 
   useEffect(() => {
     let vigente = true
@@ -34,18 +33,6 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
     }
   }, [])
 
-  async function confirmarLlegada(citaId: number) {
-    setCambiandoId(citaId)
-    await actualizarEstadoCita(citaId, 'confirmada')
-    setCambiandoId(null)
-  }
-
-  async function marcarAtendida(citaId: number) {
-    setCambiandoId(citaId)
-    await actualizarEstadoCita(citaId, 'atendida')
-    setCambiandoId(null)
-  }
-
   const solicitudesReagenda = citas.filter((c) => c.solicitaReagenda)
 
   return (
@@ -58,7 +45,7 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
             <h3 className="text-sm font-bold text-slate-900">Agenda de recepción · Pacientes por atender</h3>
           </div>
           <p className="mt-1 text-xs text-slate-400">
-            Control de recepción de pacientes y confirmación de llegada a consulta.
+            Control de citas, agendamiento y solicitudes de reagenda médica.
           </p>
         </div>
         <button
@@ -157,29 +144,6 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  {cita.estado === 'Pendiente' && (
-                    <button
-                      type="button"
-                      disabled={cambiandoId === cita.id}
-                      onClick={() => confirmarLlegada(cita.id)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      <UserCheck size={12} />
-                      Llegó
-                    </button>
-                  )}
-
-                  {cita.estado === 'Confirmada' && (
-                    <button
-                      type="button"
-                      disabled={cambiandoId === cita.id}
-                      onClick={() => marcarAtendida(cita.id)}
-                      className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                    >
-                      Concluir
-                    </button>
-                  )}
-
                   {cita.solicitaReagenda ? (
                     <button
                       type="button"

@@ -108,6 +108,7 @@ export type CitaPanel = {
   motivo: string
   motivoCancelacion: string | null
   solicitaReagenda: boolean
+  reagendadaPorRecepcion?: boolean
   estado: string
   inicio: number
 }
@@ -149,7 +150,15 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
         medico: nombreMedico ?? '—',
         motivo: cita.motivo ?? 'Sin motivo',
         motivoCancelacion: cita.motivo_cancelacion ?? null,
-        solicitaReagenda: Boolean(cita.motivo_cancelacion && cita.motivo_cancelacion.toLowerCase().includes('reagenda')),
+        solicitaReagenda: Boolean(
+          cita.motivo_cancelacion &&
+          cita.motivo_cancelacion.toLowerCase().includes('reagenda') &&
+          !cita.motivo_cancelacion.toLowerCase().includes('por recepción')
+        ),
+        reagendadaPorRecepcion: Boolean(
+          cita.motivo_cancelacion &&
+          cita.motivo_cancelacion.toLowerCase().includes('reagendada por recepción')
+        ),
         estado: ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
         inicio: new Date(cita.inicio).getTime(),
       }
@@ -208,7 +217,7 @@ export async function reagendarCita(
       inicio,
       fin,
       estado: 'confirmada',
-      motivo_cancelacion: null,
+      motivo_cancelacion: 'Reagendada por recepción: nuevo horario asignado',
       actualizado_en: new Date().toISOString(),
     })
     .eq('id', id)
@@ -231,16 +240,51 @@ type PacienteFila = {
 
 export async function cargarPacientes(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
-  const { filas, error } = await consultar<PacienteFila>(
-    supabase.from('perfiles_pacientes')
-      .select('id, esta_activo, fecha_nacimiento, genero, notas_medicas, usuarios(nombre_completo, correo, telefono)')
-      .order('id', { ascending: true })
-      .limit(100)
-  )
+  const [{ filas, error }, { data: citasData }] = await Promise.all([
+    consultar<PacienteFila>(
+      supabase.from('perfiles_pacientes')
+        .select('id, esta_activo, fecha_nacimiento, genero, notas_medicas, usuarios(nombre_completo, correo, telefono)')
+        .order('id', { ascending: true })
+        .limit(100)
+    ),
+    supabase
+      .from('citas')
+      .select('paciente_id, inicio, motivo, perfiles_medicos(usuarios(nombre_completo))')
+      .order('inicio', { ascending: false })
+      .limit(200),
+  ])
+
+  type CitaResumenPaciente = {
+    medico: string
+    hora: string
+    motivo: string
+  }
+  const citasPorPaciente = new Map<number, CitaResumenPaciente>()
+  if (citasData) {
+    for (const c of citasData as any[]) {
+      if (c.paciente_id && !citasPorPaciente.has(c.paciente_id)) {
+        const medRel = Array.isArray(c.perfiles_medicos) ? c.perfiles_medicos[0] : c.perfiles_medicos
+        const usuRel = Array.isArray(medRel?.usuarios) ? medRel?.usuarios[0] : medRel?.usuarios
+        const medicoNombre = usuRel?.nombre_completo || 'Por asignar'
+        const horaFormateada = c.inicio ? horaDe(c.inicio) : '—'
+        const motivoTexto = c.motivo || 'Consulta general'
+        citasPorPaciente.set(c.paciente_id, {
+          medico: medicoNombre,
+          hora: horaFormateada,
+          motivo: motivoTexto,
+        })
+      }
+    }
+  }
+
   return {
     error,
     filas: filas.map((paciente) => {
       const usuario = Array.isArray(paciente.usuarios) ? paciente.usuarios[0] : paciente.usuarios
+      const infoCita = citasPorPaciente.get(paciente.id)
+      const medicoAsignado = infoCita?.medico || 'Por asignar'
+      const horaCita = infoCita?.hora || '—'
+      const motivoCita = infoCita?.motivo || 'Consulta general'
       return [
         usuario?.nombre_completo ?? '—',
         `PAC-${String(paciente.id).padStart(5, '0')}`,
@@ -251,6 +295,9 @@ export async function cargarPacientes(): Promise<{ filas: Row[]; error: string |
         paciente.genero ?? '',
         paciente.notas_medicas ?? '',
         (usuario as { correo?: string } | null)?.correo ?? '',
+        medicoAsignado,
+        horaCita,
+        motivoCita,
       ]
     }),
   }
@@ -1020,7 +1067,15 @@ export async function obtenerCitaPanel(
     medico: nombreDe(medicoUsr),
     motivo: data.motivo ?? 'Sin motivo',
     motivoCancelacion: data.motivo_cancelacion,
-    solicitaReagenda: Boolean(data.motivo_cancelacion && data.motivo_cancelacion.toLowerCase().includes('reagenda')),
+    solicitaReagenda: Boolean(
+      data.motivo_cancelacion &&
+      data.motivo_cancelacion.toLowerCase().includes('reagenda') &&
+      !data.motivo_cancelacion.toLowerCase().includes('por recepción')
+    ),
+    reagendadaPorRecepcion: Boolean(
+      data.motivo_cancelacion &&
+      data.motivo_cancelacion.toLowerCase().includes('reagendada por recepción')
+    ),
     estado: ETIQUETA_ESTADO_CITA[data.estado] ?? data.estado,
     inicio: fechaObj.getTime(),
   }

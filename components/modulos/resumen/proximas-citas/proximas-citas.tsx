@@ -163,6 +163,15 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
         <BotonesFiltros filtroActivo={filtroActivo} alElegir={setFiltroActivo} cuenta={cuenta} />
       </div>
 
+      {citas.some((c) => c.reagendadaPorRecepcion) && (
+        <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50/70 px-5 py-2.5 text-xs text-blue-900">
+          <span className="size-2 shrink-0 rounded-full bg-blue-600 animate-pulse" />
+          <span>
+            <strong>Aviso de recepción:</strong> Cita(s) reprogramadas con nuevo horario asignado por recepción.
+          </span>
+        </div>
+      )}
+
       <div>
         {[...bloques.entries()].map(([fecha, delDia]) => (
           <section key={fecha}>
@@ -191,7 +200,14 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
                     </div>
 
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-slate-800">{cita.paciente}</p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="truncate text-xs font-semibold text-slate-800">{cita.paciente}</p>
+                        {cita.reagendadaPorRecepcion && (
+                          <span className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">
+                            Reagendada por recepción
+                          </span>
+                        )}
+                      </div>
                       <p className="truncate text-[11px] text-slate-500">{cita.medico} · {cita.motivo}</p>
                     </div>
 
