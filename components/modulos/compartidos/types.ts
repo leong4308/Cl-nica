@@ -10,4 +10,5 @@ export type ClinicActions = {
   addAppointment: (appointment: Row) => void
   onAccion: (cita: CitaPanel, accion: 'detalle' | 'reagendar' | 'historial') => void
   rol?: RolUsuario
+  usuarioNombre?: string
 }

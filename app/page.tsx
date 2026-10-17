@@ -97,6 +97,7 @@ const openModal = (title: string) => {
     addAppointment: (appointment: string[]) => window.dispatchEvent(new CustomEvent('cita-creada', { detail: appointment })),
     onAccion: (cita: CitaPanel, accion: AccionCita) => setCitaAbierta({ cita, accion }),
     rol: perfil.rol,
+    usuarioNombre: perfil.nombre,
   }
 
   if (!authenticated) {
@@ -147,6 +148,7 @@ const openModal = (title: string) => {
         onAbrirModal={openModal}
         onCerrar={() => setMenuOpen(false)}
         esAdmin={perfil.rol === 'admin'}
+        rol={perfil.rol}
       />
 
       <section className="lg:pl-[260px]">

@@ -61,7 +61,12 @@ export function BarraSuperior({
         <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
         <div className="relative" ref={contenedor}>
-          <BotonAvatarMenu nombre={usuario.nombre} abierto={menuAbierto} onAlternar={() => setMenuAbierto((abierto) => !abierto)} />
+          <div className="flex items-center gap-2.5">
+            <span className="hidden sm:inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 border border-blue-100">
+              {ETIQUETA_ROL[usuario.rol]}
+            </span>
+            <BotonAvatarMenu nombre={usuario.nombre} abierto={menuAbierto} onAlternar={() => setMenuAbierto((abierto) => !abierto)} />
+          </div>
 
           {menuAbierto && (
             <div role="menu" className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
@@ -80,7 +85,7 @@ export function BarraSuperior({
                     Vista previa de rol
                   </p>
                   <div className="flex flex-col gap-1">
-                    {(['admin', 'recepcionista', 'enfermero'] as RolUsuario[]).map((r) => (
+                    {(['admin', 'medico', 'recepcionista', 'enfermero'] as RolUsuario[]).map((r) => (
                       <button
                         key={r}
                         type="button"

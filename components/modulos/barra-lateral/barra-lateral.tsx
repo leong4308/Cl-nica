@@ -15,9 +15,11 @@ type BarraLateralProps = {
   onNavegar: (label: string) => void
   onAbrirModal: (title: string) => void
   onCerrar: () => void
+  esAdmin?: boolean
+  rol?: string
 }
 
-export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar, esAdmin }: BarraLateralProps & { esAdmin?: boolean }) {
+export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar, esAdmin, rol }: BarraLateralProps) {
   const [insignias, setInsignias] = useState<Record<string, string>>(() => leerInsignias())
 
   useEffect(() => {
@@ -37,11 +39,16 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
     }
   }, [])
 
+  const etiquetaRol = rol === 'medico' ? 'Médico' : esAdmin ? 'Administrador' : 'Sistema Médico'
+
   return (
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-[82px] items-center gap-3 border-b border-slate-100 px-7">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white"><HeartPulse size={23} /></div>
-        <div><b className="text-[17px] tracking-tight">Clínica Nova</b><p className="text-[10px] font-medium tracking-widest text-slate-400">SISTEMA MÉDICO</p></div>
+        <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-200"><HeartPulse size={23} /></div>
+        <div>
+          <b className="text-[17px] tracking-tight text-slate-900">Clínica Nova</b>
+          <p className="text-[10px] font-semibold tracking-wider text-blue-600 uppercase">{etiquetaRol}</p>
+        </div>
         <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
 

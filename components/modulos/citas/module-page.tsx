@@ -17,7 +17,7 @@ import { precargarPerfilPaciente, registrarPerfilPacienteEnCache } from '@/lib/s
 
 type DatosModulo = { modulo: string; filas: Row[]; error: string | null }
 
-export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicActions & { active: string }) {
+export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNombre }: ClinicActions & { active: string }) {
   const [busqueda, setBusqueda] = useState('')
   const [version, setVersion] = useState(0)
   const config = modules[active]
@@ -109,13 +109,18 @@ export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicA
   const Icon = config.icon
 
   const esMedico = rol === 'medico'
-  const accionOcultaParaMedico = esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')
+  const esAdmin = rol === 'admin'
+  const accionOculta =
+    (esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||
+    (config.action === 'Registrar médico' && !esAdmin)
 
-  const botonPrincipal = accionOcultaParaMedico
+  const botonPrincipal = accionOculta
     ? null
     : config.action === 'Nueva cita'
       ? <BotonNuevaCitaModulo onAbrirModal={openModal} />
-      : <BotonAccionModulo etiqueta={config.action} onAbrirModal={openModal} />
+      : config.action === 'Registrar médico'
+        ? <BotonAccionModulo etiqueta={config.action} onAbrirModal={() => openModal('Usuarios')} />
+        : <BotonAccionModulo etiqueta={config.action} onAbrirModal={openModal} />
   return (
     <section>
       <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
@@ -169,7 +174,13 @@ export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicA
                 </button>
               )}
             </div>
-            <BotonExportarModulo modulo={active} filas={filasFiltradas} onAvisar={notify} />
+            <BotonExportarModulo
+              modulo={active}
+              filas={filasFiltradas}
+              onAvisar={notify}
+              rol={rol}
+              nombreUsuario={usuarioNombre}
+            />
           </div>
         </div>
 
