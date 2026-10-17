@@ -110,6 +110,8 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
 
   const esMedico = rol === 'medico'
   const esAdmin = rol === 'admin'
+  const esRecepcionista = rol === 'recepcionista'
+  const ocultarColumnaAcciones = active === 'Citas' && esRecepcionista
   const accionOculta =
     (esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||
     (config.action === 'Registrar médico' && !esAdmin)
@@ -208,7 +210,14 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
         {!cargando && !error && filasFiltradas.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
-              <thead><tr className="border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">{config.columns.map((column) => <th className="px-5 py-3" key={column}>{column}</th>)}<th className="px-5 py-3">Acciones</th></tr></thead>
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {config.columns.map((column) => (
+                    <th className="px-5 py-3" key={column}>{column}</th>
+                  ))}
+                  {!ocultarColumnaAcciones && <th className="px-5 py-3">Acciones</th>}
+                </tr>
+              </thead>
               <tbody>
                 {filasFiltradas.map((row, i) => {
                   const displayCells = row.slice(0, config.columns.length)
@@ -217,19 +226,22 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
                     <tr className="border-b border-slate-50 text-xs last:border-0" key={`${id}-${i}`}>
                       {displayCells.map((cell, j) => (
                         <td className="px-5 py-4 text-slate-600" key={`${cell}-${j}`}>
-                          {j === displayCells.length - 1 ? <Status text={cell} /> : cell}
+                          {config.columns[j] === 'Estado' ? <Status text={cell} /> : cell}
                         </td>
                       ))}
-                      <td className="px-5 py-3">
-                        <AccionesFilaModulo
-                          id={id}
-                          fila={row}
-                          modulo={active}
-                          esMedico={esMedico}
-                          onAbrirModal={openModal}
-                          onAccion={onAccion}
-                        />
-                      </td>
+                      {!ocultarColumnaAcciones && (
+                        <td className="px-5 py-3">
+                          <AccionesFilaModulo
+                            id={id}
+                            fila={row}
+                            modulo={active}
+                            esMedico={esMedico}
+                            rol={rol}
+                            onAbrirModal={openModal}
+                            onAccion={onAccion}
+                          />
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

@@ -20,14 +20,18 @@ import {
   registrarHistorialPacienteEnCache,
   registrarPerfilPacienteEnCache,
 } from '@/lib/supabase/cache-pacientes'
+import type { RolUsuario } from '@/lib/supabase/tipos-rol'
+import { Status } from '@/components/modulos/citas/estado'
 
 type Tab = 'perfil' | 'historial'
 
 export function ModalPerfilPaciente({
   pacienteId,
+  rol,
   onClose,
 }: {
   pacienteId: number
+  rol?: RolUsuario
   onClose: () => void
 }) {
   const datosIniciales = obtenerDatosPacienteInicial(pacienteId)
@@ -115,8 +119,8 @@ export function ModalPerfilPaciente({
               <p className="mt-0.5 text-xs text-slate-500">
                 ID: <span className="font-semibold text-slate-700">PAC-{String(pacienteId).padStart(5, '0')}</span>
                 {perfil && (
-                  <span className={`ml-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${perfil.estaActivo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {perfil.estaActivo ? 'Activo' : 'Inactivo'}
+                  <span className="ml-2 inline-flex align-middle">
+                    <Status text={perfil.estaActivo ? 'Activo' : 'Inactivo'} />
                   </span>
                 )}
               </p>
@@ -146,18 +150,20 @@ export function ModalPerfilPaciente({
             <User size={14} />
             Datos del paciente
           </button>
-          <button
-            type="button"
-            onClick={() => handleTab('historial')}
-            className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors ${
-              tab === 'historial'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <History size={14} />
-            Historial clínico
-          </button>
+          {rol !== 'recepcionista' && (
+            <button
+              type="button"
+              onClick={() => handleTab('historial')}
+              className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors ${
+                tab === 'historial'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <History size={14} />
+              Historial clínico
+            </button>
+          )}
         </div>
 
         {/* Contenido instantáneo */}
@@ -188,17 +194,17 @@ export function ModalPerfilPaciente({
 
           {cargando && !perfil && (
             <div className="space-y-3 py-6">
-              <div className="h-24 rounded-xl bg-slate-100 animate-pulse" />
-              <div className="h-20 rounded-xl bg-slate-100 animate-pulse" />
+              <div className="h-24 rounded-xl bg-slate-50 border border-slate-100" />
+              <div className="h-20 rounded-xl bg-slate-50 border border-slate-100" />
             </div>
           )}
 
-          {tab === 'historial' && (
+          {rol !== 'recepcionista' && tab === 'historial' && (
             <div>
               {cargandoHistorial && !historial ? (
                 <div className="space-y-3 py-4">
-                  <div className="h-16 rounded-xl bg-slate-100 animate-pulse" />
-                  <div className="h-16 rounded-xl bg-slate-100 animate-pulse" />
+                  <div className="h-16 rounded-xl bg-slate-50 border border-slate-100" />
+                  <div className="h-16 rounded-xl bg-slate-50 border border-slate-100" />
                 </div>
               ) : historial !== null && historial.length === 0 ? (
                 <div className="py-12 text-center">
@@ -208,7 +214,7 @@ export function ModalPerfilPaciente({
                 </div>
               ) : historial === null ? (
                 <div className="space-y-3 py-4">
-                  <div className="h-16 rounded-xl bg-slate-100 animate-pulse" />
+                  <div className="h-16 rounded-xl bg-slate-50 border border-slate-100" />
                 </div>
               ) : (
                 <div className="space-y-3">

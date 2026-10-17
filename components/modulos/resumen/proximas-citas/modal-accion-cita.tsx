@@ -14,6 +14,7 @@ import {
 } from '@/lib/supabase/datos'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { actualizarAgendaEnCache, leerAgendaEnCache, ocuparSlotEnCache } from '@/lib/supabase/cache-cita'
+import { leerHistorialPacienteEnCache, registrarHistorialPacienteEnCache } from '@/lib/supabase/cache-pacientes'
 import { BotonAccionDetalle } from './detalle-cita'
 import { BotonCerrarModal } from './cerrar-modal'
 import { BotonesDiaReagenda, BotonesHoraReagenda, BotonCancelarReagenda, BotonGuardarReagenda } from './reagendar-cita'
@@ -40,9 +41,11 @@ export function ModalAccionCita({
 }: PropsModalCita) {
   const [trabajando, setTrabajando] = useState<Accion>('')
   const [error, setError] = useState('')
-  const [historial, setHistorial] = useState<HistorialPaciente[] | null>(null)
-  const [cargandoHistorial, setCargandoHistorial] = useState(false)
-  const [creandoExpediente, setCreandoExpediente] = useState(false)
+  const historialPrecargado = cita.pacienteId ? leerHistorialPacienteEnCache(cita.pacienteId) : null
+  const [historial, setHistorial] = useState<HistorialPaciente[] | null>(historialPrecargado)
+  const [creandoExpediente, setCreandoExpediente] = useState(
+    rol === 'medico' || (historialPrecargado !== null && historialPrecargado.length === 0)
+  )
   const [diagnostico, setDiagnostico] = useState('')
   const [receta, setReceta] = useState('')
   const [notas, setNotas] = useState('')
@@ -51,16 +54,16 @@ export function ModalAccionCita({
   const [mensajeExito, setMensajeExito] = useState('')
 
   useEffect(() => {
-    setHistorial(null)
-    setCargandoHistorial(false)
+    const precargado = cita.pacienteId ? leerHistorialPacienteEnCache(cita.pacienteId) : null
+    setHistorial(precargado)
     setError('')
-    setCreandoExpediente(false)
+    setCreandoExpediente(rol === 'medico' || (precargado !== null && precargado.length === 0))
     setDiagnostico('')
     setReceta('')
     setNotas('')
     setEnviandoSolicitud(false)
     setMensajeExito('')
-  }, [cita.id])
+  }, [cita.id, cita.pacienteId, rol])
 
   const agendaPrecargada = accion === 'reagendar' && cita.medicoId ? leerAgendaEnCache(cita.medicoId) : null
   const [dias, setDias] = useState<DiaDisponible[]>(agendaPrecargada?.filas ?? [])
@@ -116,27 +119,25 @@ export function ModalAccionCita({
 
   async function soloCargarHistorial() {
     if (!cita.pacienteId) return
-    setCargandoHistorial(true)
     const resultado = await cargarHistorialPaciente(cita.pacienteId)
-    setCargandoHistorial(false)
     if (resultado.error) {
       setError(resultado.error)
       return
     }
     setHistorial(resultado.filas)
+    registrarHistorialPacienteEnCache(cita.pacienteId, resultado.filas)
   }
 
   async function confirmarYVerHistorial() {
     const ok = await ejecutar('confirmar', onConfirmar)
     if (!ok || !cita.pacienteId) return
-    setCargandoHistorial(true)
     const resultado = await cargarHistorialPaciente(cita.pacienteId)
-    setCargandoHistorial(false)
     if (resultado.error) {
       setError(resultado.error)
       return
     }
     setHistorial(resultado.filas)
+    registrarHistorialPacienteEnCache(cita.pacienteId, resultado.filas)
   }
 
   async function guardarNuevoExpediente() {
@@ -156,7 +157,10 @@ export function ModalAccionCita({
     setMensajeExito('Expediente guardado correctamente')
     window.setTimeout(() => setMensajeExito(''), 3500)
     const historialNuevo = await cargarHistorialPaciente(cita.pacienteId)
-    if (!historialNuevo.error) setHistorial(historialNuevo.filas)
+    if (!historialNuevo.error) {
+      setHistorial(historialNuevo.filas)
+      registrarHistorialPacienteEnCache(cita.pacienteId, historialNuevo.filas)
+    }
   }
 
   useEffect(() => {
@@ -235,14 +239,12 @@ export function ModalAccionCita({
         {mensajeExito && <p role="status" className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800">{mensajeExito}</p>}
         {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{error}</p>}
 
-        {(historial !== null || cargandoHistorial) && accion !== 'reagendar' && (
+        {accion !== 'reagendar' && (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
             {accion !== 'historial' && (
               <p className="text-xs font-bold text-emerald-800">Historial médico de {cita.paciente}</p>
             )}
-            {cargandoHistorial ? (
-              <p className="mt-2 text-xs text-slate-500">Cargando historial…</p>
-            ) : historial !== null && historial.length === 0 ? (
+            {historial !== null && historial.length === 0 ? (
               <>
                 <p className="mt-2 text-xs text-slate-500">Este paciente aún no tiene expedientes anteriores.</p>
                 {!creandoExpediente ? (

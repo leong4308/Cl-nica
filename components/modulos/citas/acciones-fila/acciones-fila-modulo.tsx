@@ -2,6 +2,7 @@
 
 import { RowActions } from '../../compartidos/ui'
 import type { CitaPanel } from '@/lib/supabase/datos'
+import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { precargarDetalleCita, registrarCitaRapida } from '@/lib/supabase/cache-detalle-cita'
 
 import {
@@ -15,6 +16,7 @@ type PropsAccionesFilaModulo = {
   fila?: string[]
   modulo?: string
   esMedico?: boolean
+  rol?: RolUsuario
   onAbrirModal: (titulo: string) => void
   onAccion?: (cita: CitaPanel, accion: 'detalle' | 'reagendar' | 'historial') => void
 }
@@ -24,8 +26,13 @@ export function AccionesFilaModulo({
   fila,
   modulo,
   esMedico,
+  rol,
   onAbrirModal,
 }: PropsAccionesFilaModulo) {
+  if (modulo === 'Citas' && rol === 'recepcionista') {
+    return <span className="text-xs text-slate-300 font-medium select-none">—</span>
+  }
+
   if (modulo === 'Citas' && esMedico) {
     const pacienteId = fila?.[8] ? Number(fila[8]) : undefined
 
@@ -76,17 +83,19 @@ export function AccionesFilaModulo({
       onAbrirModal(`PacienteDetalle: ${id}`)
     }
 
+    const esAdmin = rol === 'admin'
     return (
       <RowActions
         onView={handleVerPaciente}
         onHoverView={!Number.isNaN(numId) ? () => void precargarPerfilPaciente(numId) : undefined}
-        onEdit={esMedico ? undefined : () => onAbrirModal(`Editar: ${id}`)}
-        onDelete={esMedico ? undefined : () => onAbrirModal(`Eliminar: ${id}`)}
+        onEdit={esAdmin ? () => onAbrirModal(`Editar: ${id}`) : undefined}
+        onDelete={esAdmin ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
       />
     )
   }
 
   const pacienteId = fila?.[8] ? Number(fila[8]) : undefined
+  const esAdmin = rol === 'admin'
 
   return (
     <RowActions
@@ -109,8 +118,8 @@ export function AccionesFilaModulo({
         onAbrirModal(`Detalle: ${id}`)
       }}
       onHoverView={modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
-      onEdit={esMedico ? undefined : () => onAbrirModal(`Editar: ${id}`)}
-      onDelete={esMedico ? undefined : () => onAbrirModal(`Eliminar: ${id}`)}
+      onEdit={esAdmin ? () => onAbrirModal(`Editar: ${id}`) : undefined}
+      onDelete={esAdmin ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
     />
   )
 }

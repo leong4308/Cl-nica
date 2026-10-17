@@ -174,7 +174,7 @@ export function InterfazEnfermero({
       )}
 
       {modal !== null && modal.startsWith('PacienteDetalle: ') && (
-        <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
+        <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} rol={usuario.rol} onClose={() => setModal(null)} />
       )}
 
       {modal !== null && modal.startsWith('Editar: ') && (

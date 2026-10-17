@@ -187,7 +187,7 @@ const openModal = (title: string) => {
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
       )}
       {(modal !== null && modal.startsWith('PacienteDetalle: ')) && (
-        <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
+        <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} rol={perfil.rol} onClose={() => setModal(null)} />
       )}
       {(modal !== null && modal.startsWith('Editar: ')) && (
         <ModalEditarCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />

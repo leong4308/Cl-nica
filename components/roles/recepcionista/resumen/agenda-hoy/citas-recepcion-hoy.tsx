@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { CalendarDays, Clock, User } from 'lucide-react'
 import { cargarCitasPanel, type CitaPanel } from '@/lib/supabase/datos'
 import { leerPanel, guardarPanel } from '@/lib/supabase/cache-modulos'
+import { Status } from '@/components/modulos/citas/estado'
 
 type PropsCitasRecepcion = {
   onAbrirCita: (cita: CitaPanel, accion: 'detalle' | 'reagendar') => void
@@ -111,17 +112,7 @@ export function CitasRecepcionHoy({ onAbrirCita, onNuevaCita }: PropsCitasRecepc
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-slate-900">{cita.paciente}</p>
-                    <span
-                      className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold ${
-                        cita.estado === 'Confirmada'
-                          ? 'bg-blue-50 text-blue-700'
-                          : cita.estado === 'Atendida'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-amber-50 text-amber-700'
-                      }`}
-                    >
-                      {cita.estado}
-                    </span>
+                    <Status text={cita.estado} />
                     {cita.solicitaReagenda && (
                       <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                         <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
