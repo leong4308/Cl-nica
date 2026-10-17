@@ -10,6 +10,7 @@ import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nu
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/proximas-citas/modal-accion-cita'
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
+import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
 import { actualizarEstadoCita, eliminarCita, type CitaPanel, type EstadoCita } from '@/lib/supabase/datos'
@@ -40,7 +41,7 @@ export function InterfazEnfermero({
   }
 
   const MODALES_CON_FORMULARIO = ['Registrar paciente', 'Nuevo paciente', 'Nueva cita', 'Buscar paciente']
-  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar']
+  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle']
 
   const openModal = (title: string) => {
     const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -168,6 +169,10 @@ export function InterfazEnfermero({
 
       {modal !== null && modal.startsWith('Detalle: ') && (
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
+      )}
+
+      {modal !== null && modal.startsWith('PacienteDetalle: ') && (
+        <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
 
       {modal !== null && modal.startsWith('Editar: ') && (

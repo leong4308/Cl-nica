@@ -22,6 +22,7 @@ import {
   type EstadoCita,
 } from '@/lib/supabase/datos'
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
+import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
@@ -54,7 +55,7 @@ export default function Page() {
   }
 
 const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente', 'Ver resultados pendientes']
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle']
 
 const openModal = (title: string) => {
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -182,6 +183,9 @@ const openModal = (title: string) => {
       )}
       {(modal !== null && modal.startsWith('HistorialDetalle: ')) && (
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
+      )}
+      {(modal !== null && modal.startsWith('PacienteDetalle: ')) && (
+        <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
       {(modal !== null && modal.startsWith('Editar: ')) && (
         <ModalEditarCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />

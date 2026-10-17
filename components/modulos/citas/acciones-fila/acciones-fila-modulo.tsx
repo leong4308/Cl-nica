@@ -4,6 +4,12 @@ import { RowActions } from '../../compartidos/ui'
 import type { CitaPanel } from '@/lib/supabase/datos'
 import { precargarDetalleCita, registrarCitaRapida } from '@/lib/supabase/cache-detalle-cita'
 
+import {
+  leerPerfilPacienteEnCache,
+  precargarPerfilPaciente,
+  registrarPerfilPacienteEnCache,
+} from '@/lib/supabase/cache-pacientes'
+
 type PropsAccionesFilaModulo = {
   id: string
   fila?: string[]
@@ -21,35 +27,88 @@ export function AccionesFilaModulo({
   onAbrirModal,
 }: PropsAccionesFilaModulo) {
   if (modulo === 'Citas' && esMedico) {
-    const numId = Number(id)
+    const pacienteId = fila?.[8] ? Number(fila[8]) : undefined
 
-    const handleVerHistorial = () => {
-      if (fila && fila.length >= 6 && !Number.isNaN(numId)) {
-        registrarCitaRapida({
-          id: numId,
-          paciente: fila[1] ?? '',
-          medico: fila[2] ?? '',
-          motivo: fila[3] ?? '',
-          estado: fila[9] || fila[4] || 'pendiente',
-          inicio: fila[6] || new Date().toISOString(),
-          fin: fila[7] || fila[6] || new Date().toISOString(),
-          pacienteId: fila[8] ? Number(fila[8]) : undefined,
+    const handleVerPacienteCita = () => {
+      if (pacienteId && !Number.isNaN(pacienteId)) {
+        const existente = leerPerfilPacienteEnCache(pacienteId)
+        registrarPerfilPacienteEnCache({
+          id: pacienteId,
+          nombre: fila?.[1] || existente?.nombre || 'Paciente',
+          correo: fila?.[14] || existente?.correo || '',
+          telefono: fila?.[12] || existente?.telefono || '—',
+          fechaNacimiento: fila?.[11] || existente?.fechaNacimiento || '—',
+          genero: fila?.[10] === 'M' ? 'Masculino' : fila?.[10] === 'F' ? 'Femenino' : fila?.[10] || existente?.genero || '—',
+          estaActivo: fila?.[13] ? fila?.[13] === 'Activo' : (existente?.estaActivo ?? true),
+          notasMedicas: existente?.notasMedicas || '',
         })
+        onAbrirModal(`PacienteDetalle: ${pacienteId}`)
+        return
       }
       onAbrirModal(`HistorialDetalle: ${id}`)
     }
 
     return (
       <RowActions
-        onView={handleVerHistorial}
-        onHoverView={!Number.isNaN(numId) ? () => void precargarDetalleCita(numId) : undefined}
+        onView={handleVerPacienteCita}
+        onHoverView={pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
       />
     )
   }
 
+  if (modulo === 'Pacientes') {
+    const numId = Number(id)
+
+    const handleVerPaciente = () => {
+      if (fila && !Number.isNaN(numId)) {
+        const existente = leerPerfilPacienteEnCache(numId)
+        registrarPerfilPacienteEnCache({
+          id: numId,
+          nombre: fila[0] || existente?.nombre || 'Paciente',
+          correo: fila[8] || existente?.correo || '',
+          telefono: fila[2] || existente?.telefono || '—',
+          fechaNacimiento: fila[3] || existente?.fechaNacimiento || '—',
+          genero: fila[6] === 'M' ? 'Masculino' : fila[6] === 'F' ? 'Femenino' : fila[6] || existente?.genero || '—',
+          estaActivo: fila[4] ? fila[4] === 'Activo' : (existente?.estaActivo ?? true),
+          notasMedicas: fila[7] || existente?.notasMedicas || '',
+        })
+      }
+      onAbrirModal(`PacienteDetalle: ${id}`)
+    }
+
+    return (
+      <RowActions
+        onView={handleVerPaciente}
+        onHoverView={!Number.isNaN(numId) ? () => void precargarPerfilPaciente(numId) : undefined}
+        onEdit={esMedico ? undefined : () => onAbrirModal(`Editar: ${id}`)}
+        onDelete={esMedico ? undefined : () => onAbrirModal(`Eliminar: ${id}`)}
+      />
+    )
+  }
+
+  const pacienteId = fila?.[8] ? Number(fila[8]) : undefined
+
   return (
     <RowActions
-      onView={() => onAbrirModal(`Detalle: ${id}`)}
+      onView={() => {
+        if (modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId)) {
+          const existente = leerPerfilPacienteEnCache(pacienteId)
+          registrarPerfilPacienteEnCache({
+            id: pacienteId,
+            nombre: fila?.[1] || existente?.nombre || 'Paciente',
+            correo: fila?.[14] || existente?.correo || '',
+            telefono: fila?.[12] || existente?.telefono || '—',
+            fechaNacimiento: fila?.[11] || existente?.fechaNacimiento || '—',
+            genero: fila?.[10] === 'M' ? 'Masculino' : fila?.[10] === 'F' ? 'Femenino' : fila?.[10] || existente?.genero || '—',
+            estaActivo: fila?.[13] ? fila?.[13] === 'Activo' : (existente?.estaActivo ?? true),
+            notasMedicas: existente?.notasMedicas || '',
+          })
+          onAbrirModal(`PacienteDetalle: ${pacienteId}`)
+          return
+        }
+        onAbrirModal(`Detalle: ${id}`)
+      }}
+      onHoverView={modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
       onEdit={esMedico ? undefined : () => onAbrirModal(`Editar: ${id}`)}
       onDelete={esMedico ? undefined : () => onAbrirModal(`Eliminar: ${id}`)}
     />

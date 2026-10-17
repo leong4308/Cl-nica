@@ -24,7 +24,7 @@ function sigueExpresion(fuente, desde) {
 
 function siguienteToken(fuente, desde) {
   let i = desde
-  for (;;) {
+  for (; ;) {
     while (i < fuente.length && /\s/.test(fuente[i])) i++
     if (fuente.startsWith('//', i)) {
       const fin = fuente.indexOf('\n', i)

@@ -13,6 +13,7 @@ import { BotonAccionModulo } from './boton-accion'
 import { cargarModulo } from '@/lib/supabase/datos'
 import { guardarModulo, leerModulo } from '@/lib/supabase/cache-modulos'
 import { registrarCitaRapida } from '@/lib/supabase/cache-detalle-cita'
+import { precargarPerfilPaciente, registrarPerfilPacienteEnCache } from '@/lib/supabase/cache-pacientes'
 
 type DatosModulo = { modulo: string; filas: Row[]; error: string | null }
 
@@ -34,6 +35,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicA
         resultado.filas.forEach((row) => {
           if (row.length >= 6) {
             const idNum = Number(row[5])
+            const pacienteId = row[8] ? Number(row[8]) : undefined
             if (!Number.isNaN(idNum)) {
               registrarCitaRapida({
                 id: idNum,
@@ -43,9 +45,40 @@ export function ModulePage({ active, notify, openModal, onAccion, rol }: ClinicA
                 estado: row[9] || row[4] || 'pendiente',
                 inicio: row[6] || new Date().toISOString(),
                 fin: row[7] || row[6] || new Date().toISOString(),
-                pacienteId: row[8] ? Number(row[8]) : undefined,
+                pacienteId,
               })
             }
+            if (pacienteId && !Number.isNaN(pacienteId)) {
+              registrarPerfilPacienteEnCache({
+                id: pacienteId,
+                nombre: row[1] ?? '—',
+                correo: row[14] ?? '',
+                telefono: row[12] ?? '—',
+                fechaNacimiento: row[11] ?? '—',
+                genero: row[10] === 'M' ? 'Masculino' : row[10] === 'F' ? 'Femenino' : row[10] || '—',
+                estaActivo: row[13] !== 'Inactivo',
+                notasMedicas: '',
+              })
+              void precargarPerfilPaciente(pacienteId)
+            }
+          }
+        })
+      }
+      if (active === 'Pacientes') {
+        resultado.filas.forEach((row) => {
+          const idNum = Number(row[5] ?? row[0])
+          if (!Number.isNaN(idNum)) {
+            registrarPerfilPacienteEnCache({
+              id: idNum,
+              nombre: row[0] ?? '—',
+              correo: row[8] ?? '—',
+              telefono: row[2] ?? '—',
+              fechaNacimiento: row[3] ?? '—',
+              genero: row[6] === 'M' ? 'Masculino' : row[6] === 'F' ? 'Femenino' : row[6] || '—',
+              estaActivo: row[4] === 'Activo',
+              notasMedicas: row[7] ?? '',
+            })
+            void precargarPerfilPaciente(idNum)
           }
         })
       }

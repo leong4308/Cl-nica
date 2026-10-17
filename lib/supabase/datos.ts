@@ -39,10 +39,18 @@ const ETIQUETA_ESTADO_ORDEN: Record<string, string> = {
 }
 const ETIQUETA_ESTADO_INTERNACION: Record<string, string> = { activa: 'Ocupada', alta: 'Alta', traslado: 'Traslado' }
 
+type PacienteCitaRelacion = {
+  id?: number
+  esta_activo?: boolean
+  fecha_nacimiento?: string | null
+  genero?: string | null
+  usuarios: { nombre_completo: string; correo?: string | null; telefono?: string | null } | { nombre_completo: string; correo?: string | null; telefono?: string | null }[] | null
+}
+
 type CitaFila = {
   id: number; inicio: string; fin?: string; estado: string; motivo: string | null; motivo_cancelacion: string | null
   paciente_id: number
-  perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+  perfiles_pacientes: PacienteCitaRelacion | PacienteCitaRelacion[] | null
   perfiles_medicos: MedicoRelacion | MedicoRelacion[] | null
 }
 type MedicoRelacion = {
@@ -55,7 +63,7 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
   const supabase = createClient()
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
-      .select('id, inicio, fin, estado, motivo, paciente_id, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
+      .select('id, inicio, fin, estado, motivo, paciente_id, perfiles_pacientes(id, esta_activo, fecha_nacimiento, genero, usuarios(nombre_completo, correo, telefono)), perfiles_medicos(usuarios(nombre_completo))')
       .order('inicio', { ascending: false })
       .limit(100)
   )
@@ -64,17 +72,25 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
     filas: filas.map((cita) => {
       const medicoRel = cita.perfiles_medicos
       const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : medicoRel
+      const pacRel = cita.perfiles_pacientes
+      const pac: PacienteCitaRelacion | null = Array.isArray(pacRel) ? (pacRel[0] ?? null) : pacRel
+      const pacUsr = Array.isArray(pac?.usuarios) ? (pac?.usuarios[0] ?? null) : (pac?.usuarios ?? null)
       return [
         horaDe(cita.inicio),
-        nombreDe(cita.perfiles_pacientes?.usuarios),
+        nombreDe(pac?.usuarios),
         nombreDe(medico?.usuarios),
         cita.motivo ?? 'Sin motivo',
         ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
         String(cita.id),
         cita.inicio,
         cita.fin ?? cita.inicio,
-        String(cita.paciente_id ?? ''),
+        String(cita.paciente_id ?? pac?.id ?? ''),
         cita.estado,
+        pac?.genero ?? '',
+        pac?.fecha_nacimiento ? fechaDe(pac.fecha_nacimiento) : '—',
+        pacUsr?.telefono ?? '—',
+        pac?.esta_activo !== false ? 'Activo' : 'Inactivo',
+        pacUsr?.correo ?? '',
       ]
     }),
   }
@@ -121,6 +137,7 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
       const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : medicoRel
       const usuarioMedico = medico?.usuarios
       const nombreMedico = Array.isArray(usuarioMedico) ? usuarioMedico[0]?.nombre_completo : usuarioMedico?.nombre_completo
+      const pacRel = Array.isArray(cita.perfiles_pacientes) ? cita.perfiles_pacientes[0] : cita.perfiles_pacientes
       return {
         id: cita.id,
         pacienteId: cita.paciente_id,
@@ -128,7 +145,7 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
         duracionConsulta: medico?.duracion_consulta ?? 20,
         fecha: aIso(fechaLocal(new Date(cita.inicio).toLocaleDateString('en-CA'))),
         hora: horaDe(cita.inicio),
-        paciente: nombreDe(cita.perfiles_pacientes?.usuarios),
+        paciente: nombreDe(pacRel?.usuarios),
         medico: nombreMedico ?? '—',
         motivo: cita.motivo ?? 'Sin motivo',
         motivoCancelacion: cita.motivo_cancelacion ?? null,
@@ -208,14 +225,15 @@ export async function reagendarCita(
 
 type PacienteFila = {
   id: number; esta_activo: boolean; fecha_nacimiento: string | null
-  usuarios: { nombre_completo: string; telefono: string | null } | { nombre_completo: string; telefono: string | null }[] | null
+  genero: string | null; notas_medicas: string | null
+  usuarios: { nombre_completo: string; correo?: string | null; telefono: string | null } | { nombre_completo: string; correo?: string | null; telefono: string | null }[] | null
 }
 
 export async function cargarPacientes(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
   const { filas, error } = await consultar<PacienteFila>(
     supabase.from('perfiles_pacientes')
-      .select('id, esta_activo, fecha_nacimiento, usuarios(nombre_completo, telefono)')
+      .select('id, esta_activo, fecha_nacimiento, genero, notas_medicas, usuarios(nombre_completo, correo, telefono)')
       .order('id', { ascending: true })
       .limit(100)
   )
@@ -230,6 +248,9 @@ export async function cargarPacientes(): Promise<{ filas: Row[]; error: string |
         paciente.fecha_nacimiento ? fechaDe(paciente.fecha_nacimiento) : '—',
         paciente.esta_activo ? 'Activo' : 'Inactivo',
         String(paciente.id),
+        paciente.genero ?? '',
+        paciente.notas_medicas ?? '',
+        (usuario as { correo?: string } | null)?.correo ?? '',
       ]
     }),
   }
@@ -252,6 +273,42 @@ export type HistorialPaciente = {
   receta: string
   notas: string
   medico: string
+}
+
+export type PerfilPacienteDetalle = {
+  id: number
+  nombre: string
+  correo: string
+  telefono: string
+  fechaNacimiento: string
+  genero: string
+  estaActivo: boolean
+  notasMedicas: string
+}
+
+export async function cargarPerfilPaciente(pacienteId: number): Promise<{ perfil: PerfilPacienteDetalle | null; error: string | null }> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('perfiles_pacientes')
+    .select('id, esta_activo, fecha_nacimiento, genero, notas_medicas, usuarios(nombre_completo, correo, telefono)')
+    .eq('id', pacienteId)
+    .maybeSingle()
+  if (error) return { perfil: null, error: error.message }
+  if (!data) return { perfil: null, error: null }
+  const u = Array.isArray(data.usuarios) ? data.usuarios[0] : data.usuarios
+  return {
+    perfil: {
+      id: data.id,
+      nombre: u?.nombre_completo ?? '—',
+      correo: (u as { correo?: string } | null)?.correo ?? '—',
+      telefono: (u as { telefono?: string } | null)?.telefono ?? '—',
+      fechaNacimiento: data.fecha_nacimiento ? fechaDe(data.fecha_nacimiento) : '—',
+      genero: data.genero === 'M' ? 'Masculino' : data.genero === 'F' ? 'Femenino' : data.genero ?? '—',
+      estaActivo: data.esta_activo,
+      notasMedicas: data.notas_medicas ?? '',
+    },
+    error: null,
+  }
 }
 
 export async function cargarHistorialPaciente(pacienteId: number): Promise<{ filas: HistorialPaciente[]; error: string | null }> {
@@ -907,9 +964,9 @@ export async function obtenerCita(
   if (error) return { cita: null, error: error.message }
   if (!data) return { cita: null, error: null }
 
-  const pacienteRel = data.perfiles_pacientes
+  const pacienteRel = data.perfiles_pacientes as any
   const pacienteUsr = Array.isArray(pacienteRel) ? pacienteRel[0]?.usuarios : pacienteRel?.usuarios
-  const medicoRel = data.perfiles_medicos
+  const medicoRel = data.perfiles_medicos as any
   const medicoUsr = Array.isArray(medicoRel) ? medicoRel[0]?.usuarios : medicoRel?.usuarios
 
   const cita = {
@@ -945,7 +1002,7 @@ export async function obtenerCitaPanel(
   if (error) return { cita: null, error: error.message }
   if (!data) return { cita: null, error: null }
 
-  const pacienteRel = data.perfiles_pacientes
+  const pacienteRel = data.perfiles_pacientes as any
   const pacienteUsr = Array.isArray(pacienteRel) ? pacienteRel[0]?.usuarios : pacienteRel?.usuarios
   const medicoRel = data.perfiles_medicos
   const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : (medicoRel as MedicoRelacion | null)
