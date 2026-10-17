@@ -406,16 +406,21 @@ export type DatosExpediente = {
 }
 
 export async function guardarExpediente(datos: DatosExpediente): Promise<{ error: string | null }> {
-  const fila = {
-    cita_id: datos.citaId,
-    diagnostico: datos.diagnostico.trim() || null,
-    receta: datos.receta.trim() || null,
-    notas_doctor: datos.notas.trim() || null,
+  try {
+    const res = await fetch('/api/expedientes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      return { error: json.error || 'Error al guardar el expediente' }
+    }
+    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    return { error: null }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Error al guardar el expediente' }
   }
-  const { error } = await createClient().from('expedientes').upsert(fila, { onConflict: 'cita_id' })
-  if (error) return { error: error.message }
-  window.dispatchEvent(new CustomEvent('datos-actualizados'))
-  return { error: null }
 }
 
 export async function cargarExpedienteCita(citaId: number): Promise<{

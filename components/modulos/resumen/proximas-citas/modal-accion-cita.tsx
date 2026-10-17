@@ -48,6 +48,7 @@ export function ModalAccionCita({
   const [notas, setNotas] = useState('')
   const [guardandoExpediente, setGuardandoExpediente] = useState(false)
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false)
+  const [mensajeExito, setMensajeExito] = useState('')
 
   useEffect(() => {
     setHistorial(null)
@@ -58,6 +59,7 @@ export function ModalAccionCita({
     setReceta('')
     setNotas('')
     setEnviandoSolicitud(false)
+    setMensajeExito('')
   }, [cita.id])
 
   const agendaPrecargada = accion === 'reagendar' && cita.medicoId ? leerAgendaEnCache(cita.medicoId) : null
@@ -151,6 +153,8 @@ export function ModalAccionCita({
     setDiagnostico('')
     setReceta('')
     setNotas('')
+    setMensajeExito('Expediente guardado correctamente')
+    window.setTimeout(() => setMensajeExito(''), 3500)
     const historialNuevo = await cargarHistorialPaciente(cita.pacienteId)
     if (!historialNuevo.error) setHistorial(historialNuevo.filas)
   }
@@ -228,6 +232,7 @@ export function ModalAccionCita({
           </dl>
         </div>
 
+        {mensajeExito && <p role="status" className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800">{mensajeExito}</p>}
         {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{error}</p>}
 
         {(historial !== null || cargandoHistorial) && accion !== 'reagendar' && (
@@ -298,20 +303,84 @@ export function ModalAccionCita({
                 )}
               </>
             ) : (
-              <ul className="mt-2 space-y-2">
-                {historial?.map((item, i) => (
-                  <li key={i} className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-slate-800">{item.motivo}</p>
-                      <p className="shrink-0 text-[11px] text-slate-400">{item.fecha}</p>
+              <>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-emerald-900">Historial clínico ({historial?.length})</p>
+                  {!creandoExpediente && (
+                    <button
+                      type="button"
+                      onClick={() => setCreandoExpediente(true)}
+                      className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition-colors"
+                    >
+                      + Añadir consulta
+                    </button>
+                  )}
+                </div>
+
+                {creandoExpediente && (
+                  <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <label className="block text-xs font-semibold text-slate-700">Diagnóstico
+                      <textarea
+                        value={diagnostico}
+                        onChange={(e) => setDiagnostico(e.target.value)}
+                        rows={2}
+                        placeholder="Diagnóstico del paciente"
+                        className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs font-normal text-slate-800 placeholder:text-slate-400"
+                      />
+                    </label>
+                    <label className="block text-xs font-semibold text-slate-700">Receta
+                      <textarea
+                        value={receta}
+                        onChange={(e) => setReceta(e.target.value)}
+                        rows={2}
+                        placeholder="Medicamentos recetados"
+                        className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs font-normal text-slate-800 placeholder:text-slate-400"
+                      />
+                    </label>
+                    <label className="block text-xs font-semibold text-slate-700">Notas del doctor
+                      <textarea
+                        value={notas}
+                        onChange={(e) => setNotas(e.target.value)}
+                        rows={2}
+                        placeholder="Notas de la consulta"
+                        className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs font-normal text-slate-800 placeholder:text-slate-400"
+                      />
+                    </label>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setCreandoExpediente(false)}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={guardarNuevoExpediente}
+                        disabled={guardandoExpediente || (!diagnostico.trim() && !receta.trim() && !notas.trim())}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {guardandoExpediente ? 'Guardando…' : 'Guardar expediente'}
+                      </button>
                     </div>
-                    <p className="mt-1 text-xs text-slate-600"><span className="font-semibold">Diagnóstico:</span> {item.diagnostico}</p>
-                    <p className="mt-0.5 text-xs text-slate-600"><span className="font-semibold">Receta:</span> {item.receta}</p>
-                    {item.notas && <p className="mt-0.5 text-[11px] text-slate-500">Notas: {item.notas}</p>}
-                    <p className="mt-1 text-[11px] text-slate-400">Atendió: {item.medico}</p>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                )}
+
+                <ul className="mt-2.5 space-y-2">
+                  {historial?.map((item, i) => (
+                    <li key={i} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-slate-800">{item.motivo}</p>
+                        <p className="shrink-0 text-[11px] text-slate-400">{item.fecha}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600"><span className="font-semibold text-slate-800">Diagnóstico:</span> {item.diagnostico}</p>
+                      <p className="mt-0.5 text-xs text-slate-600"><span className="font-semibold text-slate-800">Receta:</span> {item.receta}</p>
+                      {item.notas && <p className="mt-0.5 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Notas:</span> {item.notas}</p>}
+                      <p className="mt-1 text-[11px] text-slate-400">Atendió: {item.medico}</p>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         )}
