@@ -29,8 +29,8 @@ export function AccionesFilaModulo({
   rol,
   onAbrirModal,
 }: PropsAccionesFilaModulo) {
-  if (modulo === 'Citas' && rol === 'recepcionista') {
-    return <span className="text-xs text-slate-300 font-medium select-none">—</span>
+  if (rol === 'recepcionista') {
+    return null
   }
 
   if (modulo === 'Citas' && esMedico) {
