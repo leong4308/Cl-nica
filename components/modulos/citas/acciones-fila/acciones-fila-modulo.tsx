@@ -75,8 +75,8 @@ export function AccionesFilaModulo({
           correo: fila[8] || existente?.correo || '',
           telefono: fila[2] || existente?.telefono || '—',
           fechaNacimiento: fila[3] || existente?.fechaNacimiento || '—',
-          genero: fila[6] === 'M' ? 'Masculino' : fila[6] === 'F' ? 'Femenino' : fila[6] || existente?.genero || '—',
-          estaActivo: fila[4] ? fila[4] === 'Activo' : (existente?.estaActivo ?? true),
+          genero: fila[4] || existente?.genero || '—',
+          estaActivo: fila[5] ? fila[5] === 'Activo' : (existente?.estaActivo ?? true),
           notasMedicas: fila[7] || existente?.notasMedicas || '',
         })
       }

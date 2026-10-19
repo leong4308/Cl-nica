@@ -66,7 +66,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
       }
       if (active === 'Pacientes') {
         resultado.filas.forEach((row) => {
-          const idNum = Number(row[5] ?? row[0])
+          const idNum = Number(row[6] ?? row[0])
           if (!Number.isNaN(idNum)) {
             registrarPerfilPacienteEnCache({
               id: idNum,
@@ -74,8 +74,8 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
               correo: row[8] ?? '—',
               telefono: row[2] ?? '—',
               fechaNacimiento: row[3] ?? '—',
-              genero: row[6] === 'M' ? 'Masculino' : row[6] === 'F' ? 'Femenino' : row[6] || '—',
-              estaActivo: row[4] === 'Activo',
+              genero: row[4] ?? '—',
+              estaActivo: row[5] === 'Activo',
               notasMedicas: row[7] ?? '',
             })
             void precargarPerfilPaciente(idNum)

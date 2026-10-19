@@ -19,7 +19,7 @@ export function ModalBuscarPaciente({ onClose }: PropsModalBuscarPaciente) {
       identificacion: fila[1] ?? '—',
       pass: '—',
       telefono: fila[2] ?? '—',
-      estado: fila[4] ?? 'Activo',
+      estado: fila[5] ?? 'Activo',
     })),
   )
   const recargarPacientes = () => {
@@ -30,7 +30,7 @@ export function ModalBuscarPaciente({ onClose }: PropsModalBuscarPaciente) {
         identificacion: fila[1] ?? '—',
         pass: '—',
         telefono: fila[2] ?? '—',
-        estado: fila[4] ?? 'Activo',
+        estado: fila[5] ?? 'Activo',
       })))
       guardarModulo('Pacientes', resultado.filas, resultado.error)
     })
@@ -45,7 +45,7 @@ export function ModalBuscarPaciente({ onClose }: PropsModalBuscarPaciente) {
         identificacion: fila[1] ?? '—',
         pass: '—',
         telefono: fila[2] ?? '—',
-        estado: fila[4] ?? 'Activo',
+        estado: fila[5] ?? 'Activo',
       })))
       guardarModulo('Pacientes', resultado.filas, resultado.error)
     })

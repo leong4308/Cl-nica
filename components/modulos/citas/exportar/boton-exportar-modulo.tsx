@@ -51,7 +51,7 @@ export function BotonExportarModulo({
         motivo: row[11] || 'Consulta general',
         telefono: row[2] ?? '',
         nacimiento: row[3] ?? '',
-        estado: row[4] ?? '',
+        estado: row[5] ?? '',
       }))
 
       onAvisar(`Generando directorio de pacientes en PDF (${pacientesParaExportar.length} pacientes)...`)

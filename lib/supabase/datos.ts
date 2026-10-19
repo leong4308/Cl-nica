@@ -285,14 +285,16 @@ export async function cargarPacientes(): Promise<{ filas: Row[]; error: string |
       const medicoAsignado = infoCita?.medico || 'Por asignar'
       const horaCita = infoCita?.hora || '—'
       const motivoCita = infoCita?.motivo || 'Consulta general'
+      const generoTexto =
+        paciente.genero === 'M' ? 'Masculino' : paciente.genero === 'F' ? 'Femenino' : paciente.genero || '—'
       return [
         usuario?.nombre_completo ?? '—',
         `PAC-${String(paciente.id).padStart(5, '0')}`,
         usuario?.telefono ?? '—',
         paciente.fecha_nacimiento ? fechaDe(paciente.fecha_nacimiento) : '—',
+        generoTexto,
         paciente.esta_activo ? 'Activo' : 'Inactivo',
         String(paciente.id),
-        paciente.genero ?? '',
         paciente.notas_medicas ?? '',
         (usuario as { correo?: string } | null)?.correo ?? '',
         medicoAsignado,

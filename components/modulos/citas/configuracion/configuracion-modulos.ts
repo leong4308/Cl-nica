@@ -13,7 +13,7 @@ export type ModuleConfig = {
 
 export const modules: Record<string, Omit<ModuleConfig, 'rows'>> = {
   Citas: { icon: CalendarDays, eyebrow: 'Gestión de agenda', title: 'Citas médicas', description: 'Programa, confirma y da seguimiento a las consultas.', action: 'Nueva cita', columns: ['Hora', 'Paciente', 'Médico', 'Motivo', 'Estado'] },
-  Pacientes: { icon: UsersRound, eyebrow: 'Directorio clínico', title: 'Pacientes', description: 'Administra datos e historial de tus pacientes.', action: 'Nuevo paciente', columns: ['Paciente', 'Identificación', 'Teléfono', 'Fecha de nacimiento', 'Estado'] },
+  Pacientes: { icon: UsersRound, eyebrow: 'Directorio clínico', title: 'Pacientes', description: 'Administra datos e historial de tus pacientes.', action: 'Nuevo paciente', columns: ['Paciente', 'Identificación', 'Teléfono', 'Fecha de nacimiento', 'Género', 'Estado'] },
   Médicos: { icon: Stethoscope, eyebrow: 'Personal médico', title: 'Médicos y especialistas', description: 'Consulta especialidades, horarios y disponibilidad.', action: 'Registrar médico', columns: ['Profesional', 'Especialidad', 'Registro', 'Duración', 'Estado'] },
   Expedientes: { icon: FileText, eyebrow: 'Historia clínica', title: 'Expedientes médicos', description: 'Registra consultas, diagnósticos, recetas y documentos.', action: 'Nuevo expediente', columns: ['Paciente', 'Motivo', 'Diagnóstico', 'Médico', 'Actualizado'] },
   Internación: { icon: Bed, eyebrow: 'Hospitalización', title: 'Internación y camas', description: 'Controla habitaciones, admisiones, traslados y altas.', action: 'Nueva admisión', columns: ['Habitación', 'Paciente', 'Ingreso', 'Médico', 'Estado'] },
