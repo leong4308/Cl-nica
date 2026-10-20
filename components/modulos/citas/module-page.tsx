@@ -114,6 +114,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
   const ocultarColumnaAcciones = esRecepcionista || (esMedico && active.toLowerCase() === 'citas')
   const accionOculta =
     (esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||
+    (rol === 'enfermero' && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||
     (config.action === 'Registrar médico' && !esAdmin)
 
   const botonPrincipal = accionOculta
