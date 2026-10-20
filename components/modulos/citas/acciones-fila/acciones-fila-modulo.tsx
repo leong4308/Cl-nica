@@ -33,34 +33,8 @@ export function AccionesFilaModulo({
     return null
   }
 
-  if (modulo === 'Citas' && esMedico) {
-    const pacienteId = fila?.[8] ? Number(fila[8]) : undefined
-
-    const handleVerPacienteCita = () => {
-      if (pacienteId && !Number.isNaN(pacienteId)) {
-        const existente = leerPerfilPacienteEnCache(pacienteId)
-        registrarPerfilPacienteEnCache({
-          id: pacienteId,
-          nombre: fila?.[1] || existente?.nombre || 'Paciente',
-          correo: fila?.[14] || existente?.correo || '',
-          telefono: fila?.[12] || existente?.telefono || '—',
-          fechaNacimiento: fila?.[11] || existente?.fechaNacimiento || '—',
-          genero: fila?.[10] === 'M' ? 'Masculino' : fila?.[10] === 'F' ? 'Femenino' : fila?.[10] || existente?.genero || '—',
-          estaActivo: fila?.[13] ? fila?.[13] === 'Activo' : (existente?.estaActivo ?? true),
-          notasMedicas: existente?.notasMedicas || '',
-        })
-        onAbrirModal(`PacienteDetalle: ${pacienteId}`)
-        return
-      }
-      onAbrirModal(`HistorialDetalle: ${id}`)
-    }
-
-    return (
-      <RowActions
-        onView={handleVerPacienteCita}
-        onHoverView={pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
-      />
-    )
+  if (modulo === 'Citas' && (esMedico || rol === 'medico')) {
+    return null
   }
 
   if (modulo === 'Pacientes') {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -20,7 +20,9 @@ import {
   guardarFichaImportante,
   parsearFichaImportante,
   type FichaImportante,
+  type SignosVitales,
 } from '@/lib/supabase/datos'
+import { createClient } from '@/lib/supabase/client'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 type PropsFichaImportante = {
@@ -45,6 +47,8 @@ export function FichaImportantePaciente({
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
+  const [nombreSesion, setNombreSesion] = useState<string>(usuarioNombre ?? '')
+  const [rolSesion, setRolSesion] = useState<RolUsuario | undefined>(rol)
 
   // Campos de formulario
   const [alergias, setAlergias] = useState(ficha.alergias ?? '')
@@ -59,6 +63,46 @@ export function FichaImportantePaciente({
   const [spo2, setSpo2] = useState(ficha.signosVitales?.saturacionOxigeno ?? '')
   const [peso, setPeso] = useState(ficha.signosVitales?.peso ?? '')
   const [glucosa, setGlucosa] = useState(ficha.signosVitales?.glucosa ?? '')
+
+  // Sincronizar datos reactivamente si notasMedicasRaw llega de manera asíncrona
+  useEffect(() => {
+    const parsed = parsearFichaImportante(notasMedicasRaw)
+    setFicha(parsed)
+    if (!editando) {
+      setAlergias(parsed.alergias ?? '')
+      setTipoSangre(parsed.tipoSangre ?? '')
+      setCondiciones(parsed.condicionesCronicas ?? '')
+      setMedicamento(parsed.medicamentoActual ?? '')
+      setPa(parsed.signosVitales?.presionArterial ?? '')
+      setFc(parsed.signosVitales?.frecuenciaCardiaca ?? '')
+      setTemp(parsed.signosVitales?.temperatura ?? '')
+      setSpo2(parsed.signosVitales?.saturacionOxigeno ?? '')
+      setPeso(parsed.signosVitales?.peso ?? '')
+      setGlucosa(parsed.signosVitales?.glucosa ?? '')
+    }
+  }, [notasMedicasRaw, editando])
+
+  // Obtener nombre y rol de sesión si no vinieron por props
+  useEffect(() => {
+    if (usuarioNombre && rol) return
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('usuarios')
+        .select('nombre_completo, rol')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.nombre_completo && !usuarioNombre) {
+            setNombreSesion(data.nombre_completo)
+          }
+          if (data?.rol && !rol) {
+            setRolSesion(data.rol as RolUsuario)
+          }
+        })
+    })
+  }, [usuarioNombre, rol])
 
   const abrirEdicion = () => {
     setAlergias(ficha.alergias ?? '')
@@ -80,8 +124,10 @@ export function FichaImportantePaciente({
     setGuardando(true)
     setError('')
 
-    const rolTexto = rol === 'enfermero' ? 'Enfermería' : rol === 'medico' ? 'Médico' : 'Clínica'
-    const nombreRegistrador = usuarioNombre ? `${usuarioNombre} (${rolTexto})` : rolTexto
+    const rolEfectivo = rol || rolSesion
+    const rolTexto = rolEfectivo === 'enfermero' ? 'Enfermería' : rolEfectivo === 'medico' ? 'Médico' : 'Clínica'
+    const nombreEfectivo = usuarioNombre || nombreSesion
+    const nombreRegistrador = nombreEfectivo ? `${nombreEfectivo} (${rolTexto})` : rolTexto
 
     const ahora = new Date().toLocaleDateString('es-MX', {
       day: '2-digit',
@@ -91,7 +137,11 @@ export function FichaImportantePaciente({
       minute: '2-digit',
     })
 
-    const signosActualizados = (pa || fc || temp || spo2 || peso || glucosa) ? {
+    const tieneSignos = Boolean(
+      pa.trim() || fc.trim() || temp.trim() || spo2.trim() || peso.trim() || glucosa.trim()
+    )
+
+    const signosActualizados: SignosVitales | undefined = tieneSignos ? {
       presionArterial: pa.trim() || undefined,
       frecuenciaCardiaca: fc.trim() || undefined,
       temperatura: temp.trim() || undefined,
@@ -107,7 +157,7 @@ export function FichaImportantePaciente({
       tipoSangre: tipoSangre.trim() || undefined,
       condicionesCronicas: condiciones.trim() || undefined,
       medicamentoActual: medicamento.trim() || undefined,
-      signosVitales: signosActualizados ?? ficha.signosVitales,
+      signosVitales: signosActualizados,
     }
 
     const { ok, error: errGuardar } = await guardarFichaImportante(pacienteId, nuevaFicha)
@@ -159,24 +209,23 @@ export function FichaImportantePaciente({
                 <AlertTriangle size={15} className="text-amber-500" />
                 Alertas de Seguridad Clínica
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={abrirEdicion}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-teal-700 active:scale-95 transition-all"
-                >
-                  <Activity size={13} />
-                  Tomar signos vitales
-                </button>
-                <button
-                  type="button"
-                  onClick={abrirEdicion}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 active:scale-95 transition-all"
-                >
-                  <Edit3 size={13} />
-                  Editar signos
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={abrirEdicion}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-teal-700 active:scale-95 transition-all"
+              >
+                {haySignos ? (
+                  <>
+                    <Edit3 size={13} />
+                    Editar signos vitales
+                  </>
+                ) : (
+                  <>
+                    <Activity size={13} />
+                    Tomar signos vitales
+                  </>
+                )}
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

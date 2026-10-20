@@ -111,7 +111,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
   const esMedico = rol === 'medico'
   const esAdmin = rol === 'admin'
   const esRecepcionista = rol === 'recepcionista'
-  const ocultarColumnaAcciones = esRecepcionista
+  const ocultarColumnaAcciones = esRecepcionista || (esMedico && active.toLowerCase() === 'citas')
   const accionOculta =
     (esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||
     (config.action === 'Registrar médico' && !esAdmin)
