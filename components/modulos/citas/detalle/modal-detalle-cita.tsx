@@ -18,16 +18,23 @@ import {
   actualizarEstadoCita,
   cargarExpedienteCita,
   cargarHistorialPaciente,
+  cargarPerfilPaciente,
   guardarExpediente,
   obtenerCita,
   solicitarReagenda,
   type CitaDetalle,
   type HistorialPaciente,
+  type PerfilPacienteDetalle,
 } from '@/lib/supabase/datos'
 import {
   guardarHistorialPacienteEnCache,
   obtenerDatosCitaInicial,
 } from '@/lib/supabase/cache-detalle-cita'
+import {
+  leerPerfilPacienteEnCache,
+  registrarPerfilPacienteEnCache,
+} from '@/lib/supabase/cache-pacientes'
+import { FichaImportantePaciente } from '@/components/modulos/pacientes/ficha-importante-paciente'
 
 type TabActivo = 'consulta' | 'historial'
 
@@ -97,12 +104,26 @@ export function ModalDetalleCita({
   // Historial
   const [historial, setHistorial] = useState<HistorialPaciente[] | null>(datosIniciales.historial)
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
+  const [perfilPaciente, setPerfilPaciente] = useState<PerfilPacienteDetalle | null>(() =>
+    cita?.pacienteId ? leerPerfilPacienteEnCache(cita.pacienteId) : null
+  )
 
   // Reagenda
   const [solicitandoReagenda, setSolicitandoReagenda] = useState(false)
 
   useEffect(() => {
     let cancelada = false
+
+    // Cargar perfil paciente si tenemos pacienteId para signos vitales y alertas
+    if (cita?.pacienteId && !perfilPaciente) {
+      void cargarPerfilPaciente(cita.pacienteId).then(({ perfil }) => {
+        if (cancelada) return
+        if (perfil) {
+          setPerfilPaciente(perfil)
+          registrarPerfilPacienteEnCache(perfil)
+        }
+      })
+    }
 
     // Si ya tenemos pacienteId y no hay historial cargado, solicitarlo de inmediato
     if (cita?.pacienteId && historial === null && !cargandoHistorial) {
@@ -281,7 +302,7 @@ export function ModalDetalleCita({
       onMouseDown={onClose}
     >
       <div
-        className="my-auto flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="my-auto flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Cabecera / Ficha del Paciente */}
@@ -387,6 +408,17 @@ export function ModalDetalleCita({
                     <strong>Reagenda confirmada por recepción:</strong> Esta cita fue reprogramada a este nuevo horario.
                   </span>
                 </div>
+              )}
+
+              {/* Ficha Importante / Signos Vitales y Alertas de Triage */}
+              {cita.pacienteId && (
+                <FichaImportantePaciente
+                  pacienteId={cita.pacienteId}
+                  notasMedicasRaw={perfilPaciente?.notasMedicas}
+                  onActualizado={(nuevaFicha) => {
+                    setPerfilPaciente((prev) => (prev ? { ...prev, notasMedicas: JSON.stringify(nuevaFicha) } : null))
+                  }}
+                />
               )}
 
               {/* Tarjeta del Motivo de Consulta */}

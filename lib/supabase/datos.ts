@@ -324,6 +324,56 @@ export type HistorialPaciente = {
   medico: string
 }
 
+export type SignosVitales = {
+  presionArterial?: string
+  frecuenciaCardiaca?: string
+  temperatura?: string
+  saturacionOxigeno?: string
+  peso?: string
+  glucosa?: string
+  tomadoPor?: string
+  fechaHora?: string
+}
+
+export type FichaImportante = {
+  alergias?: string
+  tipoSangre?: string
+  condicionesCronicas?: string
+  signosVitales?: SignosVitales
+  medicamentoActual?: string
+}
+
+export function parsearFichaImportante(raw: string | null | undefined): FichaImportante {
+  if (!raw || !raw.trim()) return {}
+  try {
+    const obj = JSON.parse(raw)
+    if (typeof obj === 'object' && obj !== null) return obj as FichaImportante
+  } catch {
+    return { condicionesCronicas: raw }
+  }
+  return {}
+}
+
+export async function guardarFichaImportante(
+  pacienteId: number,
+  ficha: FichaImportante
+): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch('/api/pacientes/ficha-importante', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pacienteId, ficha }),
+    })
+    const data = await res.json()
+    if (!res.ok || data.error) {
+      return { ok: false, error: data.error || 'Error al guardar ficha importante' }
+    }
+    return { ok: true, error: null }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error de conexión' }
+  }
+}
+
 export type PerfilPacienteDetalle = {
   id: number
   nombre: string

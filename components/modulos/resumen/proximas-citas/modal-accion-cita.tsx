@@ -5,17 +5,24 @@ import { CalendarClock, Send, UserRound } from 'lucide-react'
 import {
   cargarDisponibilidad,
   cargarHistorialPaciente,
+  cargarPerfilPaciente,
   guardarExpediente,
   reagendarCita,
   solicitarReagenda,
   type CitaPanel,
   type DiaDisponible,
   type HistorialPaciente,
+  type PerfilPacienteDetalle,
 } from '@/lib/supabase/datos'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { actualizarAgendaEnCache, leerAgendaEnCache, ocuparSlotEnCache } from '@/lib/supabase/cache-cita'
-import { leerHistorialPacienteEnCache, registrarHistorialPacienteEnCache } from '@/lib/supabase/cache-pacientes'
-import { BotonAccionDetalle } from './detalle-cita'
+import {
+  leerHistorialPacienteEnCache,
+  leerPerfilPacienteEnCache,
+  registrarHistorialPacienteEnCache,
+  registrarPerfilPacienteEnCache,
+} from '@/lib/supabase/cache-pacientes'
+import { FichaImportantePaciente } from '@/components/modulos/pacientes/ficha-importante-paciente'
 import { BotonCerrarModal } from './cerrar-modal'
 import { BotonesDiaReagenda, BotonesHoraReagenda, BotonCancelarReagenda, BotonGuardarReagenda } from './reagendar-cita'
 
@@ -43,6 +50,9 @@ export function ModalAccionCita({
   const [error, setError] = useState('')
   const historialPrecargado = cita.pacienteId ? leerHistorialPacienteEnCache(cita.pacienteId) : null
   const [historial, setHistorial] = useState<HistorialPaciente[] | null>(historialPrecargado)
+  const [perfilPaciente, setPerfilPaciente] = useState<PerfilPacienteDetalle | null>(
+    cita.pacienteId ? leerPerfilPacienteEnCache(cita.pacienteId) : null
+  )
   const [creandoExpediente, setCreandoExpediente] = useState(
     rol === 'medico' || (historialPrecargado !== null && historialPrecargado.length === 0)
   )
@@ -52,6 +62,17 @@ export function ModalAccionCita({
   const [guardandoExpediente, setGuardandoExpediente] = useState(false)
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false)
   const [mensajeExito, setMensajeExito] = useState('')
+
+  useEffect(() => {
+    if (cita.pacienteId && !perfilPaciente) {
+      void cargarPerfilPaciente(cita.pacienteId).then(({ perfil }) => {
+        if (perfil) {
+          setPerfilPaciente(perfil)
+          registrarPerfilPacienteEnCache(perfil)
+        }
+      })
+    }
+  }, [cita.pacienteId, perfilPaciente])
 
   useEffect(() => {
     const precargado = cita.pacienteId ? leerHistorialPacienteEnCache(cita.pacienteId) : null
@@ -214,7 +235,7 @@ export function ModalAccionCita({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-cita-title" onMouseDown={onClose}>
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 id="modal-cita-title" className="text-lg font-bold">{titulo}</h3>
           <BotonCerrarModal onCerrar={onClose} />
@@ -240,9 +261,22 @@ export function ModalAccionCita({
         {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{error}</p>}
 
         {accion !== 'reagendar' && (
-          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-4">
+            {cita.pacienteId && (
+              <FichaImportantePaciente
+                pacienteId={cita.pacienteId}
+                notasMedicasRaw={perfilPaciente?.notasMedicas}
+                rol={rol}
+                onActualizado={(nuevaFicha) => {
+                  setPerfilPaciente((prev) => (prev ? { ...prev, notasMedicas: JSON.stringify(nuevaFicha) } : null))
+                }}
+              />
+            )}
+
             {accion !== 'historial' && (
-              <p className="text-xs font-bold text-emerald-800">Historial médico de {cita.paciente}</p>
+              <p className="text-xs font-bold text-emerald-800 border-t border-emerald-200/60 pt-3">
+                Historial médico de {cita.paciente}
+              </p>
             )}
             {historial !== null && historial.length === 0 ? (
               <>
@@ -468,21 +502,15 @@ export function ModalAccionCita({
               </div>
             </>
           )
-        ) : accion === 'historial' ? (
+        ) : (
           <div className="mt-6 flex justify-end">
-            <button type="button" onClick={onClose} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+            >
               Cerrar
             </button>
-          </div>
-        ) : (
-          <div className="mt-5 flex flex-col gap-2">
-            <p className="text-xs font-semibold text-slate-700">Acciones</p>
-            <div className="grid grid-cols-2 gap-2">
-              <BotonAccionDetalle etiqueta="Confirmar" color="bg-emerald-600" cargando={trabajando === 'confirmar'} onClick={confirmarYVerHistorial} />
-              <BotonAccionDetalle etiqueta="Registrar asistencia" color="bg-blue-600" cargando={trabajando === 'registrar'} onClick={() => ejecutar('registrar', onRegistrar)} />
-              <BotonAccionDetalle etiqueta="No asistió" color="bg-amber-600" cargando={trabajando === 'noasistio'} onClick={() => ejecutar('noasistio', onNoAsistio)} />
-              <BotonAccionDetalle etiqueta="Cancelar cita" color="bg-red-600" cargando={trabajando === 'cancelar'} onClick={() => ejecutar('cancelar', onCancelar)} />
-            </div>
           </div>
         )}
       </div>

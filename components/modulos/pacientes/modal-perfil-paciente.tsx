@@ -6,6 +6,7 @@ import {
   ClipboardList,
   History,
   Phone,
+  ShieldAlert,
   User,
   X,
 } from 'lucide-react'
@@ -22,8 +23,9 @@ import {
 } from '@/lib/supabase/cache-pacientes'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { Status } from '@/components/modulos/citas/estado'
+import { FichaImportantePaciente } from './ficha-importante-paciente'
 
-type Tab = 'perfil' | 'historial'
+type Tab = 'perfil' | 'importante' | 'historial'
 
 export function ModalPerfilPaciente({
   pacienteId,
@@ -40,7 +42,7 @@ export function ModalPerfilPaciente({
   const [cargando, setCargando] = useState(!datosIniciales.perfil)
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('perfil')
+  const [tab, setTab] = useState<Tab>(rol === 'enfermero' ? 'importante' : 'perfil')
 
   useEffect(() => {
     let vigente = true
@@ -106,7 +108,7 @@ export function ModalPerfilPaciente({
       onMouseDown={onClose}
     >
       <div
-        className="my-auto flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl scale-in-95 transition-all"
+        className="my-auto flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl scale-in-95 transition-all"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Cabecera instantánea */}
@@ -137,11 +139,11 @@ export function ModalPerfilPaciente({
         </div>
 
         {/* Pestañas */}
-        <div className="flex border-b border-slate-100 bg-white px-5 pt-2">
+        <div className="flex border-b border-slate-100 bg-white px-5 pt-2 gap-2 overflow-x-auto">
           <button
             type="button"
             onClick={() => handleTab('perfil')}
-            className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors ${
+            className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors shrink-0 ${
               tab === 'perfil'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -150,11 +152,25 @@ export function ModalPerfilPaciente({
             <User size={14} />
             Datos del paciente
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleTab('importante')}
+            className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-bold transition-colors shrink-0 ${
+              tab === 'importante'
+                ? 'border-amber-600 text-amber-700 bg-amber-50/40 rounded-t-lg'
+                : 'border-transparent text-amber-700/80 hover:text-amber-800'
+            }`}
+          >
+            <ShieldAlert size={14} className="text-amber-600" />
+            Importante
+          </button>
+
           {rol !== 'recepcionista' && (
             <button
               type="button"
               onClick={() => handleTab('historial')}
-              className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors ${
+              className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors shrink-0 ${
                 tab === 'historial'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -190,6 +206,18 @@ export function ModalPerfilPaciente({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* PESTAÑA IMPORTANTE */}
+          {tab === 'importante' && (
+            <FichaImportantePaciente
+              pacienteId={pacienteId}
+              notasMedicasRaw={perfil?.notasMedicas}
+              rol={rol}
+              onActualizado={(nuevaFicha) => {
+                setPerfil((prev) => (prev ? { ...prev, notasMedicas: JSON.stringify(nuevaFicha) } : null))
+              }}
+            />
           )}
 
           {cargando && !perfil && (
