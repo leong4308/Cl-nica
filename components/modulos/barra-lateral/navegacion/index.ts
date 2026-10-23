@@ -1,1 +1,1 @@
-export { insigniasMenu, itemsAdministracion, navItems } from './items-menu'
+export { insigniasMenu, itemsAdministracion, navItems, obtenerNavItemsPorRol, obtenerItemDefaultPorRol } from './items-menu'

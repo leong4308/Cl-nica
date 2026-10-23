@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { Dashboard } from '@/components/modulos/resumen/dashboard'
 import { ModulePage } from '@/components/modulos/citas/module-page'
+import { MedicosPage } from '@/components/modulos/medicos'
 import { BarraLateral } from '@/components/modulos/barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
 import { BotonCerrarAviso, BotonCerrarMenu } from './botones-pagina'
-import { cargarPerfilSesion, cerrarSesion } from '@/lib/supabase/sesion'
+import { cargarPerfilSesion, cerrarSesion, type PerfilSesion } from '@/lib/supabase/sesion'
 import { type RolUsuario } from '@/lib/supabase/tipos-rol'
+import { obtenerItemDefaultPorRol } from '@/components/modulos/barra-lateral/navegacion/items-menu'
 import { ModalUsuarios } from '@/components/modulos/barra-lateral/usuarios'
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
@@ -38,7 +40,14 @@ export default function Page() {
   const [modal, setModal] = useState<string | null>(null)
   const [citaAbierta, setCitaAbierta] = useState<CitaEnEdicion>(null)
   const [notice, setNotice] = useState('')
-  const [perfil, setPerfil] = useState<{ nombre: string; rol: RolUsuario }>({ nombre: 'Usuario', rol: 'paciente' })
+  const [perfil, setPerfil] = useState<PerfilSesion>({ nombre: 'Usuario', rol: 'paciente' })
+
+  // Cuando cambia el rol, navegar al item por default de ese rol
+  useEffect(() => {
+    if (authenticated) {
+      setActive(obtenerItemDefaultPorRol(perfil.rol))
+    }
+  }, [perfil.rol, authenticated])
 
   useEffect(() => {
     if (!authenticated) return
@@ -101,7 +110,45 @@ const openModal = (title: string) => {
   }
 
   if (!authenticated) {
-    return <LoginForm onSuccess={async () => { setPerfil(await cargarPerfilSesion()); setAuthenticated(true) }} />
+    return (
+      <LoginForm
+        onSuccess={async (perfilDirecto) => {
+          if (perfilDirecto) {
+            setPerfil(perfilDirecto)
+          } else {
+            setPerfil(await cargarPerfilSesion())
+          }
+          setAuthenticated(true)
+        }}
+      />
+    )
+  }
+
+  /**
+   * Renderizar contenido según el rol y pestaña activa:
+   * - Admin: ve Dashboard global + todos los módulos
+   * - Recepcionista: ve Dashboard + Citas, Pacientes, Médicos (directorio), Expedientes
+   * - Médico: ve "Mi Consulta" (su estación) como pantalla principal + solo sus citas/pacientes/expedientes
+   * - Enfermero: ve Dashboard + Citas, Pacientes, Internación, Órdenes
+   */
+  const renderContenido = () => {
+    // "Mi Consulta" para médicos — va directo a su estación de consulta, fijado a su perfil
+    if (active === 'Mi Consulta') {
+      return <MedicosPage {...actions} usuario={perfil} />
+    }
+
+    // "Médicos" — solo para admin/recepcionista (directorio de todos los médicos)
+    if (active === 'Médicos') {
+      return <MedicosPage {...actions} usuario={perfil} />
+    }
+
+    // "Resumen" — dashboard global (solo admin, recepcionista, enfermero)
+    if (active === 'Resumen') {
+      return <Dashboard {...actions} />
+    }
+
+    // Otros módulos genéricos
+    return <ModulePage active={active} {...actions} />
   }
 
   const handleCerrarSesion = async () => {
@@ -147,7 +194,6 @@ const openModal = (title: string) => {
         onNavegar={navigate}
         onAbrirModal={openModal}
         onCerrar={() => setMenuOpen(false)}
-        esAdmin={perfil.rol === 'admin'}
         rol={perfil.rol}
       />
 
@@ -158,12 +204,19 @@ const openModal = (title: string) => {
           onCerrarSesion={handleCerrarSesion}
           usuario={perfil}
           onCambiarVistaRol={handleCambiarVistaRol}
+          onCambiarRol={(nuevoRol, medicoId, nombre) => {
+            setPerfil((prev) => ({
+              ...prev,
+              rol: nuevoRol,
+              medicoId,
+              nombre: nombre || (nuevoRol === 'admin' ? 'Administrador Demo' : nuevoRol === 'recepcionista' ? 'Recepcionista Central' : prev.nombre),
+            }))
+            notify(`Vista cambiada a: ${nuevoRol === 'medico' ? (nombre ?? 'Médico') : nuevoRol.toUpperCase()}`)
+          }}
         />
 
         <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-9">
-          {active === 'Resumen'
-            ? <Dashboard {...actions} />
-            : <ModulePage active={active} {...actions} />}
+          {renderContenido()}
         </div>
       </section>
 
@@ -180,19 +233,19 @@ const openModal = (title: string) => {
           onSave={(value) => { notify(value ? 'Nueva cita guardado correctamente' : 'Nueva cita listo para completar'); setModal(null) }}
         />
       )}
-      {(modal !== null && modal.startsWith('Detalle: ')) && (
+      {modal !== null && modal.startsWith('Detalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
-      {(modal !== null && modal.startsWith('HistorialDetalle: ')) && (
+      {modal !== null && modal.startsWith('HistorialDetalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
       )}
-      {(modal !== null && modal.startsWith('PacienteDetalle: ')) && (
+      {modal !== null && modal.startsWith('PacienteDetalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} rol={perfil.rol} onClose={() => setModal(null)} />
       )}
-      {(modal !== null && modal.startsWith('Editar: ')) && (
+      {modal !== null && modal.startsWith('Editar: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalEditarCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
-      {(modal !== null && modal.startsWith('Eliminar: ')) && (
+      {modal !== null && modal.startsWith('Eliminar: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalConfirmarEliminacion
           citaId={Number(modal.split(': ')[1])}
           onClose={() => setModal(null)}

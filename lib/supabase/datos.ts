@@ -76,6 +76,7 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
       const pac: PacienteCitaRelacion | null = Array.isArray(pacRel) ? (pacRel[0] ?? null) : pacRel
       const pacUsr = Array.isArray(pac?.usuarios) ? (pac?.usuarios[0] ?? null) : (pac?.usuarios ?? null)
       return [
+        String(cita.id),
         horaDe(cita.inicio),
         nombreDe(pac?.usuarios),
         nombreDe(medico?.usuarios),
@@ -1057,6 +1058,9 @@ export type CitaActualizar = {
 export async function obtenerCita(
   id: number,
 ): Promise<{ cita: CitaDetalle | null; error: string | null }> {
+  if (!id || Number.isNaN(id) || !Number.isFinite(id) || id <= 0) {
+    return { cita: null, error: 'Identificador de cita no válido' }
+  }
   const supabase = createClient()
   const { data, error } = await supabase
     .from('citas')
@@ -1204,5 +1208,23 @@ export async function cargarInsigniasMenu(): Promise<Record<string, string>> {
     Citas: String(totalCitas),
     Internación: String(totalInternaciones),
   }
+}
+
+export async function derivarCitaMedico(
+  citaId: number,
+  nuevoMedicoId: number,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('citas')
+    .update({
+      medico_id: nuevoMedicoId,
+      actualizado_en: new Date().toISOString(),
+    })
+    .eq('id', citaId)
+
+  if (error) return { error: error.message }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
 }
 

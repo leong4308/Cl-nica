@@ -1,3 +1,3 @@
 export const medicosModule = { name: 'Médicos', routeKey: 'Médicos' } as const
-export { ModulePage as MedicosPage } from '../citas/module-page'
+export { MedicosWorkstation as MedicosPage } from './medicos-workstation'
 export { BotonRegistrarMedico } from './registrar-medico'

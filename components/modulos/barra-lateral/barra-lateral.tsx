@@ -1,13 +1,14 @@
 'use client'
- 
+
 import { useEffect, useState } from 'react'
 import { HeartPulse } from 'lucide-react'
 import { cargarInsigniasMenu } from '@/lib/supabase/datos'
 import { guardarInsignias, leerInsignias } from '@/lib/supabase/cache-modulos'
-import { itemsAdministracion, navItems } from './navegacion/items-menu'
+import { obtenerNavItemsPorRol, itemsAdministracion } from './navegacion/items-menu'
 import { BotonAdminLateral } from './admin-lateral/boton-admin-lateral'
 import { BotonCerrarBarra } from './cerrar-barra/boton-cerrar-barra'
 import { BotonNavLateral } from './nav-lateral/boton-nav-lateral'
+import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 type BarraLateralProps = {
   activo: string
@@ -15,12 +16,13 @@ type BarraLateralProps = {
   onNavegar: (label: string) => void
   onAbrirModal: (title: string) => void
   onCerrar: () => void
-  esAdmin?: boolean
-  rol?: string
+  rol: RolUsuario
 }
 
-export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar, esAdmin, rol }: BarraLateralProps) {
+export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar, rol }: BarraLateralProps) {
   const [insignias, setInsignias] = useState<Record<string, string>>(() => leerInsignias())
+  const esAdmin = rol === 'admin'
+  const itemsNav = obtenerNavItemsPorRol(rol)
 
   useEffect(() => {
     let vigente = true
@@ -39,7 +41,16 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
     }
   }, [])
 
-  const etiquetaRol = rol === 'medico' ? 'Médico' : esAdmin ? 'Administrador' : 'Sistema Médico'
+  const etiquetaRol =
+    rol === 'medico'
+      ? 'Médico'
+      : rol === 'admin'
+      ? 'Administrador'
+      : rol === 'recepcionista'
+      ? 'Recepcionista'
+      : rol === 'enfermero'
+      ? 'Enfermero'
+      : 'Sistema Médico'
 
   return (
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -54,24 +65,29 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
 
       <nav className="flex flex-col gap-1 px-4 pt-7">
         <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Menú principal</p>
-        {navItems.map(([label, Icon]) => (
+        {itemsNav.map((item) => (
           <BotonNavLateral
-            key={label}
-            etiqueta={label}
-            Icono={Icon}
-            activo={activo === label}
-            insignia={insignias[label]}
+            key={item.label}
+            etiqueta={item.label}
+            Icono={item.icon}
+            activo={activo === item.label}
+            insignia={insignias[item.label]}
             onNavegar={onNavegar}
           />
         ))}
       </nav>
 
-      <div className="mt-8 px-4">
-        <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Administración</p>
-        <div className="flex flex-col gap-1">
-          {itemsAdministracion.filter((item) => !item.soloAdmin || esAdmin).map(({ label, icono: Icono }) => <BotonAdminLateral key={label} etiqueta={label} Icono={Icono} onAbrirModal={onAbrirModal} />)}
+      {/* Sección de Administración — solo visible para admin */}
+      {esAdmin && (
+        <div className="mt-8 px-4">
+          <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Administración</p>
+          <div className="flex flex-col gap-1">
+            {itemsAdministracion.map(({ label, icono: Icono }) => (
+              <BotonAdminLateral key={label} etiqueta={label} Icono={Icono} onAbrirModal={onAbrirModal} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   )
 }

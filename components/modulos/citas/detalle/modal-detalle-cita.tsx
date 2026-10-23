@@ -114,6 +114,12 @@ export function ModalDetalleCita({
   useEffect(() => {
     let cancelada = false
 
+    if (Number.isNaN(citaId) || citaId <= 0) {
+      setCargando(false)
+      setError('Identificador de cita no válido.')
+      return
+    }
+
     // Cargar perfil paciente si tenemos pacienteId para signos vitales y alertas
     if (cita?.pacienteId && !perfilPaciente) {
       void cargarPerfilPaciente(cita.pacienteId).then(({ perfil }) => {
