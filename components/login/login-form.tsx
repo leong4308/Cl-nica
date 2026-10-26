@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react'
 import { HeartPulse, LockKeyhole, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { cargarPerfilSesion } from '@/lib/supabase/sesion'
 import type { PerfilSesion } from '@/lib/supabase/sesion'
 import { BotonMostrarContrasena } from './mostrar-contrasena'
 import { BotonOlvidoContrasena } from './olvido-contrasena'
@@ -12,60 +13,28 @@ interface LoginFormProps {
   onSuccess: (perfilDirecto?: PerfilSesion) => void
 }
 
-const CUENTAS_DEMO = [
-  { rol: 'Administrador', correo: 'admin@admin.com' },
-  { rol: 'Médico', correo: 'doc@doc.com' },
-  { rol: 'Recepcionista', correo: 'recepcion1@clinicanova.com' },
-  { rol: 'Enfermero', correo: 'enfermero1@clinicanova.com' },
-] as const
-
-const CLAVE = '123456'
-
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState<string>(CUENTAS_DEMO[1].correo) // Por defecto doc@doc.com
-  const [password, setPassword] = useState(CLAVE)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+
     if (!email || !password) {
       setError('Ingresa tu correo y contraseña para continuar.')
       return
     }
 
     setLoading(true)
-    const correoLimpio = email.trim().toLowerCase()
 
-    // 1. Acceso directo a credencial médica requerida
-    if ((correoLimpio === 'doc@doc.com' || correoLimpio === 'medico@clinicanova.com') && password === CLAVE) {
-      setLoading(false)
-      onSuccess({
-        nombre: 'Dr. Jorge Méndez',
-        rol: 'medico',
-        medicoId: 2,
-        clinicaId: 1,
-      })
-      return
-    }
-
-    // 2. Acceso directo a credencial recepcionista
-    if ((correoLimpio === 'recepcion@clinicanova.com' || correoLimpio === 'recepcion1@clinicanova.com') && password === CLAVE) {
-      setLoading(false)
-      onSuccess({
-        nombre: 'Valeria Gómez',
-        rol: 'recepcionista',
-        clinicaId: 1,
-      })
-      return
-    }
-
-    // 3. Intento vía Supabase Auth
     try {
-      const { error: signInError } = await createClient().auth.signInWithPassword({
-        email: correoLimpio,
+      const supabase = createClient()
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
         password,
       })
 
@@ -74,19 +43,23 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         const message = signInError.message.toLowerCase()
         setError(
           message.includes('confirm')
-            ? 'Confirma tu correo electrónico para continuar.'
+            ? 'Confirma tu correo electrónico antes de iniciar sesión.'
             : message.includes('rate')
-            ? 'Demasiados intentos. Espera unos minutos y vuelve a intentar.'
-            : 'Correo o contraseña incorrectos.'
+            ? 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
+            : message.includes('invalid login')
+            ? 'Correo o contraseña incorrectos.'
+            : 'No se pudo iniciar sesión. Verifica tus credenciales.'
         )
         return
       }
 
+      // Cargar perfil real desde la base de datos
+      const perfil = await cargarPerfilSesion()
       setLoading(false)
-      onSuccess()
+      onSuccess(perfil)
     } catch {
       setLoading(false)
-      setError('Error al conectar con el servidor de autenticación.')
+      setError('Error al conectar con el servidor. Verifica tu conexión.')
     }
   }
 
@@ -104,37 +77,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </div>
 
         <div className="mb-8">
-          <p className="mb-2 text-sm font-medium text-[#0e9f6e]">Bienvenido de nuevo</p>
+          <p className="mb-2 text-sm font-medium text-[#0e9f6e]">Bienvenido</p>
           <h2 className="text-3xl font-semibold tracking-tight text-[#0b1b33]">Inicia sesión</h2>
-          <p className="mt-2 text-sm text-[#64748b]">Accede a tu panel clínico según tu rol.</p>
-
-          <div className="mt-5 rounded-xl border border-[#c9d8f5] bg-[#e8f0ff] p-3.5 text-xs text-[#344054]">
-            <p className="font-semibold text-blue-900 mb-2">Credenciales demo de acceso:</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {CUENTAS_DEMO.map((c) => (
-                <button
-                  key={c.correo}
-                  type="button"
-                  onClick={() => {
-                    setEmail(c.correo)
-                    setPassword(CLAVE)
-                    setError('')
-                  }}
-                  className={`text-left p-2 rounded-lg border transition-colors ${
-                    email === c.correo
-                      ? 'border-blue-500 bg-blue-100/80 text-blue-900 font-semibold shadow-xs'
-                      : 'border-blue-200/60 bg-white/80 hover:bg-white text-slate-700'
-                  }`}
-                >
-                  <p className="text-[10px] uppercase font-bold text-blue-600">{c.rol}</p>
-                  <p className="truncate text-[11px] font-mono mt-0.5">{c.correo}</p>
-                </button>
-              ))}
-            </div>
-            <p className="mt-2.5 text-[11px] text-[#475467]">
-              Contraseña única: <span className="font-mono font-semibold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-blue-200">{CLAVE}</span> (Haz clic en cualquiera para auto-completar).
-            </p>
-          </div>
+          <p className="mt-2 text-sm text-[#64748b]">Accede a tu panel clínico con tus credenciales.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -146,7 +91,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="doc@doc.com"
+                placeholder="tu@correo.com"
+                autoComplete="email"
                 className="h-12 w-full rounded-xl border border-[#d6e0ef] bg-[#f8fbff] pl-11 pr-4 text-xs font-medium outline-hidden transition focus:border-[#1a56db] focus:ring-4 focus:ring-[#1a56db]/10"
               />
             </div>
@@ -161,6 +107,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Ingresa tu contraseña"
+                autoComplete="current-password"
                 className="h-12 w-full rounded-xl border border-[#d6e0ef] bg-[#f8fbff] pl-11 pr-12 text-xs font-medium outline-hidden transition focus:border-[#1a56db] focus:ring-4 focus:ring-[#1a56db]/10"
               />
               <BotonMostrarContrasena visible={showPassword} onAlternar={() => setShowPassword((value) => !value)} />

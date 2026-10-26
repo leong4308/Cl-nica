@@ -62,7 +62,7 @@ export const navItems: NavItem[] = [
   {
     label: 'Laboratorio',
     icon: FlaskConical,
-    roles: ['admin'],
+    roles: ['admin', 'medico', 'enfermero'],
   },
 ]
 

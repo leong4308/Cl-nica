@@ -313,7 +313,11 @@ type MedicoFila = {
 
 type ExpedienteFila = {
   id: number; diagnostico: string | null; creado_en: string
-  citas: { motivo: string | null; perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null } | null
+  citas: {
+    motivo: string | null
+    perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+    perfiles_medicos: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+  } | null
 }
 
 export type HistorialPaciente = {
@@ -501,20 +505,27 @@ export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string
   const supabase = createClient()
   const { filas, error } = await consultar<ExpedienteFila>(
     supabase.from('expedientes')
-      .select('id, diagnostico, creado_en, citas(motivo, perfiles_pacientes(usuarios(nombre_completo)))')
+      .select('id, diagnostico, creado_en, citas(motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)))')
       .order('creado_en', { ascending: false })
       .limit(100)
   )
   return {
     error,
-    filas: filas.map((expediente) => [
-      nombreDe(expediente.citas?.perfiles_pacientes?.usuarios),
-      expediente.citas?.motivo ?? 'Consulta general',
-      expediente.diagnostico ?? 'Sin diagnóstico',
-      '—',
-      fechaDe(expediente.creado_en),
-      String(expediente.id),
-    ]),
+    filas: filas.map((expediente) => {
+      const cita = expediente.citas
+      const pacRel = cita?.perfiles_pacientes
+      const medRel = cita?.perfiles_medicos
+      const usuarioMed = Array.isArray(medRel) ? medRel[0]?.usuarios : medRel?.usuarios
+      const nombreMed = Array.isArray(usuarioMed) ? usuarioMed[0]?.nombre_completo : usuarioMed?.nombre_completo
+      return [
+        nombreDe(Array.isArray(pacRel) ? pacRel[0]?.usuarios : pacRel?.usuarios),
+        cita?.motivo ?? 'Consulta general',
+        expediente.diagnostico ?? 'Sin diagnóstico',
+        nombreMed ?? 'Médico',
+        fechaDe(expediente.creado_en),
+        String(expediente.id),
+      ]
+    }),
   }
 }
 
@@ -523,13 +534,14 @@ type InternacionFila = {
   habitaciones: { numero: string } | { numero: string }[] | null
   camas: { numero: string; esta_ocupada: boolean } | { numero: string; esta_ocupada: boolean }[] | null
   perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+  perfiles_medicos: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
 }
 
 export async function cargarInternacion(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
   const { filas, error } = await consultar<InternacionFila>(
     supabase.from('internaciones')
-      .select('id, fecha_ingreso, estado, habitaciones(numero), camas(numero, esta_ocupada), perfiles_pacientes(usuarios(nombre_completo))')
+      .select('id, fecha_ingreso, estado, habitaciones(numero), camas(numero, esta_ocupada), perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
       .order('fecha_ingreso', { ascending: false })
       .limit(100)
   )
@@ -538,11 +550,14 @@ export async function cargarInternacion(): Promise<{ filas: Row[]; error: string
     filas: filas.map((internacion) => {
       const habitacion = Array.isArray(internacion.habitaciones) ? internacion.habitaciones[0] : internacion.habitaciones
       const cama = Array.isArray(internacion.camas) ? internacion.camas[0] : internacion.camas
+      const pac = Array.isArray(internacion.perfiles_pacientes) ? internacion.perfiles_pacientes[0] : internacion.perfiles_pacientes
+      const med = Array.isArray(internacion.perfiles_medicos) ? internacion.perfiles_medicos[0] : internacion.perfiles_medicos
+      const usuarioMed = Array.isArray(med?.usuarios) ? med?.usuarios[0] : med?.usuarios
       return [
-        `${habitacion?.numero ?? '—'} · Cama ${cama?.numero ?? '—'}`,
-        nombreDe(internacion.perfiles_pacientes?.usuarios),
+        `${habitacion?.numero ?? 'Hab. —'} · Cama ${cama?.numero ?? '—'}`,
+        nombreDe(pac?.usuarios),
         fechaDe(internacion.fecha_ingreso),
-        '—',
+        usuarioMed?.nombre_completo ?? 'Médico tratante',
         ETIQUETA_ESTADO_INTERNACION[internacion.estado] ?? internacion.estado,
         String(internacion.id),
       ]
@@ -551,40 +566,60 @@ export async function cargarInternacion(): Promise<{ filas: Row[]; error: string
 }
 
 type OrdenFila = {
-  id: number; descripcion: string; tipo_orden: string; estado: string; fecha_prescripcion: string
+  id: number; descripcion: string; tipo_orden: string; estado: string; fecha_prescripcion: string; episodio_id: number
+  episodios_medicos: {
+    tipo_episodio: string
+    perfiles_medicos: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+    internaciones: {
+      perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+    } | null
+  } | null
 }
 
 export async function cargarOrdenesMedicas(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
   const { filas, error } = await consultar<OrdenFila>(
     supabase.from('ordenes_medicas')
-      .select('id, descripcion, tipo_orden, estado, fecha_prescripcion')
+      .select('id, descripcion, tipo_orden, estado, fecha_prescripcion, episodio_id, episodios_medicos(tipo_episodio, perfiles_medicos(usuarios(nombre_completo)), internaciones(perfiles_pacientes(usuarios(nombre_completo))))')
       .order('fecha_prescripcion', { ascending: false })
       .limit(100)
   )
   return {
     error,
-    filas: filas.map((orden) => [
-      `ORD-${String(orden.id).padStart(4, '0')}`,
-      '—',
-      '—',
-      orden.descripcion,
-      ETIQUETA_ESTADO_ORDEN[orden.estado] ?? orden.estado,
-      String(orden.id),
-    ]),
+    filas: filas.map((orden) => {
+      const ep = Array.isArray(orden.episodios_medicos) ? orden.episodios_medicos[0] : orden.episodios_medicos
+      const med = Array.isArray(ep?.perfiles_medicos) ? ep?.perfiles_medicos[0] : ep?.perfiles_medicos
+      const usuarioMed = Array.isArray(med?.usuarios) ? med?.usuarios[0] : med?.usuarios
+      return [
+        `ORD-${String(orden.id).padStart(4, '0')}`,
+        ep?.tipo_episodio ? `Ep. ${ep.tipo_episodio}` : `Episodio #${orden.episodio_id}`,
+        usuarioMed?.nombre_completo ?? 'Médico',
+        orden.descripcion,
+        ETIQUETA_ESTADO_ORDEN[orden.estado] ?? orden.estado,
+        String(orden.id),
+      ]
+    }),
   }
 }
 
 type SolicitudFila = {
   id: number; estado_analisis: string; fecha_solicitud: string; resultado: string | null
   catalogo_analisis: { nombre: string } | { nombre: string }[] | null
+  ordenes_medicas: {
+    id: number
+    episodios_medicos: {
+      internaciones: {
+        perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
+      } | null
+    } | null
+  } | null
 }
 
 export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
   const { filas, error } = await consultar<SolicitudFila>(
     supabase.from('solicitudes_analisis')
-      .select('id, estado_analisis, fecha_solicitud, resultado, catalogo_analisis(nombre)')
+      .select('id, estado_analisis, fecha_solicitud, resultado, catalogo_analisis(nombre), ordenes_medicas(id, episodios_medicos(internaciones(perfiles_pacientes(usuarios(nombre_completo)))))')
       .order('fecha_solicitud', { ascending: false })
       .limit(100)
   )
@@ -592,10 +627,11 @@ export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string
     error,
     filas: filas.map((solicitud) => {
       const analisis = Array.isArray(solicitud.catalogo_analisis) ? solicitud.catalogo_analisis[0] : solicitud.catalogo_analisis
+      const ord = Array.isArray(solicitud.ordenes_medicas) ? solicitud.ordenes_medicas[0] : solicitud.ordenes_medicas
       return [
         `LAB-${String(solicitud.id).padStart(4, '0')}`,
-        '—',
-        analisis?.nombre ?? '—',
+        ord?.id ? `ORD-${String(ord.id).padStart(4, '0')}` : 'General',
+        analisis?.nombre ?? 'Análisis clínico',
         fechaDe(solicitud.fecha_solicitud),
         solicitud.estado_analisis,
         String(solicitud.id),
@@ -1226,5 +1262,301 @@ export async function derivarCitaMedico(
   if (error) return { error: error.message }
   window.dispatchEvent(new CustomEvent('datos-actualizados'))
   return { error: null }
+}
+
+// ----------------------------------------------------
+// Auxiliares de soporte para Internación, Órdenes y Lab
+// ----------------------------------------------------
+
+export type OpcionSelector = { id: number; nombre: string; detalle?: string }
+
+export async function cargarOpcionesInternacion(): Promise<{
+  pacientes: OpcionSelector[]
+  medicos: OpcionSelector[]
+  camasDisponibles: { id: number; habitacionId: number; numero: string; habitacion: string }[]
+  error: string | null
+}> {
+  const supabase = createClient()
+  const [pacientesRes, medicosRes, camasRes] = await Promise.all([
+    supabase
+      .from('perfiles_pacientes')
+      .select('id, usuarios(nombre_completo)')
+      .eq('esta_activo', true)
+      .limit(100),
+    supabase
+      .from('perfiles_medicos')
+      .select('id, especialidad, usuarios(nombre_completo)')
+      .eq('esta_activo', true)
+      .limit(100),
+    supabase
+      .from('camas')
+      .select('id, numero, habitacion_id, habitaciones(id, numero, tipo)')
+      .eq('esta_ocupada', false)
+      .limit(50),
+  ])
+
+  const error = pacientesRes.error?.message ?? medicosRes.error?.message ?? camasRes.error?.message ?? null
+
+  const pacientes: OpcionSelector[] = (pacientesRes.data ?? []).map((p: any) => {
+    const usr = Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios
+    return { id: p.id, nombre: usr?.nombre_completo ?? 'Paciente' }
+  })
+
+  const medicos: OpcionSelector[] = (medicosRes.data ?? []).map((m: any) => {
+    const usr = Array.isArray(m.usuarios) ? m.usuarios[0] : m.usuarios
+    return { id: m.id, nombre: usr?.nombre_completo ?? 'Médico', detalle: m.especialidad }
+  })
+
+  const camasDisponibles = (camasRes.data ?? []).map((c: any) => {
+    const hab = Array.isArray(c.habitaciones) ? c.habitaciones[0] : c.habitaciones
+    return {
+      id: c.id,
+      habitacionId: c.habitacion_id,
+      numero: c.numero,
+      habitacion: hab?.numero ? `Hab. ${hab.numero} (${hab.tipo ?? 'General'})` : 'Habitación',
+    }
+  })
+
+  return { pacientes, medicos, camasDisponibles, error }
+}
+
+export type DatosNuevaInternacion = {
+  pacienteId: number
+  medicoId: number
+  camaId: number
+  habitacionId: number
+  motivoIngreso: string
+  diagnosticoIngreso: string
+}
+
+export async function crearInternacion(datos: DatosNuevaInternacion): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  // Obtener clínica por defecto
+  const { data: clinica } = await supabase.from('clinicas').select('id').limit(1).maybeSingle()
+  const clinicaId = clinica?.id ?? 1
+
+  const { data: internacion, error: errInter } = await supabase
+    .from('internaciones')
+    .insert({
+      paciente_id: datos.pacienteId,
+      clinica_id: clinicaId,
+      medico_responsable_id: datos.medicoId,
+      habitacion_id: datos.habitacionId,
+      cama_id: datos.camaId,
+      motivo_ingreso: datos.motivoIngreso,
+      diagnostico_ingreso: datos.diagnosticoIngreso,
+      estado: 'activa',
+    })
+    .select('id')
+    .single()
+
+  if (errInter) return { error: errInter.message }
+
+  // Marcar cama como ocupada
+  await supabase.from('camas').update({ esta_ocupada: true }).eq('id', datos.camaId)
+
+  // Crear episodio inicial de ingreso
+  if (internacion?.id) {
+    await supabase.from('episodios_medicos').insert({
+      internacion_id: internacion.id,
+      medico_id: datos.medicoId,
+      tipo_episodio: 'Ingreso',
+      descripcion: `Admisión de paciente: ${datos.motivoIngreso}. Diagnóstico presuntivo: ${datos.diagnosticoIngreso}`,
+    })
+  }
+
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+export async function darAltaInternacion(internacionId: number): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { data: inter, error: errGet } = await supabase
+    .from('internaciones')
+    .select('id, cama_id')
+    .eq('id', internacionId)
+    .single()
+
+  if (errGet || !inter) return { error: errGet?.message || 'Internación no encontrada' }
+
+  const { error: errUpd } = await supabase
+    .from('internaciones')
+    .update({ estado: 'alta', fecha_alta: new Date().toISOString(), actualizado_en: new Date().toISOString() })
+    .eq('id', internacionId)
+
+  if (errUpd) return { error: errUpd.message }
+
+  if (inter.cama_id) {
+    await supabase.from('camas').update({ esta_ocupada: false }).eq('id', inter.cama_id)
+  }
+
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+export async function cargarOpcionesOrdenes(): Promise<{
+  internacionesActivas: { id: number; paciente: string; habitacionCama: string; medico: string; episodioId: number }[]
+  catalogoAnalisis: { id: number; nombre: string; requiereAyuno: boolean }[]
+  error: string | null
+}> {
+  const supabase = createClient()
+  const [internacionesRes, catalogoRes] = await Promise.all([
+    supabase
+      .from('internaciones')
+      .select('id, habitaciones(numero), camas(numero), perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)), episodios_medicos(id)')
+      .eq('estado', 'activa')
+      .order('fecha_ingreso', { ascending: false }),
+    supabase
+      .from('catalogo_analisis')
+      .select('id, nombre, requiere_ayuno')
+      .order('nombre', { ascending: true }),
+  ])
+
+  const error = internacionesRes.error?.message ?? catalogoRes.error?.message ?? null
+
+  const internacionesActivas = (internacionesRes.data ?? []).map((item: any) => {
+    const pac = Array.isArray(item.perfiles_pacientes) ? item.perfiles_pacientes[0] : item.perfiles_pacientes
+    const usrPac = Array.isArray(pac?.usuarios) ? pac?.usuarios[0] : pac?.usuarios
+    const med = Array.isArray(item.perfiles_medicos) ? item.perfiles_medicos[0] : item.perfiles_medicos
+    const usrMed = Array.isArray(med?.usuarios) ? med?.usuarios[0] : med?.usuarios
+    const hab = Array.isArray(item.habitaciones) ? item.habitaciones[0] : item.habitaciones
+    const cama = Array.isArray(item.camas) ? item.camas[0] : item.camas
+    const ep = Array.isArray(item.episodios_medicos) ? item.episodios_medicos[0] : item.episodios_medicos
+
+    return {
+      id: item.id,
+      paciente: usrPac?.nombre_completo ?? 'Paciente',
+      habitacionCama: `Hab. ${hab?.numero ?? '—'} · Cama ${cama?.numero ?? '—'}`,
+      medico: usrMed?.nombre_completo ?? 'Médico',
+      episodioId: ep?.id ?? 0,
+    }
+  })
+
+  const catalogoAnalisis = (catalogoRes.data ?? []).map((cat: any) => ({
+    id: cat.id,
+    nombre: cat.nombre,
+    requiereAyuno: Boolean(cat.requiere_ayuno),
+  }))
+
+  return { internacionesActivas, catalogoAnalisis, error }
+}
+
+export type DatosNuevaOrden = {
+  internacionId: number
+  episodioId?: number
+  tipoOrden: 'analisis' | 'medicamento' | 'tratamiento' | 'procedimiento'
+  descripcion: string
+  instrucciones?: string
+  analisisId?: number
+}
+
+export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  let episodioId = datos.episodioId
+
+  // Si no hay episodioId, buscar o crear uno para la internación
+  if (!episodioId || episodioId === 0) {
+    const { data: epExistente } = await supabase
+      .from('episodios_medicos')
+      .select('id')
+      .eq('internacion_id', datos.internacionId)
+      .limit(1)
+      .maybeSingle()
+
+    if (epExistente?.id) {
+      episodioId = epExistente.id
+    } else {
+      const { data: epNuevo, error: errEp } = await supabase
+        .from('episodios_medicos')
+        .insert({
+          internacion_id: datos.internacionId,
+          tipo_episodio: 'Evolución',
+          descripcion: 'Episodio generado para orden médica',
+        })
+        .select('id')
+        .single()
+      if (errEp || !epNuevo) return { error: errEp?.message || 'No se pudo crear el episodio clínico' }
+      episodioId = epNuevo.id
+    }
+  }
+
+  const { data: orden, error: errOrd } = await supabase
+    .from('ordenes_medicas')
+    .insert({
+      episodio_id: episodioId,
+      tipo_orden: datos.tipoOrden,
+      descripcion: datos.descripcion,
+      instrucciones: datos.instrucciones ?? null,
+      estado: 'prescrita',
+    })
+    .select('id')
+    .single()
+
+  if (errOrd) return { error: errOrd.message }
+
+  // Si la orden es de tipo análisis y se especificó un catálogo, crear la solicitud en laboratorio de inmediato
+  if (datos.tipoOrden === 'analisis' && datos.analisisId && orden?.id) {
+    await supabase.from('solicitudes_analisis').insert({
+      orden_medica_id: orden.id,
+      analisis_id: datos.analisisId,
+      estado_analisis: 'solicitado',
+      observaciones: datos.instrucciones ?? null,
+    })
+  }
+
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+export async function registrarResultadoLaboratorio(
+  solicitudId: number,
+  resultado: string,
+  observaciones?: string,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('solicitudes_analisis')
+    .update({
+      resultado,
+      observaciones: observaciones || null,
+      estado_analisis: 'completado',
+      fecha_resultado: new Date().toISOString(),
+    })
+    .eq('id', solicitudId)
+
+  if (error) return { error: error.message }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+export async function cargarCitasParaExpediente(): Promise<{
+  citas: { id: number; paciente: string; medico: string; fecha: string; motivo: string }[]
+  error: string | null
+}> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('citas')
+    .select('id, inicio, motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
+    .order('inicio', { ascending: false })
+    .limit(100)
+
+  if (error) return { citas: [], error: error.message }
+
+  const citas = (data ?? []).map((c: any) => {
+    const pac = Array.isArray(c.perfiles_pacientes) ? c.perfiles_pacientes[0] : c.perfiles_pacientes
+    const usrPac = Array.isArray(pac?.usuarios) ? pac?.usuarios[0] : pac?.usuarios
+    const med = Array.isArray(c.perfiles_medicos) ? c.perfiles_medicos[0] : c.perfiles_medicos
+    const usrMed = Array.isArray(med?.usuarios) ? med?.usuarios[0] : med?.usuarios
+
+    return {
+      id: c.id,
+      paciente: usrPac?.nombre_completo ?? 'Paciente',
+      medico: usrMed?.nombre_completo ?? 'Médico',
+      fecha: fechaDe(c.inicio),
+      motivo: c.motivo ?? 'Consulta médica',
+    }
+  })
+
+  return { citas, error: null }
 }
 

@@ -1,3 +1,3 @@
 export const laboratorioModule = { name: 'Laboratorio', routeKey: 'Laboratorio' } as const
 export { ModulePage as LaboratorioPage } from '../citas/module-page'
-export { BotonRegistrarResultado } from './registrar-resultado'
+export { BotonRegistrarResultado, ModalRegistrarResultado } from './registrar-resultado'

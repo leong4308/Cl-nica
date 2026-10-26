@@ -12,6 +12,8 @@ import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/p
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
+import { ModalNuevaAdmision } from '@/components/modulos/internacion'
+import { ModalNuevaOrden } from '@/components/modulos/ordenes-medicas'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
 import { actualizarEstadoCita, eliminarCita, type CitaPanel, type EstadoCita } from '@/lib/supabase/datos'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
@@ -40,7 +42,14 @@ export function InterfazEnfermero({
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-  const MODALES_CON_FORMULARIO = ['Registrar paciente', 'Nuevo paciente', 'Nueva cita', 'Buscar paciente']
+  const MODALES_CON_FORMULARIO = [
+    'Registrar paciente',
+    'Nuevo paciente',
+    'Nueva cita',
+    'Buscar paciente',
+    'Nueva admisión',
+    'Nueva orden',
+  ]
   const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle']
 
   const openModal = (title: string) => {
@@ -164,6 +173,26 @@ export function InterfazEnfermero({
           onClose={() => setModal(null)}
           onSave={(value) => {
             notify(value ? 'Búsqueda completada' : 'Listo')
+            setModal(null)
+          }}
+        />
+      )}
+
+      {modal === 'Nueva admisión' && (
+        <ModalNuevaAdmision
+          onClose={() => setModal(null)}
+          onSave={(msg) => {
+            notify(msg)
+            setModal(null)
+          }}
+        />
+      )}
+
+      {modal === 'Nueva orden' && (
+        <ModalNuevaOrden
+          onClose={() => setModal(null)}
+          onSave={(msg) => {
+            notify(msg)
             setModal(null)
           }}
         />

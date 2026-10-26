@@ -12,6 +12,7 @@ import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/p
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
+import { ModalNuevoExpediente } from '@/components/modulos/expedientes'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
 import { actualizarEstadoCita, eliminarCita, type CitaPanel, type EstadoCita } from '@/lib/supabase/datos'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
@@ -40,7 +41,13 @@ export function InterfazRecepcionista({
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-  const MODALES_CON_FORMULARIO = ['Registrar paciente', 'Nuevo paciente', 'Nueva cita', 'Buscar paciente']
+  const MODALES_CON_FORMULARIO = [
+    'Registrar paciente',
+    'Nuevo paciente',
+    'Nueva cita',
+    'Buscar paciente',
+    'Nuevo expediente',
+  ]
   const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle']
 
   const openModal = (title: string) => {
@@ -165,6 +172,16 @@ export function InterfazRecepcionista({
           onClose={() => setModal(null)}
           onSave={(value) => {
             notify(value ? 'Búsqueda completada' : 'Listo')
+            setModal(null)
+          }}
+        />
+      )}
+
+      {modal === 'Nuevo expediente' && (
+        <ModalNuevoExpediente
+          onClose={() => setModal(null)}
+          onSave={(msg) => {
+            notify(msg)
             setModal(null)
           }}
         />

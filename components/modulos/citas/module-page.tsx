@@ -111,7 +111,8 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
   const esMedico = rol === 'medico'
   const esAdmin = rol === 'admin'
   const esRecepcionista = rol === 'recepcionista'
-  const ocultarColumnaAcciones = esRecepcionista || (esMedico && active.toLowerCase() === 'citas')
+  // Todos los roles de gestión clínica pueden ver la columna de acciones para ver detalles o editar según sus permisos
+  const ocultarColumnaAcciones = false
   const accionOculta =
     (esMedico && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||
     (rol === 'enfermero' && (config.action === 'Nueva cita' || config.action === 'Nuevo paciente')) ||

@@ -115,7 +115,6 @@ export function ModalDetalleCita({
     let cancelada = false
 
     if (Number.isNaN(citaId) || citaId <= 0) {
-      setCargando(false)
       setError('Identificador de cita no válido.')
       return
     }

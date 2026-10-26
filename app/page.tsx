@@ -30,6 +30,10 @@ import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
 import { InterfazRecepcionista } from '@/components/roles/recepcionista'
 import { InterfazEnfermero } from '@/components/roles/enfermero'
+import { ModalNuevoExpediente } from '@/components/modulos/expedientes'
+import { ModalNuevaAdmision } from '@/components/modulos/internacion'
+import { ModalNuevaOrden } from '@/components/modulos/ordenes-medicas'
+import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
 
 type CitaEnEdicion = { cita: CitaPanel; accion: AccionCita } | null
 
@@ -63,7 +67,18 @@ export default function Page() {
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente', 'Ver resultados pendientes']
+const MODALES_CON_FORMULARIO = [
+  'Usuarios',
+  'Buscar paciente',
+  'Nueva cita',
+  'Registrar paciente',
+  'Nuevo paciente',
+  'Ver resultados pendientes',
+  'Nuevo expediente',
+  'Nueva admisión',
+  'Nueva orden',
+  'Registrar resultado',
+]
 const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle']
 
 const openModal = (title: string) => {
@@ -203,16 +218,6 @@ const openModal = (title: string) => {
           onAbrirModal={openModal}
           onCerrarSesion={handleCerrarSesion}
           usuario={perfil}
-          onCambiarVistaRol={handleCambiarVistaRol}
-          onCambiarRol={(nuevoRol, medicoId, nombre) => {
-            setPerfil((prev) => ({
-              ...prev,
-              rol: nuevoRol,
-              medicoId,
-              nombre: nombre || (nuevoRol === 'admin' ? 'Administrador Demo' : nuevoRol === 'recepcionista' ? 'Recepcionista Central' : prev.nombre),
-            }))
-            notify(`Vista cambiada a: ${nuevoRol === 'medico' ? (nombre ?? 'Médico') : nuevoRol.toUpperCase()}`)
-          }}
         />
 
         <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-9">
@@ -275,6 +280,30 @@ const openModal = (title: string) => {
       )}
       {modal === 'Ver resultados pendientes' && (
         <ModalResultadosPendientes onClose={() => setModal(null)} />
+      )}
+      {modal === 'Nuevo expediente' && (
+        <ModalNuevoExpediente
+          onClose={() => setModal(null)}
+          onSave={(msg) => { notify(msg); setModal(null) }}
+        />
+      )}
+      {modal === 'Nueva admisión' && (
+        <ModalNuevaAdmision
+          onClose={() => setModal(null)}
+          onSave={(msg) => { notify(msg); setModal(null) }}
+        />
+      )}
+      {modal === 'Nueva orden' && (
+        <ModalNuevaOrden
+          onClose={() => setModal(null)}
+          onSave={(msg) => { notify(msg); setModal(null) }}
+        />
+      )}
+      {modal === 'Registrar resultado' && (
+        <ModalRegistrarResultado
+          onClose={() => setModal(null)}
+          onSave={(msg) => { notify(msg); setModal(null) }}
+        />
       )}
 
       {citaAbierta && (

@@ -25,21 +25,40 @@ export function AccionesFilaModulo({
   id,
   fila,
   modulo,
-  esMedico,
   rol,
   onAbrirModal,
 }: PropsAccionesFilaModulo) {
-  if (rol === 'recepcionista') {
+  const esAdmin = rol === 'admin'
+  const esMedico = rol === 'medico'
+  const esEnfermero = rol === 'enfermero'
+  const esRecepcionista = rol === 'recepcionista'
+
+  // Reglas coherentes de permisos:
+  // - Eliminar: ÚNICAMENTE Administradores
+  const puedeEliminar = esAdmin
+
+  // - Editar:
+  //   * Citas: Admin, Recepcionista, Médico
+  //   * Pacientes: Admin, Recepcionista, Médico, Enfermero
+  //   * Expedientes: Admin, Médico
+  //   * Internación / Órdenes / Laboratorio: Admin, Médico, Enfermero
+  const puedeEditar =
+    esAdmin ||
+    (modulo === 'Citas' && (esRecepcionista || esMedico)) ||
+    (modulo === 'Pacientes' && (esRecepcionista || esMedico || esEnfermero)) ||
+    (modulo === 'Expedientes' && esMedico) ||
+    ((modulo === 'Internación' || modulo === 'Órdenes médicas' || modulo === 'Laboratorio') && (esMedico || esEnfermero))
+
+  // - Ver: Disponible para todo el personal clínico
+  const puedeVer = true
+
+  if (!puedeVer && !puedeEditar && !puedeEliminar) {
     return null
   }
 
-  if (modulo === 'Citas' && (esMedico || rol === 'medico')) {
-    return null
-  }
+  const numId = Number(id)
 
   if (modulo === 'Pacientes') {
-    const numId = Number(id)
-
     const handleVerPaciente = () => {
       if (fila && !Number.isNaN(numId)) {
         const existente = leerPerfilPacienteEnCache(numId)
@@ -57,19 +76,17 @@ export function AccionesFilaModulo({
       onAbrirModal(`PacienteDetalle: ${id}`)
     }
 
-    const esAdmin = rol === 'admin'
     return (
       <RowActions
         onView={handleVerPaciente}
         onHoverView={!Number.isNaN(numId) ? () => void precargarPerfilPaciente(numId) : undefined}
-        onEdit={esAdmin ? () => onAbrirModal(`Editar: ${id}`) : undefined}
-        onDelete={esAdmin ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
+        onEdit={puedeEditar ? () => onAbrirModal(`PacienteDetalle: ${id}`) : undefined}
+        onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
       />
     )
   }
 
   const pacienteId = fila?.[8] ? Number(fila[8]) : undefined
-  const esAdmin = rol === 'admin'
 
   return (
     <RowActions
@@ -92,8 +109,8 @@ export function AccionesFilaModulo({
         onAbrirModal(`Detalle: ${id}`)
       }}
       onHoverView={modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
-      onEdit={esAdmin ? () => onAbrirModal(`Editar: ${id}`) : undefined}
-      onDelete={esAdmin ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
+      onEdit={puedeEditar ? () => onAbrirModal(modulo === 'Citas' ? `Editar: ${id}` : `Detalle: ${id}`) : undefined}
+      onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
     />
   )
 }
