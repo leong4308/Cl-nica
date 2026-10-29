@@ -54,7 +54,7 @@ export default function Page() {
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente', 'Ver resultados pendientes']
+const MODALES_CON_FORMULARIO = ['Usuarios', 'Buscar paciente', 'Nueva cita', 'Registrar paciente', 'Nuevo paciente', 'Ver resultados pendientes', 'Registrar médico']
 const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle']
 
 const openModal = (title: string) => {
@@ -214,10 +214,11 @@ const openModal = (title: string) => {
           onSave={(value) => { notify(value ? 'Buscar paciente guardado correctamente' : 'Buscar paciente listo para completar'); setModal(null) }}
         />
       )}
-      {modal === 'Usuarios' && (
+      {(modal === 'Usuarios' || modal === 'Registrar médico') && (
         <ModalUsuarios
           onClose={() => setModal(null)}
-          onSave={(value) => { notify(value ? 'Usuarios guardado correctamente' : 'Usuarios listo para completar'); setModal(null) }}
+          rolInicial={modal === 'Registrar médico' ? 'medico' : undefined}
+          onSave={(value) => { notify(value ? `Usuario ${value} creado correctamente` : 'Usuario creado correctamente'); setModal(null) }}
         />
       )}
       {modal === 'Ver resultados pendientes' && (
