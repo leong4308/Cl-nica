@@ -104,10 +104,10 @@ export function AccionesFilaModulo({
               estaActivo: fila?.[13] ? fila?.[13] === 'Activo' : (existente?.estaActivo ?? true),
               notasMedicas: existente?.notasMedicas || '',
             })
-            onAbrirModal(`PacienteDetalle: `)
+            onAbrirModal(`PacienteDetalle: ${pacienteId}`)
             return
           }
-          onAbrirModal(`Detalle: `)
+          onAbrirModal(`Detalle: ${id}`)
           return
         }
 
@@ -128,14 +128,14 @@ export function AccionesFilaModulo({
           onAbrirModal('Nuevo expediente')
           return
         }
-        onAbrirModal(`Detalle: `)
+        onAbrirModal(`Detalle: ${id}`)
       }}
       onHoverView={modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
       onEdit={
         puedeEditar
           ? () => {
               if (modulo === 'Citas') {
-                onAbrirModal(`Editar: `)
+                onAbrirModal(`Editar: ${id}`)
                 return
               }
               if (modulo === 'Órdenes médicas') {
@@ -154,11 +154,11 @@ export function AccionesFilaModulo({
                 onAbrirModal('Nuevo expediente')
                 return
               }
-              onAbrirModal(`Detalle: `)
+              onAbrirModal(`Detalle: ${id}`)
             }
           : undefined
       }
-      onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: `) : undefined}
+      onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
     />
   )
 }

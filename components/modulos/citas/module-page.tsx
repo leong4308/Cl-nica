@@ -223,7 +223,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
               <tbody>
                 {filasFiltradas.map((row, i) => {
                   const displayCells = row.slice(0, config.columns.length)
-                  const id = row[config.columns.length] ?? row[0]
+                  const id = active === 'Citas' ? (row[5] ?? row[0]) : (row[config.columns.length] ?? row[0])
                   return (
                     <tr className="border-b border-slate-50 text-xs last:border-0" key={`${id}-${i}`}>
                       {displayCells.map((cell, j) => (
