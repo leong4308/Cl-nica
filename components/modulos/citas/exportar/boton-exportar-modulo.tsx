@@ -1,10 +1,11 @@
 'use client'
 
-import { Download } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText } from 'lucide-react'
 import { ActionButton } from '../../compartidos/ui'
 import type { Row } from '../../compartidos/types'
 import { exportarCitasPDF, type CitaExportar } from '@/lib/exportar/exportar-citas-pdf'
 import { exportarPacientesPDF, type PacienteExportar } from '@/lib/exportar/exportar-pacientes-pdf'
+import { exportarExpedientesExcel, exportarExpedientesPDF, type ExpedienteExportar } from '@/lib/exportar/exportar-expedientes'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 export function BotonExportarModulo({
@@ -20,20 +21,62 @@ export function BotonExportarModulo({
   nombreUsuario?: string
 }) {
   const esAdmin = rol === 'admin'
+  const esMedico = rol === 'medico'
 
-  // El botón de exportar es exclusivo únicamente para el Administrador
-  if (!esAdmin) {
+  // Modulos con soporte de exportacion
+  if (modulo !== 'Pacientes' && modulo !== 'Citas' && modulo !== 'Expedientes') {
     return null
   }
 
-  // Módulos con soporte de exportación
-  if (modulo !== 'Pacientes' && modulo !== 'Citas') {
+  // En Expedientes, tanto Admin como Medico pueden exportar; en otros, solo Admin
+  if (!esAdmin && !(modulo === 'Expedientes' && esMedico)) {
     return null
+  }
+
+  if (modulo === 'Expedientes') {
+    const expedientes: ExpedienteExportar[] = filas.map((row) => ({
+      paciente: row[0] ?? '',
+      motivo: row[1] ?? '',
+      diagnostico: row[2] ?? '',
+      medico: row[3] ?? '',
+      actualizado: row[4] ?? '',
+    }))
+
+    return (
+      <div className="flex items-center gap-2">
+        <ActionButton
+          icon={FileText}
+          onClick={() => {
+            if (filas.length === 0) {
+              onAvisar('No hay expedientes para exportar')
+              return
+            }
+            onAvisar('Generando informe PDF de expedientes...')
+            exportarExpedientesPDF(expedientes)
+          }}
+        >
+          Informe PDF
+        </ActionButton>
+        <ActionButton
+          icon={FileSpreadsheet}
+          onClick={() => {
+            if (filas.length === 0) {
+              onAvisar('No hay expedientes para exportar')
+              return
+            }
+            onAvisar('Descargando expedientes en Excel (CSV)...')
+            exportarExpedientesExcel(expedientes)
+          }}
+        >
+          Descargar Excel
+        </ActionButton>
+      </div>
+    )
   }
 
   const handleExportar = () => {
     if (!esAdmin) {
-      onAvisar('Acceso restringido: solo el administrador tiene permisos de exportación')
+      onAvisar('Acceso restringido: solo el administrador tiene permisos de exportacion')
       return
     }
 
@@ -44,7 +87,7 @@ export function BotonExportarModulo({
       }
 
       const pacientesParaExportar: PacienteExportar[] = filas.map((row) => ({
-        hora: row[10] || '—',
+        hora: row[10] || '-',
         nombre: row[0] ?? '',
         identificacion: row[1] ?? '',
         medico: row[9] || 'Por asignar',
@@ -54,7 +97,7 @@ export function BotonExportarModulo({
         estado: row[5] ?? '',
       }))
 
-      onAvisar(`Generando directorio de pacientes en PDF (${pacientesParaExportar.length} pacientes)...`)
+      onAvisar('Generando directorio de pacientes en PDF...')
       exportarPacientesPDF(pacientesParaExportar, rol)
       return
     }
@@ -75,20 +118,15 @@ export function BotonExportarModulo({
         fin: row[7],
       }))
 
-      onAvisar(`Generando reporte general de citas (${citasParaExportar.length} citas)...`)
-      exportarCitasPDF(citasParaExportar, {
-        rol,
-      })
+      onAvisar('Generando reporte general de citas...')
+      exportarCitasPDF(citasParaExportar, { rol })
       return
     }
 
-    onAvisar(`Listado de ${modulo} exportado`)
+    onAvisar('Listado de ' + modulo + ' exportado')
   }
 
-  const etiquetaBoton =
-    modulo === 'Pacientes'
-      ? 'Exportar directorio'
-      : 'Exportar reporte'
+  const etiquetaBoton = modulo === 'Pacientes' ? 'Exportar directorio' : 'Exportar reporte'
 
   return (
     <ActionButton icon={Download} onClick={handleExportar}>

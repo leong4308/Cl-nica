@@ -32,7 +32,7 @@ import { InterfazRecepcionista } from '@/components/roles/recepcionista'
 import { InterfazEnfermero } from '@/components/roles/enfermero'
 import { ModalNuevoExpediente } from '@/components/modulos/expedientes'
 import { ModalNuevaAdmision } from '@/components/modulos/internacion'
-import { ModalNuevaOrden } from '@/components/modulos/ordenes-medicas'
+import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
 import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
 
 type CitaEnEdicion = { cita: CitaPanel; accion: AccionCita } | null
@@ -79,7 +79,7 @@ const MODALES_CON_FORMULARIO = [
   'Nueva orden',
   'Registrar resultado',
 ]
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden']
 
 const openModal = (title: string) => {
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -299,6 +299,24 @@ const openModal = (title: string) => {
           onSave={(msg) => { notify(msg); setModal(null) }}
         />
       )}
+      {modal && modal.startsWith('GestionOrden:') && (() => {
+        const parts = modal.replace('GestionOrden:', '').split('___')
+        const ordenObj = {
+          id: Number(parts[0]),
+          codigo: parts[1] || 'ORD',
+          episodio: parts[2] || 'Episodio',
+          medico: parts[3] || 'Médico',
+          descripcion: decodeURIComponent(parts[4] || ''),
+          estado: parts[5] || 'prescrita',
+        }
+        return (
+          <ModalGestionOrden
+            orden={ordenObj}
+            onClose={() => setModal(null)}
+            onSave={(msg) => { notify(msg); setModal(null) }}
+          />
+        )
+      })()}
       {modal === 'Registrar resultado' && (
         <ModalRegistrarResultado
           onClose={() => setModal(null)}

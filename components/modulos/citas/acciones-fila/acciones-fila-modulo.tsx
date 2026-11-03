@@ -113,7 +113,13 @@ export function AccionesFilaModulo({
 
         // Para tablas secundarias (Órdenes médicas, Laboratorio, Internación, Expedientes)
         if (modulo === 'Órdenes médicas') {
-          onAbrirModal('Nueva orden')
+          const ordId = id || fila?.[5] || ''
+          const cod = fila?.[0] || ('ORD-' + ordId)
+          const ep = fila?.[1] || 'Episodio'
+          const med = fila?.[2] || 'Médico'
+          const desc = encodeURIComponent(fila?.[3] || '')
+          const est = fila?.[4] || 'prescrita'
+          onAbrirModal(`GestionOrden:${ordId}___${cod}___${ep}___${med}___${desc}___${est}`)
           return
         }
         if (modulo === 'Laboratorio') {
@@ -139,7 +145,13 @@ export function AccionesFilaModulo({
                 return
               }
               if (modulo === 'Órdenes médicas') {
-                onAbrirModal('Nueva orden')
+                const ordId = id || fila?.[5] || ''
+                const cod = fila?.[0] || ('ORD-' + ordId)
+                const ep = fila?.[1] || 'Episodio'
+                const med = fila?.[2] || 'Médico'
+                const desc = encodeURIComponent(fila?.[3] || '')
+                const est = fila?.[4] || 'prescrita'
+                onAbrirModal(`GestionOrden:${ordId}___${cod}___${ep}___${med}___${desc}___${est}`)
                 return
               }
               if (modulo === 'Laboratorio') {

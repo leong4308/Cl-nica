@@ -1449,6 +1449,21 @@ export type DatosNuevaOrden = {
   analisisId?: number
 }
 
+export async function actualizarEstadoOrdenMedica(
+  ordenId: number,
+  nuevoEstado: 'prescrita' | 'en_proceso' | 'realizada' | 'cancelada',
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('ordenes_medicas')
+    .update({ estado: nuevoEstado })
+    .eq('id', ordenId)
+
+  if (error) return { error: error.message }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
 export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error: string | null }> {
   const supabase = createClient()
   let episodioId = datos.episodioId
