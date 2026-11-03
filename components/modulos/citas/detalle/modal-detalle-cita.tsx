@@ -225,7 +225,7 @@ export function ModalDetalleCita({
       return
     }
 
-    if (concluir && cita.estado !== 'atendida') {
+    if (concluir) {
       const { error: errEstado } = await actualizarEstadoCita(cita.id, 'atendida')
       if (errEstado) {
         setError(`Expediente guardado, pero no se pudo cambiar el estado: ${errEstado}`)
@@ -234,6 +234,7 @@ export function ModalDetalleCita({
       }
       setCita((prev) => (prev ? { ...prev, estado: 'atendida' } : prev))
       setMensajeExito('Consulta concluida y expediente guardado con éxito.')
+      window.dispatchEvent(new CustomEvent('datos-actualizados'))
     } else {
       setMensajeExito('Expediente clínico actualizado correctamente.')
     }

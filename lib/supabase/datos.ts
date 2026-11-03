@@ -64,7 +64,7 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
       .select('id, inicio, fin, estado, motivo, paciente_id, perfiles_pacientes(id, esta_activo, fecha_nacimiento, genero, usuarios(nombre_completo, correo, telefono)), perfiles_medicos(usuarios(nombre_completo))')
-      .order('inicio', { ascending: false })
+      .order('inicio', { ascending: true })
       .limit(100)
   )
   return {
@@ -76,11 +76,10 @@ export async function cargarCitas(): Promise<{ filas: Row[]; error: string | nul
       const pac: PacienteCitaRelacion | null = Array.isArray(pacRel) ? (pacRel[0] ?? null) : pacRel
       const pacUsr = Array.isArray(pac?.usuarios) ? (pac?.usuarios[0] ?? null) : (pac?.usuarios ?? null)
       return [
-        String(cita.id),
         horaDe(cita.inicio),
         nombreDe(pac?.usuarios),
         nombreDe(medico?.usuarios),
-        cita.motivo ?? 'Sin motivo',
+        cita.motivo ?? 'Consulta general',
         ETIQUETA_ESTADO_CITA[cita.estado] ?? cita.estado,
         String(cita.id),
         cita.inicio,
@@ -1104,7 +1103,7 @@ export async function obtenerCita(
       `id, paciente_id, medico_id, clinica_id, inicio, fin, estado, motivo, motivo_cancelacion, creado_en, actualizado_en, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(duracion_consulta, usuarios(nombre_completo))`,
     )
     .eq('id', id)
-    .single()
+    .maybeSingle()
   if (error) return { cita: null, error: error.message }
   if (!data) return { cita: null, error: null }
 

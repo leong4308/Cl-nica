@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
+import { Calendar, Clock, Stethoscope, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
 import { cargarMedicosAgenda, obtenerCita, actualizarCita, type CitaDetalle } from '@/lib/supabase/datos'
-import { ModalMarco, CAMPO } from '../../compartidos/modal-marco'
 
 export function ModalEditarCita({
   citaId,
@@ -12,6 +12,7 @@ export function ModalEditarCita({
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exito, setExito] = useState(false)
 
   const [fecha, setFecha] = useState('')
   const [hora, setHora] = useState('')
@@ -23,7 +24,6 @@ export function ModalEditarCita({
   const [medicos, setMedicos] = useState<
     { id: number; nombre: string; especialidad: string; duracionConsulta: number }[]
   >([])
-  const [errorCarga, setErrorCarga] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelada = false
@@ -31,22 +31,31 @@ export function ModalEditarCita({
     async function cargarCita() {
       setCargando(true)
       setError(null)
-      setErrorCarga(null)
       const { cita, error } = await obtenerCita(citaId)
       if (cancelada) return
       if (error) {
         setError(error)
         setCitaActual(null)
-        setMedicoId('')
+        setCargando(false)
         return
       }
-      if (!cita) return
+      if (!cita) {
+        setError('No se encontró la cita especificada.')
+        setCargando(false)
+        return
+      }
       setCitaActual(cita)
-      setFecha(fechaIso(cita.inicio))
-      setHora(horaIso(cita.inicio))
+      setFecha(cita.inicio.split('T')[0])
+      try {
+        const timePart = cita.inicio.split('T')[1]
+        const [h, m] = timePart.split(':').map(Number)
+        setHora(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'))
+      } catch {
+        setHora('09:00')
+      }
       setMotivo(cita.motivo ?? '')
       setMedicoId(cita.medicoId)
-      setDuracionConsulta(20)
+      setCargando(false)
     }
 
     cargarCita()
@@ -61,20 +70,13 @@ export function ModalEditarCita({
     })
   }, [])
 
-  function fechaIso(iso: string): string {
-    return iso.split('T')[0]
-  }
-
-  function horaIso(iso: string): string {
-    const [, hora, minutos] = iso.split('T')[1].split(':').map(Number)
-    return `${String(hora).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`
-  }
-
-  async function guardar() {
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
     if (!fecha || !hora || medicoId === '' || !citaActual) return
     setGuardando(true)
     setError(null)
-    const { error } = await actualizarCita(
+
+    const { error: errUpdate } = await actualizarCita(
       {
         pacienteId: citaActual.pacienteId,
         medicoId: Number(medicoId),
@@ -86,92 +88,176 @@ export function ModalEditarCita({
       },
       citaActual.id,
     )
+
     setGuardando(false)
-    if (error) {
-      setError(error)
+    if (errUpdate) {
+      setError(errUpdate)
       return
     }
-    onClose()
+
+    setExito(true)
+    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    setTimeout(() => {
+      onClose()
+    }, 1100)
   }
 
   return (
-    <ModalMarco
-      title="Editar cita"
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+    <div
+      className=" fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4 transition-all"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-100 transition-all"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {/* Cabecera */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-sm">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Editar Cita Médica</h3>
+              <p className="text-xs text-slate-500">Modifica la fecha, horario, médico o motivo</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors"
+            aria-label="Cerrar"
           >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={guardar}
-            disabled={guardando || !citaActual}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {guardando ? 'Guardando...' : 'Guardar cambios'}
+            <X className="h-4 w-4" />
           </button>
         </div>
-      }
-      aviso={error ? <p className="text-sm text-red-600">{error}</p> : null}
-    >
-      {cargando ? (
-        <p className="text-sm text-slate-400">Cargando cita...</p>
-      ) : (
-        <div className="grid gap-4">
-          <label className="text-sm font-medium block">Fecha
-            <input
-              type="date"
-              value={fecha}
-              onChange={(event) => setFecha(event.target.value)}
-              className={CAMPO}
-              required
-            />
-          </label>
-          <label className="text-sm font-medium block">Hora
-            <input
-              type="time"
-              value={hora}
-              onChange={(event) => setHora(event.target.value)}
-              className={CAMPO}
-              required
-            />
-          </label>
-          <label className="text-sm font-medium block">Médico
-            <select
-              value={medicoId}
-              onChange={(event) => {
-                const id = event.target.value === '' ? '' : Number(event.target.value)
-                const medico = medicos.find((medico) => medico.id === id)
-                setMedicoId(id)
-                setDuracionConsulta(medico?.duracionConsulta ?? 20)
-              }}
-              className={CAMPO}
-            >
-              <option value="">Seleccione médico</option>
-              {medicos.map((medico) => (
-                <option key={medico.id} value={medico.id}>
-                  {medico.nombre} · {medico.especialidad}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium block">
-            Motivo
-            <textarea
-              value={motivo}
-              onChange={(event) => setMotivo(event.target.value)}
-              className={CAMPO}
-              rows={3}
-              placeholder="Motivo de la consulta"
-            />
-          </label>
-        </div>
-      )}
-    </ModalMarco>
+
+        {/* Feedback: Banner de Error */}
+        {error && (
+          <div className="mx-6 mt-4 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-xs font-medium text-rose-700 shadow-sm">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Feedback: Banner de Éxito */}
+        {exito && (
+          <div className="mx-6 mt-4 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-xs font-medium text-emerald-700 shadow-sm">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>¡Cita actualizada con éxito! Sincronizando cambios...</span>
+          </div>
+        )}
+
+        {/* Contenido / Formulario */}
+        {cargando ? (
+          <div className="flex flex-col items-center justify-center py-14 gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-xs font-medium text-slate-500">Cargando información de la cita...</p>
+          </div>
+        ) : (
+          <form onSubmit={guardar} className="space-y-4 p-6">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  Fecha programada
+                </label>
+                <input
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-slate-400" />
+                  Hora
+                </label>
+                <input
+                  type="time"
+                  value={hora}
+                  onChange={(e) => setHora(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Stethoscope className="h-3.5 w-3.5 text-slate-400" />
+                Médico especialista
+              </label>
+              <select
+                value={medicoId}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? '' : Number(e.target.value)
+                  const m = medicos.find((item) => item.id === val)
+                  setMedicoId(val)
+                  setDuracionConsulta(m?.duracionConsulta ?? 20)
+                }}
+                required
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all shadow-sm"
+              >
+                <option value="">Selecciona un médico</option>
+                {medicos.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre} · {m.especialidad}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 text-slate-400" />
+                Motivo de la consulta
+              </label>
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={3}
+                placeholder="Describe el motivo de la cita médica..."
+                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all shadow-sm"
+              />
+            </div>
+
+            {/* Acciones */}
+            <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={guardando}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={guardando || !citaActual}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-95 disabled:opacity-50 transition-all"
+              >
+                {guardando ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Guardando cambios...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Guardar Cambios</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
   )
 }

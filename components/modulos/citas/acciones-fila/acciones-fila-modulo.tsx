@@ -91,26 +91,74 @@ export function AccionesFilaModulo({
   return (
     <RowActions
       onView={() => {
-        if (modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId)) {
-          const existente = leerPerfilPacienteEnCache(pacienteId)
-          registrarPerfilPacienteEnCache({
-            id: pacienteId,
-            nombre: fila?.[1] || existente?.nombre || 'Paciente',
-            correo: fila?.[14] || existente?.correo || '',
-            telefono: fila?.[12] || existente?.telefono || '—',
-            fechaNacimiento: fila?.[11] || existente?.fechaNacimiento || '—',
-            genero: fila?.[10] === 'M' ? 'Masculino' : fila?.[10] === 'F' ? 'Femenino' : fila?.[10] || existente?.genero || '—',
-            estaActivo: fila?.[13] ? fila?.[13] === 'Activo' : (existente?.estaActivo ?? true),
-            notasMedicas: existente?.notasMedicas || '',
-          })
-          onAbrirModal(`PacienteDetalle: ${pacienteId}`)
+        if (modulo === 'Citas') {
+          if (pacienteId && !Number.isNaN(pacienteId)) {
+            const existente = leerPerfilPacienteEnCache(pacienteId)
+            registrarPerfilPacienteEnCache({
+              id: pacienteId,
+              nombre: fila?.[1] || existente?.nombre || 'Paciente',
+              correo: fila?.[14] || existente?.correo || '',
+              telefono: fila?.[12] || existente?.telefono || '—',
+              fechaNacimiento: fila?.[11] || existente?.fechaNacimiento || '—',
+              genero: fila?.[10] === 'M' ? 'Masculino' : fila?.[10] === 'F' ? 'Femenino' : fila?.[10] || existente?.genero || '—',
+              estaActivo: fila?.[13] ? fila?.[13] === 'Activo' : (existente?.estaActivo ?? true),
+              notasMedicas: existente?.notasMedicas || '',
+            })
+            onAbrirModal(`PacienteDetalle: `)
+            return
+          }
+          onAbrirModal(`Detalle: `)
           return
         }
-        onAbrirModal(`Detalle: ${id}`)
+
+        // Para tablas secundarias (Órdenes médicas, Laboratorio, Internación, Expedientes)
+        if (modulo === 'Órdenes médicas') {
+          onAbrirModal('Nueva orden')
+          return
+        }
+        if (modulo === 'Laboratorio') {
+          onAbrirModal('Registrar resultado')
+          return
+        }
+        if (modulo === 'Internación') {
+          onAbrirModal('Nueva admisión')
+          return
+        }
+        if (modulo === 'Expedientes') {
+          onAbrirModal('Nuevo expediente')
+          return
+        }
+        onAbrirModal(`Detalle: `)
       }}
       onHoverView={modulo === 'Citas' && pacienteId && !Number.isNaN(pacienteId) ? () => void precargarPerfilPaciente(pacienteId) : undefined}
-      onEdit={puedeEditar ? () => onAbrirModal(modulo === 'Citas' ? `Editar: ${id}` : `Detalle: ${id}`) : undefined}
-      onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
+      onEdit={
+        puedeEditar
+          ? () => {
+              if (modulo === 'Citas') {
+                onAbrirModal(`Editar: `)
+                return
+              }
+              if (modulo === 'Órdenes médicas') {
+                onAbrirModal('Nueva orden')
+                return
+              }
+              if (modulo === 'Laboratorio') {
+                onAbrirModal('Registrar resultado')
+                return
+              }
+              if (modulo === 'Internación') {
+                onAbrirModal('Nueva admisión')
+                return
+              }
+              if (modulo === 'Expedientes') {
+                onAbrirModal('Nuevo expediente')
+                return
+              }
+              onAbrirModal(`Detalle: `)
+            }
+          : undefined
+      }
+      onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: `) : undefined}
     />
   )
 }
