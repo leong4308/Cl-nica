@@ -1511,15 +1511,35 @@ export async function registrarResultadoLaboratorio(
   solicitudId: number,
   resultado: string,
   observaciones?: string,
+  nuevoEstado: 'en proceso' | 'completado' = 'completado',
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const updates: Record<string, any> = {
+    resultado,
+    observaciones: observaciones || null,
+    estado_analisis: nuevoEstado,
+  }
+  if (nuevoEstado === 'completado') {
+    updates.fecha_resultado = new Date().toISOString()
+  }
+  const { error } = await supabase
+    .from('solicitudes_analisis')
+    .update(updates)
+    .eq('id', solicitudId)
+
+  if (error) return { error: error.message }
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
+}
+
+export async function marcarLaboratorioEnProceso(
+  solicitudId: number,
 ): Promise<{ error: string | null }> {
   const supabase = createClient()
   const { error } = await supabase
     .from('solicitudes_analisis')
     .update({
-      resultado,
-      observaciones: observaciones || null,
-      estado_analisis: 'completado',
-      fecha_resultado: new Date().toISOString(),
+      estado_analisis: 'en proceso',
     })
     .eq('id', solicitudId)
 
