@@ -1,3 +1,5 @@
 export const internacionModule = { name: 'Internación', routeKey: 'Internación' } as const
 export { ModulePage as InternacionPage } from '../citas/module-page'
 export { BotonNuevaAdmision, ModalNuevaAdmision } from './nueva-admision'
+
+export { ModalDetalleInternacion } from './modal-detalle-internacion'

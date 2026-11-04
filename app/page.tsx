@@ -31,7 +31,7 @@ import { precargarModulos } from '@/lib/supabase/cache-modulos'
 import { InterfazRecepcionista } from '@/components/roles/recepcionista'
 import { InterfazEnfermero } from '@/components/roles/enfermero'
 import { ModalNuevoExpediente } from '@/components/modulos/expedientes'
-import { ModalNuevaAdmision } from '@/components/modulos/internacion'
+import { ModalNuevaAdmision, ModalDetalleInternacion } from '@/components/modulos/internacion'
 import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
 import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
 
@@ -79,7 +79,7 @@ const MODALES_CON_FORMULARIO = [
   'Nueva orden',
   'Registrar resultado',
 ]
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden', 'GestionInternacion']
 
 const openModal = (title: string) => {
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -293,6 +293,24 @@ const openModal = (title: string) => {
           onSave={(msg) => { notify(msg); setModal(null) }}
         />
       )}
+      {modal && modal.startsWith('GestionInternacion:') && (() => {
+        const parts = modal.replace('GestionInternacion:', '').split('___')
+        const internacionObj = {
+          id: Number(parts[0]),
+          habitacionCama: decodeURIComponent(parts[1] || ''),
+          paciente: decodeURIComponent(parts[2] || ''),
+          ingreso: decodeURIComponent(parts[3] || ''),
+          medico: decodeURIComponent(parts[4] || ''),
+          estado: decodeURIComponent(parts[5] || 'activa'),
+        }
+        return (
+          <ModalDetalleInternacion
+            internacion={internacionObj}
+            onClose={() => setModal(null)}
+            onSave={(msg) => { notify(msg); setModal(null) }}
+          />
+        )
+      })()}
       {modal === 'Nueva orden' && (
         <ModalNuevaOrden
           onClose={() => setModal(null)}

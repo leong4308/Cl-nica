@@ -529,7 +529,7 @@ export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string
 }
 
 type InternacionFila = {
-  id: number; fecha_ingreso: string; estado: string
+  id: number; cama_id?: number; habitacion_id?: number; fecha_ingreso: string; fecha_alta?: string | null; estado: string
   habitaciones: { numero: string } | { numero: string }[] | null
   camas: { numero: string; esta_ocupada: boolean } | { numero: string; esta_ocupada: boolean }[] | null
   perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
@@ -540,7 +540,7 @@ export async function cargarInternacion(): Promise<{ filas: Row[]; error: string
   const supabase = createClient()
   const { filas, error } = await consultar<InternacionFila>(
     supabase.from('internaciones')
-      .select('id, fecha_ingreso, estado, habitaciones(numero), camas(numero, esta_ocupada), perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
+      .select('id, cama_id, habitacion_id, fecha_ingreso, fecha_alta, estado, habitaciones(numero), camas(numero, esta_ocupada), perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo))')
       .order('fecha_ingreso', { ascending: false })
       .limit(100)
   )
@@ -559,6 +559,8 @@ export async function cargarInternacion(): Promise<{ filas: Row[]; error: string
         usuarioMed?.nombre_completo ?? 'Médico tratante',
         ETIQUETA_ESTADO_INTERNACION[internacion.estado] ?? internacion.estado,
         String(internacion.id),
+        String(internacion.cama_id ?? ''),
+        internacion.estado,
       ]
     }),
   }
@@ -1326,6 +1328,57 @@ export type DatosNuevaInternacion = {
   habitacionId: number
   motivoIngreso: string
   diagnosticoIngreso: string
+}
+
+
+export async function darAltaPaciente(
+  internacionId: number,
+  notaAlta?: string,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+
+  // 1. Obtener la internacion actual para conocer la cama asociada
+  const { data: inter, error: errInter } = await supabase
+    .from('internaciones')
+    .select('id, cama_id, medico_responsable_id, paciente_id')
+    .eq('id', internacionId)
+    .single()
+
+  if (errInter || !inter) {
+    return { error: errInter?.message ?? 'No se encontro la internacion' }
+  }
+
+  const ahora = new Date().toISOString()
+
+  // 2. Actualizar estado de la internacion a 'alta' y registrar fecha_alta
+  const { error: errUpdate } = await supabase
+    .from('internaciones')
+    .update({
+      estado: 'alta',
+      fecha_alta: ahora,
+    })
+    .eq('id', internacionId)
+
+  if (errUpdate) return { error: errUpdate.message }
+
+  // 3. LIBERAR LA CAMA (esta_ocupada = false)
+  if (inter.cama_id) {
+    await supabase
+      .from('camas')
+      .update({ esta_ocupada: false })
+      .eq('id', inter.cama_id)
+  }
+
+  // 4. Crear episodio medico de Alta clinica
+  await supabase.from('episodios_medicos').insert({
+    internacion_id: internacionId,
+    medico_id: inter.medico_responsable_id,
+    tipo_episodio: 'Alta',
+    descripcion: notaAlta?.trim() || 'Alta hospitalaria concedida. Cama liberada.',
+  })
+
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null }
 }
 
 export async function crearInternacion(datos: DatosNuevaInternacion): Promise<{ error: string | null }> {

@@ -6,6 +6,7 @@ import type { Row } from '../../compartidos/types'
 import { exportarCitasPDF, type CitaExportar } from '@/lib/exportar/exportar-citas-pdf'
 import { exportarPacientesPDF, type PacienteExportar } from '@/lib/exportar/exportar-pacientes-pdf'
 import { exportarExpedientesExcel, exportarExpedientesPDF, type ExpedienteExportar } from '@/lib/exportar/exportar-expedientes'
+import { exportarInternacionExcel, exportarInternacionPDF, type InternacionExportar } from '@/lib/exportar/exportar-internacion'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 export function BotonExportarModulo({
@@ -22,15 +23,57 @@ export function BotonExportarModulo({
 }) {
   const esAdmin = rol === 'admin'
   const esMedico = rol === 'medico'
+  const esEnfermero = rol === 'enfermero'
 
   // Modulos con soporte de exportacion
-  if (modulo !== 'Pacientes' && modulo !== 'Citas' && modulo !== 'Expedientes') {
+  if (modulo !== 'Pacientes' && modulo !== 'Citas' && modulo !== 'Expedientes' && modulo !== 'Internación') {
     return null
   }
 
-  // En Expedientes, tanto Admin como Medico pueden exportar; en otros, solo Admin
-  if (!esAdmin && !(modulo === 'Expedientes' && esMedico)) {
+  // Permisos segun rol
+  if (!esAdmin && !(modulo === 'Expedientes' && esMedico) && !(modulo === 'Internación' && (esMedico || esEnfermero))) {
     return null
+  }
+
+  if (modulo === 'Internación') {
+    const internaciones: InternacionExportar[] = filas.map((row) => ({
+      ubicacion: row[0] ?? '',
+      paciente: row[1] ?? '',
+      ingreso: row[2] ?? '',
+      medico: row[3] ?? '',
+      estado: row[4] ?? '',
+    }))
+
+    return (
+      <div className="flex items-center gap-2">
+        <ActionButton
+          icon={FileText}
+          onClick={() => {
+            if (filas.length === 0) {
+              onAvisar('No hay registros de internación para exportar')
+              return
+            }
+            onAvisar('Generando censo de camas en PDF...')
+            exportarInternacionPDF(internaciones)
+          }}
+        >
+          Censo PDF
+        </ActionButton>
+        <ActionButton
+          icon={FileSpreadsheet}
+          onClick={() => {
+            if (filas.length === 0) {
+              onAvisar('No hay registros de internación para exportar')
+              return
+            }
+            onAvisar('Descargando censo en Excel...')
+            exportarInternacionExcel(internaciones)
+          }}
+        >
+          Censo Excel
+        </ActionButton>
+      </div>
+    )
   }
 
   if (modulo === 'Expedientes') {

@@ -127,7 +127,13 @@ export function AccionesFilaModulo({
           return
         }
         if (modulo === 'Internación') {
-          onAbrirModal('Nueva admisión')
+          const intId = id || fila?.[5] || ''
+          const habCama = encodeURIComponent(fila?.[0] || '')
+          const pac = encodeURIComponent(fila?.[1] || '')
+          const ing = encodeURIComponent(fila?.[2] || '')
+          const med = encodeURIComponent(fila?.[3] || '')
+          const est = encodeURIComponent(fila?.[4] || 'activa')
+          onAbrirModal(`GestionInternacion:${intId}___${habCama}___${pac}___${ing}___${med}___${est}`)
           return
         }
         if (modulo === 'Expedientes') {
@@ -159,7 +165,13 @@ export function AccionesFilaModulo({
                 return
               }
               if (modulo === 'Internación') {
-                onAbrirModal('Nueva admisión')
+                const intId = id || fila?.[5] || ''
+                const habCama = encodeURIComponent(fila?.[0] || '')
+                const pac = encodeURIComponent(fila?.[1] || '')
+                const ing = encodeURIComponent(fila?.[2] || '')
+                const med = encodeURIComponent(fila?.[3] || '')
+                const est = encodeURIComponent(fila?.[4] || 'activa')
+                onAbrirModal(`GestionInternacion:${intId}___${habCama}___${pac}___${ing}___${med}___${est}`)
                 return
               }
               if (modulo === 'Expedientes') {
