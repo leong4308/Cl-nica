@@ -15,6 +15,72 @@ type CuerpoUsuario = {
   telefono?: string
 }
 
+export async function GET() {
+  const sessionClient = await createServerClient()
+  const { data: { user } } = await sessionClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+
+  const { data: solicitante } = await admin
+    .from('usuarios')
+    .select('rol')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (solicitante?.rol !== 'admin') {
+    return NextResponse.json({ error: 'Solo un administrador puede ver y gestionar usuarios.' }, { status: 403 })
+  }
+
+  const { data: usuarios, error } = await admin
+    .from('usuarios')
+    .select('id, auth_user_id, correo, nombre_completo, telefono, rol, esta_activo, creado_en, perfiles_medicos(id, especialidad, cedula_profesional, duracion_consulta, esta_activo), perfiles_enfermeros(id, especialidad, esta_activo)')
+    .order('id', { ascending: false })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ usuarios })
+}
+
+export async function PATCH(request: Request) {
+  const sessionClient = await createServerClient()
+  const { data: { user } } = await sessionClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+
+  const { data: solicitante } = await admin
+    .from('usuarios')
+    .select('rol')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (solicitante?.rol !== 'admin') {
+    return NextResponse.json({ error: 'Solo un administrador puede modificar usuarios.' }, { status: 403 })
+  }
+
+  const { id, esta_activo, nombre, rol, telefono } = await request.json() as {
+    id: number
+    esta_activo?: boolean
+    nombre?: string
+    rol?: string
+    telefono?: string
+  }
+
+  if (!id) return NextResponse.json({ error: 'ID de usuario requerido.' }, { status: 400 })
+
+  const updates: Record<string, unknown> = {}
+  if (esta_activo !== undefined) updates.esta_activo = Boolean(esta_activo)
+  if (nombre) updates.nombre_completo = nombre.trim()
+  if (rol) updates.rol = rol.trim()
+  if (telefono !== undefined) updates.telefono = telefono.trim()
+
+  const { error } = await admin.from('usuarios').update(updates).eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}
+
 export async function POST(request: Request) {
   const sessionClient = await createServerClient()
   const { data: { user } } = await sessionClient.auth.getUser()
