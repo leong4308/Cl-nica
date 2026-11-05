@@ -178,7 +178,7 @@ export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNo
                 </button>
               )}
             </div>
-            {rol === 'admin' && (
+            {(rol === 'admin' || (active === 'Expedientes' && rol === 'medico') || (active === 'Internación' && (rol === 'medico' || rol === 'enfermero'))) && (
               <BotonExportarModulo
                 modulo={active}
                 filas={filasFiltradas}

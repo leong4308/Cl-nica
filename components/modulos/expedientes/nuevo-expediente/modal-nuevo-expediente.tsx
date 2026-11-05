@@ -87,6 +87,7 @@ export function ModalNuevoExpediente({
     <ModalMarco
       title="Nuevo expediente clínico"
       onClose={onClose}
+      ancho="max-w-xl"
       footer={
         <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-4">
           <button
@@ -132,13 +133,13 @@ export function ModalNuevoExpediente({
                   <Calendar size={14} className="text-blue-600" /> Consulta / Cita del paciente
                 </span>
                 <select
-                  className={CAMPO}
+                  className={`${CAMPO} max-w-full truncate`}
                   value={citaId}
                   onChange={(e) => setCitaId(Number(e.target.value))}
                   required
                 >
                   {citas.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option key={c.id} value={c.id} title={`${c.paciente} · ${c.fecha} (${c.motivo}) — Dr. ${c.medico}`}>
                       {c.paciente} · {c.fecha} ({c.motivo}) — Dr. {c.medico}
                     </option>
                   ))}

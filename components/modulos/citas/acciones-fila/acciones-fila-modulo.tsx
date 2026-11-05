@@ -137,7 +137,16 @@ export function AccionesFilaModulo({
           return
         }
         if (modulo === 'Expedientes') {
-          onAbrirModal('Nuevo expediente')
+          const expId = id || fila?.[5] || ''
+          const pac = encodeURIComponent(fila?.[0] || '')
+          const mot = encodeURIComponent(fila?.[1] || '')
+          const diag = encodeURIComponent(fila?.[2] || '')
+          const med = encodeURIComponent(fila?.[3] || '')
+          const act = encodeURIComponent(fila?.[4] || '')
+          const citaId = encodeURIComponent(fila?.[6] || '')
+          const rec = encodeURIComponent(fila?.[7] || '')
+          const not = encodeURIComponent(fila?.[8] || '')
+          onAbrirModal(`GestionExpediente:ver___${expId}___${pac}___${mot}___${diag}___${med}___${act}___${citaId}___${rec}___${not}`)
           return
         }
         onAbrirModal(`Detalle: ${id}`)
@@ -175,7 +184,16 @@ export function AccionesFilaModulo({
                 return
               }
               if (modulo === 'Expedientes') {
-                onAbrirModal('Nuevo expediente')
+                const expId = id || fila?.[5] || ''
+                const pac = encodeURIComponent(fila?.[0] || '')
+                const mot = encodeURIComponent(fila?.[1] || '')
+                const diag = encodeURIComponent(fila?.[2] || '')
+                const med = encodeURIComponent(fila?.[3] || '')
+                const act = encodeURIComponent(fila?.[4] || '')
+                const citaId = encodeURIComponent(fila?.[6] || '')
+                const rec = encodeURIComponent(fila?.[7] || '')
+                const not = encodeURIComponent(fila?.[8] || '')
+                onAbrirModal(`GestionExpediente:editar___${expId}___${pac}___${mot}___${diag}___${med}___${act}___${citaId}___${rec}___${not}`)
                 return
               }
               onAbrirModal(`Detalle: ${id}`)

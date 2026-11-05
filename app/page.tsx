@@ -30,7 +30,7 @@ import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
 import { InterfazRecepcionista } from '@/components/roles/recepcionista'
 import { InterfazEnfermero } from '@/components/roles/enfermero'
-import { ModalNuevoExpediente } from '@/components/modulos/expedientes'
+import { ModalNuevoExpediente, ModalDetalleExpediente } from '@/components/modulos/expedientes'
 import { ModalNuevaAdmision, ModalDetalleInternacion } from '@/components/modulos/internacion'
 import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
 import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
@@ -79,7 +79,7 @@ const MODALES_CON_FORMULARIO = [
   'Nueva orden',
   'Registrar resultado',
 ]
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden', 'GestionInternacion']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden', 'GestionInternacion', 'GestionExpediente']
 
 const openModal = (title: string) => {
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -287,6 +287,29 @@ const openModal = (title: string) => {
           onSave={(msg) => { notify(msg); setModal(null) }}
         />
       )}
+      {modal && modal.startsWith('GestionExpediente:') && (() => {
+        const parts = modal.replace('GestionExpediente:', '').split('___')
+        const modo = (parts[0] || 'ver') as 'ver' | 'editar'
+        const expObj = {
+          id: Number(parts[1]),
+          paciente: decodeURIComponent(parts[2] || ''),
+          motivo: decodeURIComponent(parts[3] || ''),
+          diagnostico: decodeURIComponent(parts[4] || ''),
+          medico: decodeURIComponent(parts[5] || ''),
+          actualizado: decodeURIComponent(parts[6] || ''),
+          citaId: parts[7] ? Number(parts[7]) : undefined,
+          receta: decodeURIComponent(parts[8] || ''),
+          notas: decodeURIComponent(parts[9] || ''),
+        }
+        return (
+          <ModalDetalleExpediente
+            expediente={expObj}
+            modo={modo}
+            onClose={() => setModal(null)}
+            onSave={(msg) => { notify(msg); setModal(null) }}
+          />
+        )
+      })()}
       {modal === 'Nueva admisión' && (
         <ModalNuevaAdmision
           onClose={() => setModal(null)}

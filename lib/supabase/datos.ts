@@ -311,7 +311,7 @@ type MedicoFila = {
 }
 
 type ExpedienteFila = {
-  id: number; diagnostico: string | null; creado_en: string
+  id: number; cita_id: number; diagnostico: string | null; receta: string | null; notas_doctor: string | null; creado_en: string
   citas: {
     motivo: string | null
     perfiles_pacientes: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | null
@@ -479,6 +479,58 @@ export async function guardarExpediente(datos: DatosExpediente): Promise<{ error
   }
 }
 
+export async function eliminarExpediente(expedienteId: number): Promise<{ error: string | null }> {
+  try {
+    const res = await fetch(`/api/expedientes?id=${expedienteId}`, {
+      method: 'DELETE',
+    })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      return { error: json.error || 'Error al eliminar el expediente' }
+    }
+    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    return { error: null }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Error al eliminar el expediente' }
+  }
+}
+
+export async function cargarExpedientePorId(expedienteId: number): Promise<{
+  expediente: { id: number; citaId: number; diagnostico: string; receta: string; notas: string; fecha: string; paciente: string; medico: string; motivo: string } | null
+  error: string | null
+}> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('expedientes')
+    .select('id, cita_id, diagnostico, receta, notas_doctor, creado_en, citas(id, motivo, inicio, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)))')
+    .eq('id', expedienteId)
+    .maybeSingle()
+
+  if (error) return { expediente: null, error: error.message }
+  if (!data) return { expediente: null, error: null }
+
+  const cita = (data as any).citas
+  const pac = Array.isArray(cita?.perfiles_pacientes) ? cita?.perfiles_pacientes[0] : cita?.perfiles_pacientes
+  const usrPac = Array.isArray(pac?.usuarios) ? pac?.usuarios[0] : pac?.usuarios
+  const med = Array.isArray(cita?.perfiles_medicos) ? cita?.perfiles_medicos[0] : cita?.perfiles_medicos
+  const usrMed = Array.isArray(med?.usuarios) ? med?.usuarios[0] : med?.usuarios
+
+  return {
+    expediente: {
+      id: data.id,
+      citaId: data.cita_id,
+      diagnostico: data.diagnostico ?? '',
+      receta: data.receta ?? '',
+      notas: data.notas_doctor ?? '',
+      fecha: fechaDe(data.creado_en),
+      paciente: usrPac?.nombre_completo ?? 'Paciente',
+      medico: usrMed?.nombre_completo ?? 'Médico',
+      motivo: cita?.motivo ?? 'Consulta general',
+    },
+    error: null,
+  }
+}
+
 export async function cargarExpedienteCita(citaId: number): Promise<{
   expediente: { diagnostico: string; receta: string; notas: string } | null
   error: string | null
@@ -504,7 +556,7 @@ export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string
   const supabase = createClient()
   const { filas, error } = await consultar<ExpedienteFila>(
     supabase.from('expedientes')
-      .select('id, diagnostico, creado_en, citas(motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)))')
+      .select('id, cita_id, diagnostico, receta, notas_doctor, creado_en, citas(motivo, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)))')
       .order('creado_en', { ascending: false })
       .limit(100)
   )
@@ -523,6 +575,9 @@ export async function cargarExpedientes(): Promise<{ filas: Row[]; error: string
         nombreMed ?? 'Médico',
         fechaDe(expediente.creado_en),
         String(expediente.id),
+        String(expediente.cita_id ?? ''),
+        expediente.receta ?? '',
+        expediente.notas_doctor ?? '',
       ]
     }),
   }

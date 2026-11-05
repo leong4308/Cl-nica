@@ -12,9 +12,10 @@ type PropsModalMarco = {
   children: ReactNode
   footer?: ReactNode
   aviso?: ReactNode
+  ancho?: string
 }
 
-export function ModalMarco({ title, onClose, children, footer, aviso }: PropsModalMarco) {
+export function ModalMarco({ title, onClose, children, footer, aviso, ancho = 'max-w-md' }: PropsModalMarco) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
@@ -24,7 +25,7 @@ export function ModalMarco({ title, onClose, children, footer, aviso }: PropsMod
       onMouseDown={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+        className={`max-h-[90vh] w-full ${ancho} overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between">
