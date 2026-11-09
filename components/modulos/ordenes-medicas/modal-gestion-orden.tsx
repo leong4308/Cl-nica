@@ -1,168 +1,57 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ClipboardList, FileText, Loader2, Stethoscope } from 'lucide-react'
 import { ModalMarco } from '../compartidos/modal-marco'
-import { actualizarEstadoOrdenMedica } from '@/lib/supabase/datos'
-import { AlertCircle, CheckCircle2, Clock, XCircle, Loader2, ClipboardList, Stethoscope } from 'lucide-react'
+import { AvisoClinico, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO_CLINICO, DatoClinico, ETIQUETA_CLINICA, PanelClinico } from '../compartidos/editor-clinico'
+import { DocumentosClinicos } from '../compartidos/documentos-clinicos'
+import { guardarOrdenMedica } from '@/lib/supabase/datos'
+import { createClient } from '@/lib/supabase/client'
+import { subirDocumentoClinico } from '@/lib/documentos-clinicos'
+import { Status } from '../citas/estado'
 
-type PropsModalGestionOrden = {
-  orden: {
-    id: number
-    codigo: string
-    episodio: string
-    medico: string
-    descripcion: string
-    estado: string
-  }
-  onClose: () => void
-  onSave?: (mensaje: string) => void
-}
-
-export function ModalGestionOrden({ orden, onClose, onSave }: PropsModalGestionOrden) {
-  const [actualizando, setActualizando] = useState(false)
+type Orden = { id: number; codigo: string; episodio: string; medico: string; descripcion: string; estado: string }
+const ESTADOS = [{ valor: 'prescrita', titulo: 'Prescrita' }, { valor: 'en_proceso', titulo: 'En proceso' }, { valor: 'realizada', titulo: 'Completada' }, { valor: 'cancelada', titulo: 'Cancelada' }]
+export function ModalGestionOrden({ orden, modo: modoInicial = 'ver', onClose, onSave }: { orden: Orden; modo?: 'ver' | 'editar'; onClose: () => void; onSave?: (mensaje: string) => void }) {
+  const [modo, setModo] = useState(modoInicial)
+  const [descripcion, setDescripcion] = useState(orden.descripcion)
+  const [instrucciones, setInstrucciones] = useState('')
+  const [estado, setEstado] = useState('prescrita')
+  const [tipo, setTipo] = useState('')
+  const [archivo, setArchivo] = useState<File>()
+  const [validando, setValidando] = useState(false)
+  const [cargando, setCargando] = useState(true)
+  const [cargaCorrecta, setCargaCorrecta] = useState(false)
+  const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const handleCambiarEstado = async (nuevoEstado: 'prescrita' | 'en_proceso' | 'realizada' | 'cancelada') => {
-    setActualizando(true)
-    setError(null)
-    const res = await actualizarEstadoOrdenMedica(orden.id, nuevoEstado)
-    setActualizando(false)
-    if (res.error) {
-      setError(res.error)
-      return
-    }
-    const label = nuevoEstado === 'realizada' ? 'Completada' : nuevoEstado === 'en_proceso' ? 'En proceso' : nuevoEstado === 'cancelada' ? 'Cancelada' : 'Pendiente'
-    if (onSave) onSave('Orden ' + orden.codigo + ' actualizada a ' + label)
-    onClose()
+  const ocupado = guardando || validando
+  useEffect(() => {
+    let vigente = true
+    createClient().from('ordenes_medicas').select('descripcion, instrucciones, estado, tipo_orden').eq('id', orden.id).maybeSingle().then(({ data, error }) => {
+      if (!vigente) return
+      if (error || !data) setError(error?.message || 'Orden no encontrada.')
+      else { setCargaCorrecta(true); setDescripcion(data.descripcion); setInstrucciones(data.instrucciones ?? ''); setEstado(data.estado); setTipo(data.tipo_orden) }
+      setCargando(false)
+    })
+    return () => { vigente = false }
+  }, [orden.id])
+  async function guardar(event: React.FormEvent) {
+    event.preventDefault()
+    if (ocupado || cargando || !cargaCorrecta || modo !== 'editar' || !descripcion.trim()) return
+    setGuardando(true); setError(null)
+    try {
+      const res = await guardarOrdenMedica(orden.id, descripcion, instrucciones, estado)
+      if (res.error) { setError(res.error); return }
+      if (archivo) { const fallo = await subirDocumentoClinico('ordenes', orden.id, archivo); if (fallo) { setError('La orden se actualizó. El PDF sigue pendiente: ' + fallo); return } }
+      onSave?.('Orden ' + orden.codigo + ' actualizada correctamente'); onClose()
+    } catch { setError('No se pudo guardar la orden. Inténtalo de nuevo.') }
+    finally { setGuardando(false) }
   }
-
-  const estadoNorm = (orden.estado || '').toLowerCase()
-
-  const badgeEstado = (estado: string) => {
-    if (estado.includes('complet') || estado.includes('realiz')) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
-          <CheckCircle2 size={13} className="text-emerald-600" /> Completada
-        </span>
-      )
-    }
-    if (estado.includes('proceso')) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200/60">
-          <Clock size={13} className="text-blue-600" /> En proceso
-        </span>
-      )
-    }
-    if (estado.includes('cancel')) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 border border-rose-200/60">
-          <XCircle size={13} className="text-rose-600" /> Cancelada
-        </span>
-      )
-    }
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200/60">
-        <ClipboardList size={13} className="text-amber-600" /> Pendiente (Prescrita)
-      </span>
-    )
-  }
-
-  return (
-    <ModalMarco
-      title={'Gestion de Orden ' + orden.codigo}
-      onClose={onClose}
-      footer={
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <div>
-            {!estadoNorm.includes('cancel') && !estadoNorm.includes('complet') && (
-              <button
-                type="button"
-                onClick={() => handleCambiarEstado('cancelada')}
-                disabled={actualizando}
-                className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-              >
-                Cancelar orden
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={actualizando}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Cerrar
-            </button>
-            {(!estadoNorm.includes('proceso') && !estadoNorm.includes('complet') && !estadoNorm.includes('cancel')) && (
-              <button
-                type="button"
-                onClick={() => handleCambiarEstado('en_proceso')}
-                disabled={actualizando}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-              >
-                {actualizando ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}
-                Pasar a 'En proceso'
-              </button>
-            )}
-            {!estadoNorm.includes('complet') && !estadoNorm.includes('cancel') && (
-              <button
-                type="button"
-                onClick={() => handleCambiarEstado('realizada')}
-                disabled={actualizando}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {actualizando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                Completar indicacion
-              </button>
-            )}
-          </div>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        {error && (
-          <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200/70">
-            <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 p-4">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Codigo de Orden</span>
-            <p className="font-mono text-base font-bold text-slate-800">{orden.codigo}</p>
-          </div>
-          <div>{badgeEstado(orden.estado)}</div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="rounded-lg border border-slate-100 p-3 bg-white shadow-xs">
-            <span className="text-slate-400 block mb-0.5">Episodio clinico</span>
-            <span className="font-semibold text-slate-700">{orden.episodio}</span>
-          </div>
-          <div className="rounded-lg border border-slate-100 p-3 bg-white shadow-xs">
-            <span className="text-slate-400 block mb-0.5">Medico solicitante</span>
-            <span className="font-semibold text-slate-700 flex items-center gap-1">
-              <Stethoscope size={13} className="text-blue-600" /> {orden.medico}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
-          <span className="text-xs font-semibold text-slate-700 block mb-1.5">Descripcion de la indicacion medica</span>
-          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap bg-white p-3 rounded-lg border border-slate-100">
-            {orden.descripcion}
-          </p>
-        </div>
-
-        <div className="rounded-lg bg-blue-50/50 border border-blue-100 p-3 text-xs text-blue-800 space-y-1">
-          <p className="font-semibold">Ciclo de atencion clinica:</p>
-          <p className="text-[11px] text-blue-700">
-            Marca <strong>En proceso</strong> cuando el personal inicie la preparacion, o <strong>Completar indicacion</strong> una vez administrado el medicamento o realizado el estudio.
-          </p>
-        </div>
-      </div>
-    </ModalMarco>
-  )
+  const editando = modo === 'editar'
+  return <ModalMarco title={editando ? 'Modificar orden médica' : 'Detalle de orden médica'} ancho="max-w-5xl" contenidoFijo onClose={() => { if (!ocupado) onClose() }} footer={<div className="flex flex-wrap justify-between gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={onClose} disabled={ocupado}>{editando ? 'Cancelar' : 'Cerrar'}</button>{editando ? <button key="guardar" type="submit" form="form-editar-orden" className={BOTON_PRIMARIO} disabled={ocupado || cargando || !cargaCorrecta || !descripcion.trim()}>{guardando && <Loader2 size={16} className="animate-spin" />}{guardando ? 'Guardando...' : 'Guardar cambios'}</button> : <button key="editar" type="button" className={BOTON_PRIMARIO} onClick={(event) => { event.preventDefault(); setModo('editar') }} disabled={cargando || !cargaCorrecta}>Modificar orden</button>}</div>}>
+    <p className="mb-5 text-sm text-slate-500">{editando ? 'Actualiza la indicación, su estado y los documentos de apoyo.' : 'Revisa la indicación y las instrucciones del equipo médico.'}</p><AvisoClinico mensaje={error} />
+    <div className="grid min-w-0 gap-5 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.3fr)]"><div className="min-w-0 space-y-5"><PanelClinico icon={ClipboardList} titulo={orden.codigo} ayuda="Resumen de la orden" suave><div className="mb-5"><Status text={ESTADOS.find((e) => e.valor === estado)?.titulo ?? orden.estado} /></div><dl className="space-y-4"><DatoClinico etiqueta="Episodio clínico" valor={orden.episodio} /><DatoClinico etiqueta="Médico solicitante" valor={orden.medico} /><DatoClinico etiqueta="Tipo de orden" valor={{ analisis: 'Análisis clínico', medicamento: 'Medicamento', tratamiento: 'Tratamiento', procedimiento: 'Procedimiento' }[tipo] ?? tipo} /></dl></PanelClinico><DocumentosClinicos tipo="ordenes" registroId={orden.id} soloLectura={!editando} archivo={archivo} onArchivo={setArchivo} onValidando={setValidando} disabled={ocupado || cargando || !cargaCorrecta} /></div>
+    {cargando ? <p role="status" className="py-12 text-center text-sm text-slate-500">Cargando orden médica...</p> : editando ? <form id="form-editar-orden" onSubmit={guardar}><fieldset disabled={ocupado || !cargaCorrecta}><PanelClinico icon={Stethoscope} titulo="Indicación y seguimiento"><div className="space-y-5"><label className={ETIQUETA_CLINICA}>Descripción de la orden <span className="text-blue-600">*</span><textarea rows={4} className={CAMPO_CLINICO + ' resize-y'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} required /></label><label className={ETIQUETA_CLINICA}>Instrucciones clínicas / Posología<textarea rows={4} className={CAMPO_CLINICO + ' resize-y'} value={instrucciones} onChange={(e) => setInstrucciones(e.target.value)} /></label><label className={ETIQUETA_CLINICA}>Estado de la orden<select className={CAMPO_CLINICO} value={estado} onChange={(e) => setEstado(e.target.value)}>{ESTADOS.map((e) => <option key={e.valor} value={e.valor}>{e.titulo}</option>)}</select></label><p className="rounded-xl bg-blue-50 p-3 text-xs leading-relaxed text-blue-800">Usa “En proceso” al iniciar la atención y “Completada” cuando la indicación se haya realizado.</p></div></PanelClinico></fieldset></form> : <div className="min-w-0 space-y-5"><PanelClinico icon={Stethoscope} titulo="Indicación médica"><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{descripcion}</p></PanelClinico><PanelClinico icon={FileText} titulo="Instrucciones clínicas / Posología"><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{instrucciones || 'Sin instrucciones adicionales.'}</p></PanelClinico></div>}
+    </div>
+  </ModalMarco>
 }

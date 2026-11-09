@@ -105,17 +105,18 @@ export function ModalPerfilPaciente({
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="perfil-paciente-titulo"
       onMouseDown={onClose}
     >
       <div
-        className="my-auto flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl scale-in-95 transition-all"
+        className="my-auto flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Cabecera instantánea */}
-        <div className="border-b border-slate-100 bg-gradient-to-br from-blue-50 to-slate-50 p-5">
+        <div className="shrink-0 border-b border-slate-100 bg-slate-50/80 p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
+            <div className="flex min-w-0 items-start gap-4"><div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-xl font-semibold text-blue-700 sm:flex">{perfil?.nombre.trim().split(/\s+/).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || <User size={26} />}</div><div className="min-w-0"><p className="mb-1 text-xs font-semibold text-blue-600">PERFIL DEL PACIENTE</p>
+              <h3 id="perfil-paciente-titulo" className="break-words text-xl font-semibold text-slate-900">
                 {perfil?.nombre || 'Paciente'}
               </h3>
               <p className="mt-0.5 text-xs text-slate-500">
@@ -126,7 +127,8 @@ export function ModalPerfilPaciente({
                   </span>
                 )}
               </p>
-            </div>
+              <p className="mt-2 text-sm text-slate-500">Información personal, alertas y seguimiento clínico.</p>
+            </div></div>
             <button
               type="button"
               onClick={onClose}
@@ -139,9 +141,11 @@ export function ModalPerfilPaciente({
         </div>
 
         {/* Pestañas */}
-        <div className="flex border-b border-slate-100 bg-white px-5 pt-2 gap-2 overflow-x-auto">
+        <div role="tablist" aria-label="Información del paciente" className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-100 bg-white px-5 pt-3">
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'perfil'}
             onClick={() => handleTab('perfil')}
             className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors shrink-0 ${
               tab === 'perfil'
@@ -155,6 +159,8 @@ export function ModalPerfilPaciente({
 
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'importante'}
             onClick={() => handleTab('importante')}
             className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-bold transition-colors shrink-0 ${
               tab === 'importante'
@@ -169,6 +175,8 @@ export function ModalPerfilPaciente({
           {rol !== 'recepcionista' && (
             <button
               type="button"
+              role="tab"
+              aria-selected={tab === 'historial'}
               onClick={() => handleTab('historial')}
               className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors shrink-0 ${
                 tab === 'historial'
@@ -183,7 +191,7 @@ export function ModalPerfilPaciente({
         </div>
 
         {/* Contenido instantáneo */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
           {!cargando && error && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
               {error}
@@ -193,12 +201,12 @@ export function ModalPerfilPaciente({
           {perfil && tab === 'perfil' && (
             <div className="space-y-3">
               {/* Datos personales */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 space-y-3">
+              <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <User size={12} />
                   Datos personales
                 </p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <DataRow label="Nombre completo" value={perfil.nombre} />
                   <DataRow label="Género" value={perfil.genero || '—'} />
                   <DataRow label="Fecha de nacimiento" value={perfil.fechaNacimiento || '—'} icon={<CalendarDays size={13} className="text-blue-500" />} />
@@ -249,7 +257,7 @@ export function ModalPerfilPaciente({
                   {historial?.map((item, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 hover:bg-slate-50 transition-colors"
+                      className="rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-blue-200"
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
                         <span className="font-bold text-xs text-slate-900">{item.motivo}</span>
@@ -272,7 +280,7 @@ export function ModalPerfilPaciente({
         </div>
 
         {/* Pie */}
-        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 flex justify-end">
+        <div className="flex shrink-0 justify-end border-t border-slate-100 bg-white px-5 py-4">
           <button
             type="button"
             onClick={onClose}
@@ -288,9 +296,9 @@ export function ModalPerfilPaciente({
 
 function DataRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-slate-800">
+    <div className="min-w-0 rounded-xl bg-slate-50 p-4">
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-2 flex items-center gap-2 break-words text-sm font-semibold text-slate-800">
         {icon}
         {value}
       </p>

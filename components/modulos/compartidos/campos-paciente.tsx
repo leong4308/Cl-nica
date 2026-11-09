@@ -35,8 +35,8 @@ type PropsCamposPaciente = {
 }
 
 const CAMPO =
-  'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50 disabled:bg-slate-50'
-const ETIQUETA = 'text-xs font-semibold text-slate-600'
+  'mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 disabled:opacity-50 disabled:bg-slate-50'
+const ETIQUETA = 'text-sm font-semibold text-slate-700'
 
 export function CamposPaciente({
   datos,
@@ -46,7 +46,7 @@ export function CamposPaciente({
   disabled = false,
 }: PropsCamposPaciente) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-5">
       <div>
         <label htmlFor={`${prefijoId}-nombre`} className={ETIQUETA}>
           Nombre completo <span className="text-rose-500">*</span>
@@ -79,7 +79,7 @@ export function CamposPaciente({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor={`${prefijoId}-fecha-nac`} className={ETIQUETA}>
             Fecha de nacimiento
@@ -122,7 +122,7 @@ export function CamposPaciente({
           placeholder="Alergias, condiciones previas, etc."
           value={datos.notasMedicas}
           onChange={(e) => onChange('notasMedicas', e.target.value)}
-          className={CAMPO}
+          className={CAMPO + ' resize-y leading-relaxed'}
         />
       </div>
     </div>

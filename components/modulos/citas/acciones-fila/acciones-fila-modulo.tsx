@@ -119,7 +119,7 @@ export function AccionesFilaModulo({
           const med = fila?.[2] || 'Médico'
           const desc = encodeURIComponent(fila?.[3] || '')
           const est = fila?.[4] || 'prescrita'
-          onAbrirModal(`GestionOrden:${ordId}___${cod}___${ep}___${med}___${desc}___${est}`)
+          onAbrirModal(`GestionOrden:${ordId}___${cod}___${ep}___${med}___${desc}___${est}___ver`)
           return
         }
         if (modulo === 'Laboratorio') {
@@ -166,7 +166,7 @@ export function AccionesFilaModulo({
                 const med = fila?.[2] || 'Médico'
                 const desc = encodeURIComponent(fila?.[3] || '')
                 const est = fila?.[4] || 'prescrita'
-                onAbrirModal(`GestionOrden:${ordId}___${cod}___${ep}___${med}___${desc}___${est}`)
+                onAbrirModal(`GestionOrden:${ordId}___${cod}___${ep}___${med}___${desc}___${est}___editar`)
                 return
               }
               if (modulo === 'Laboratorio') {

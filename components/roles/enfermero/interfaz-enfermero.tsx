@@ -13,7 +13,7 @@ import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { ModalNuevaAdmision } from '@/components/modulos/internacion'
-import { ModalNuevaOrden } from '@/components/modulos/ordenes-medicas'
+import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
 import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
 import { actualizarEstadoCita, eliminarCita, type CitaPanel, type EstadoCita } from '@/lib/supabase/datos'
@@ -52,7 +52,7 @@ export function InterfazEnfermero({
     'Nueva orden',
     'Registrar resultado',
   ]
-  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle', 'GestionLaboratorio:']
+  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle', 'GestionLaboratorio:', 'GestionOrden:']
 
   const openModal = (title: string) => {
     const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -150,6 +150,10 @@ export function InterfazEnfermero({
       )}
 
       {/* Modales */}
+      {modal?.startsWith('GestionOrden:') && (() => {
+        const parts = modal.replace('GestionOrden:', '').split('___')
+        return <ModalGestionOrden key={modal} orden={{ id: Number(parts[0]), codigo: parts[1], episodio: parts[2], medico: parts[3], descripcion: decodeURIComponent(parts[4] || ''), estado: parts[5] }} modo={parts[6] === 'editar' ? 'editar' : 'ver'} onClose={() => setModal(null)} onSave={(msg) => { notify(msg); setModal(null) }} />
+      })()}
       {(modal === 'Registrar resultado' || (modal && /^GestionLaboratorio:(ver|editar):\d+$/.test(modal))) && (
         <ModalRegistrarResultado
           key={modal}

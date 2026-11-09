@@ -305,6 +305,7 @@ const openModal = (title: string) => {
           <ModalDetalleExpediente
             expediente={expObj}
             modo={modo}
+            puedeEditar={perfil.rol === 'admin' || perfil.rol === 'medico'}
             onClose={() => setModal(null)}
             onSave={(msg) => { notify(msg); setModal(null) }}
           />
@@ -353,6 +354,7 @@ const openModal = (title: string) => {
         return (
           <ModalGestionOrden
             orden={ordenObj}
+            modo={parts[6] === 'editar' ? 'editar' : 'ver'}
             onClose={() => setModal(null)}
             onSave={(msg) => { notify(msg); setModal(null) }}
           />

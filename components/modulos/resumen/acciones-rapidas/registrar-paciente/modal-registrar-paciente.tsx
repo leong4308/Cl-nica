@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from 'react'
 import { ModalMarco } from '../../../compartidos/modal-marco'
+import { UserRound, HeartPulse } from 'lucide-react'
+import { BOTON_PRIMARIO, BOTON_SECUNDARIO, PanelClinico } from '../../../compartidos/editor-clinico'
 import {
   CamposPaciente,
   DATOS_PACIENTE_INICIALES,
@@ -59,26 +61,28 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
   return (
     <ModalMarco
       title="Registrar nuevo paciente"
-      onClose={onClose}
+      onClose={() => { if (!cargando) onClose() }}
+      ancho="max-w-4xl"
+      contenidoFijo
       footer={
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">Los campos con * son obligatorios.</p><div className="flex gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={cargando}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className={BOTON_SECUNDARIO}
           >
             Cancelar
           </button>
           <button
             type="submit"
             form="form-registrar-paciente"
-            disabled={cargando}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            disabled={cargando || !datos.nombre.trim()}
+            className={BOTON_PRIMARIO}
           >
             {cargando ? 'Guardando...' : 'Guardar paciente'}
           </button>
-        </div>
+        </div></div>
       }
       aviso={
         error ? (
@@ -88,6 +92,10 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
         ) : null
       }
     >
+      <p className="mb-5 text-sm text-slate-500">Crea el perfil con los datos de contacto y los antecedentes del paciente.</p>
+      <div className="grid min-w-0 gap-5 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
+      <div className="min-w-0 space-y-5"><PanelClinico icon={UserRound} titulo="Nuevo paciente" ayuda="Identificación y contacto" suave><div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-xl font-semibold text-blue-700">{datos.nombre.trim().split(/\s+/).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || <UserRound size={28} />}</div><p className="break-words text-base font-semibold text-slate-900">{datos.nombre.trim() || 'Nombre del paciente'}</p><p className="mt-2 text-sm text-slate-500">{datos.telefono || 'Añade un teléfono de contacto.'}</p></PanelClinico><PanelClinico icon={HeartPulse} titulo="Antecedentes relevantes" ayuda="Incluye alergias o condiciones previas para facilitar la atención."><p className="text-sm leading-relaxed text-slate-500">Revisa el nombre y el teléfono antes de guardar el perfil.</p></PanelClinico></div>
+      <PanelClinico icon={UserRound} titulo="Datos del paciente" ayuda="Completa la información que tengas disponible.">
       <form id="form-registrar-paciente" onSubmit={handleSubmit}>
         <CamposPaciente
           datos={datos}
@@ -97,6 +105,7 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
           autoFocusNombre
         />
       </form>
+      </PanelClinico></div>
     </ModalMarco>
   )
 }

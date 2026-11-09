@@ -13,9 +13,10 @@ type PropsModalMarco = {
   footer?: ReactNode
   aviso?: ReactNode
   ancho?: string
+  contenidoFijo?: boolean
 }
 
-export function ModalMarco({ title, onClose, children, footer, aviso, ancho = 'max-w-md' }: PropsModalMarco) {
+export function ModalMarco({ title, onClose, children, footer, aviso, ancho = 'max-w-md', contenidoFijo = false }: PropsModalMarco) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
@@ -25,20 +26,19 @@ export function ModalMarco({ title, onClose, children, footer, aviso, ancho = 'm
       onMouseDown={onClose}
     >
       <div
-        className={`max-h-[90vh] w-full ${ancho} overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl`}
+        className={`max-h-[90dvh] w-full ${ancho} rounded-2xl bg-white shadow-2xl ${contenidoFijo ? 'flex flex-col overflow-hidden' : 'overflow-y-auto p-6'}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
+        <div className={`flex shrink-0 items-center justify-between gap-3 ${contenidoFijo ? 'px-5 py-5 sm:px-6' : ''}`}>
           <h3 id="modal-title" className="text-lg font-bold">{title}</h3>
           <button type="button" onClick={onClose} aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
 
-        <div className="mt-5 flex flex-col gap-3">{children}</div>
+        <div className={contenidoFijo ? 'min-h-0 overflow-y-auto px-5 pb-5 sm:px-6' : 'mt-5 flex flex-col gap-3'}>{children}</div>
 
-        {footer}
-        {aviso}
+        {contenidoFijo ? <div className="shrink-0 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">{footer}{aviso}</div> : <>{footer}{aviso}</>}
       </div>
     </div>
   )

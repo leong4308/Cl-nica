@@ -455,13 +455,14 @@ export async function cargarHistorialPaciente(pacienteId: number): Promise<{ fil
 }
 
 export type DatosExpediente = {
+  id?: number
   citaId: number
   diagnostico: string
   receta: string
   notas: string
 }
 
-export async function guardarExpediente(datos: DatosExpediente): Promise<{ error: string | null }> {
+export async function guardarExpediente(datos: DatosExpediente): Promise<{ error: string | null; id?: number }> {
   try {
     const res = await fetch('/api/expedientes', {
       method: 'POST',
@@ -473,7 +474,7 @@ export async function guardarExpediente(datos: DatosExpediente): Promise<{ error
       return { error: json.error || 'Error al guardar el expediente' }
     }
     window.dispatchEvent(new CustomEvent('datos-actualizados'))
-    return { error: null }
+    return { error: null, id: json.data?.[0]?.id }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Error al guardar el expediente' }
   }
@@ -1596,7 +1597,7 @@ export async function actualizarEstadoOrdenMedica(
   return { error: null }
 }
 
-export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error: string | null }> {
+export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error: string | null; id?: number }> {
   const supabase = createClient()
   let episodioId = datos.episodioId
 
@@ -1642,14 +1643,25 @@ export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error:
 
   // Si la orden es de tipo análisis y se especificó un catálogo, crear la solicitud en laboratorio de inmediato
   if (datos.tipoOrden === 'analisis' && datos.analisisId && orden?.id) {
-    await supabase.from('solicitudes_analisis').insert({
+    const { error: errorSolicitud } = await supabase.from('solicitudes_analisis').insert({
       orden_medica_id: orden.id,
       analisis_id: datos.analisisId,
       estado_analisis: 'solicitado',
       observaciones: datos.instrucciones ?? null,
     })
+    if (errorSolicitud) return { error: 'La orden se guardó, pero no se pudo generar la solicitud de laboratorio.', id: orden.id }
   }
 
+  window.dispatchEvent(new CustomEvent('datos-actualizados'))
+  return { error: null, id: orden?.id }
+}
+
+export async function guardarOrdenMedica(id: number, descripcion: string, instrucciones: string, estado: string): Promise<{ error: string | null }> {
+  if (!['prescrita', 'en_proceso', 'realizada', 'cancelada'].includes(estado)) return { error: 'Estado de orden inválido.' }
+  const { data, error } = await createClient().from('ordenes_medicas')
+    .update({ descripcion: descripcion.trim(), instrucciones: instrucciones.trim() || null, estado, actualizado_en: new Date().toISOString() })
+    .eq('id', id).select('id').maybeSingle()
+  if (error || !data) return { error: error?.message || 'No tienes permiso para actualizar esta orden.' }
   window.dispatchEvent(new CustomEvent('datos-actualizados'))
   return { error: null }
 }
