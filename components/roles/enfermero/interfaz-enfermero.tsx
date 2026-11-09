@@ -14,7 +14,7 @@ import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/p
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalPerfilPaciente, ModalEditarPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
-import { ModalNuevaAdmision } from '@/components/modulos/internacion'
+import { ModalNuevaAdmision, ModalDetalleInternacion } from '@/components/modulos/internacion'
 import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
 import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
@@ -56,7 +56,7 @@ export function InterfazEnfermero({
     'Nueva orden',
     'Registrar resultado',
   ]
-  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle', 'PacienteEditar', 'GestionLaboratorio:', 'GestionOrden:']
+  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle', 'PacienteEditar', 'GestionLaboratorio:', 'GestionOrden:', 'GestionInternacion:']
 
   const openModal = (title: string) => {
     if (abrirSeccionCuenta(title)) return
@@ -155,6 +155,10 @@ export function InterfazEnfermero({
       )}
 
       {/* Modales */}
+      {modal?.startsWith('GestionInternacion:') && (() => {
+        const parts = modal.replace('GestionInternacion:', '').split('___')
+        return <ModalDetalleInternacion key={modal} internacion={{ id: Number(parts[0]) }} modo={parts[6] === 'editar' ? 'editar' : 'ver'} onClose={() => setModal(null)} onSave={(msg) => { notify(msg); setModal(null) }} />
+      })()}
       {modal?.startsWith('GestionOrden:') && (() => {
         const parts = modal.replace('GestionOrden:', '').split('___')
         return <ModalGestionOrden key={modal} orden={{ id: Number(parts[0]), codigo: parts[1], episodio: parts[2], medico: parts[3], descripcion: decodeURIComponent(parts[4] || ''), estado: parts[5] }} modo={parts[6] === 'editar' ? 'editar' : 'ver'} onClose={() => setModal(null)} onSave={(msg) => { notify(msg); setModal(null) }} />

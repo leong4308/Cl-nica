@@ -133,7 +133,7 @@ export function AccionesFilaModulo({
           const ing = encodeURIComponent(fila?.[2] || '')
           const med = encodeURIComponent(fila?.[3] || '')
           const est = encodeURIComponent(fila?.[4] || 'activa')
-          onAbrirModal(`GestionInternacion:${intId}___${habCama}___${pac}___${ing}___${med}___${est}`)
+          onAbrirModal(`GestionInternacion:${intId}___${habCama}___${pac}___${ing}___${med}___${est}___ver`)
           return
         }
         if (modulo === 'Expedientes') {
@@ -180,7 +180,7 @@ export function AccionesFilaModulo({
                 const ing = encodeURIComponent(fila?.[2] || '')
                 const med = encodeURIComponent(fila?.[3] || '')
                 const est = encodeURIComponent(fila?.[4] || 'activa')
-                onAbrirModal(`GestionInternacion:${intId}___${habCama}___${pac}___${ing}___${med}___${est}`)
+                onAbrirModal(`GestionInternacion:${intId}___${habCama}___${pac}___${ing}___${med}___${est}___editar`)
                 return
               }
               if (modulo === 'Expedientes') {
@@ -200,7 +200,7 @@ export function AccionesFilaModulo({
             }
           : undefined
       }
-      onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
+      onDelete={puedeEliminar && modulo !== 'Internación' ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
     />
   )
 }

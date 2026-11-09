@@ -1,0 +1,79 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { ArrowDownToLine, BedDouble, Building2, CheckCircle2, ClipboardList, Eye, LayoutGrid, List, Loader2, Pencil, Plus, RefreshCw, Search, UsersRound } from 'lucide-react'
+import type { ClinicActions } from '../compartidos/types'
+import { AvisoClinico, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO_CLINICO } from '../compartidos/editor-clinico'
+import { consultarHospital, diasHospital, ESTADOS_HOSPITAL, fechaHospital, guardarHospital, ubicacionHospital, type DatosHospital } from '@/lib/internacion/modelo'
+import { exportarInternacionExcel, exportarInternacionPDF } from '@/lib/exportar/exportar-internacion'
+import { ModalNuevaAdmision } from './nueva-admision/modal-nueva-admision'
+import { ModalDetalleInternacion } from './modal-detalle-internacion'
+
+const normalizar = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es')
+export function InternacionPage({ notify, rol }: ClinicActions) {
+  const [datos, setDatos] = useState<DatosHospital | null>(null)
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+  const [vista, setVista] = useState<'ingresos' | 'camas'>('ingresos')
+  const [busqueda, setBusqueda] = useState('')
+  const [estado, setEstado] = useState('todos')
+  const [medico, setMedico] = useState('todos')
+  const [habitacion, setHabitacion] = useState('todas')
+  const [pagina, setPagina] = useState(1)
+  const [admision, setAdmision] = useState<{ camaId?: number } | null>(null)
+  const [detalle, setDetalle] = useState<{ id: number; modo: 'ver' | 'editar' } | null>(null)
+  const [sincronizando, setSincronizando] = useState(false)
+  useEffect(() => {
+    const controller = new AbortController(); setCargando(true)
+    consultarHospital<DatosHospital>('', { signal: controller.signal }).then((res) => { setDatos(res); setError(null) }).catch((err) => { if (!controller.signal.aborted) setError(err.message) }).finally(() => { if (!controller.signal.aborted) setCargando(false) })
+    return () => controller.abort()
+  }, [revision])
+  useEffect(() => { const refrescar = () => setRevision((v) => v + 1); window.addEventListener('datos-actualizados', refrescar); return () => window.removeEventListener('datos-actualizados', refrescar) }, [])
+  const ingresos = datos?.ingresos ?? [], camas = datos?.camas ?? []
+  const activas = ingresos.filter((i) => i.estado === 'activa')
+  const libres = camas.filter((c) => !c.ocupada)
+  const inconsistencias = camas.filter((c) => c.inconsistente)
+  const consulta = normalizar(busqueda.trim())
+  const filtrados = ingresos.filter((i) => (estado === 'todos' || i.estado === estado) && (medico === 'todos' || i.medicoId === Number(medico)) && normalizar(`${i.paciente} ${i.medico} ${i.motivo} ${i.diagnostico} ${ubicacionHospital(i.habitacion, i.cama)}`).includes(consulta))
+  const paginas = Math.max(1, Math.ceil(filtrados.length / 8)), actual = Math.min(pagina, paginas)
+  const visibles = filtrados.slice((actual - 1) * 8, actual * 8)
+  const habitaciones = [...new Set(camas.map((c) => c.habitacion))]
+  const medicosLista = [...new Map(ingresos.map((i) => [i.medicoId, i.medico])).entries()]
+  function exportar(pdf: boolean) {
+    if (!filtrados.length) { notify('No hay hospitalizaciones con esos filtros para exportar.'); return }
+    const filas = filtrados.map((i) => ({ ubicacion: ubicacionHospital(i.habitacion, i.cama), paciente: i.paciente, ingreso: fechaHospital(i.ingreso), medico: i.medico, estado: ESTADOS_HOSPITAL[i.estado] }))
+    if (pdf) { if (!exportarInternacionPDF(filas)) notify('Permite abrir una ventana para imprimir el censo o guardarlo como PDF.') }
+    else exportarInternacionExcel(filas)
+  }
+  async function sincronizar() {
+    if (sincronizando) return
+    setSincronizando(true)
+    try { const res = await guardarHospital<{ corregidas: number }>('', { accion: 'sincronizar' }); notify(`Ocupación actualizada: ${res.corregidas} cama(s) corregida(s).`); setRevision((v) => v + 1) }
+    catch (err) { setError(err instanceof Error ? err.message : 'No se pudo actualizar la ocupación.') }
+    finally { setSincronizando(false) }
+  }
+  return <section className="space-y-6">
+    <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600"><BedDouble size={18} />Hospitalización</p><h2 className="text-3xl font-semibold tracking-tight text-slate-900">Internación y camas</h2><p className="mt-2 text-sm text-slate-500">Administra ingresos, ubicación y seguimiento de los pacientes hospitalizados.</p></div><div className="flex flex-wrap gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={() => setRevision((v) => v + 1)} disabled={cargando}><RefreshCw size={16} className={cargando ? 'animate-spin' : ''} />Actualizar</button><button type="button" className={BOTON_PRIMARIO} disabled={!datos || !libres.length} onClick={() => setAdmision({})}><Plus size={17} />Nueva admisión</button></div></div>
+    <AvisoClinico mensaje={error} />
+    <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">{[
+      { titulo: 'Pacientes hospitalizados', valor: activas.length, ayuda: 'Ingresos activos', icon: UsersRound, clase: 'border-blue-100 bg-blue-50/60 text-blue-700' },
+      { titulo: 'Camas disponibles', valor: libres.length, ayuda: `${camas.length} camas registradas`, icon: BedDouble, clase: 'border-emerald-100 bg-emerald-50/50 text-emerald-700' },
+      { titulo: 'Ocupación', valor: camas.length ? `${Math.round((camas.length - libres.length) / camas.length * 100)}%` : '0%', ayuda: `${camas.length - libres.length} camas ocupadas o no disponibles`, icon: Building2, clase: 'border-violet-100 bg-violet-50/40 text-violet-700' },
+      { titulo: 'Egresos registrados', valor: ingresos.filter((i) => i.estado !== 'activa').length, ayuda: 'Altas y traslados externos', icon: CheckCircle2, clase: 'border-slate-200 bg-white text-slate-600' },
+    ].map(({ titulo, valor, ayuda, icon: Icon, clase }) => <div key={titulo} className={'min-w-0 rounded-2xl border p-4 sm:p-5 ' + clase}><p className="flex items-center gap-2 text-xs font-medium"><Icon size={17} className="shrink-0" />{titulo}</p><p className="mt-3 text-3xl font-semibold text-slate-900">{datos ? valor : '—'}</p><p className="mt-2 text-xs leading-relaxed text-slate-500">{ayuda}</p></div>)}</div>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:px-5"><div className="flex gap-2" role="tablist" aria-label="Vistas de hospitalización"><button type="button" role="tab" aria-selected={vista === 'ingresos'} onClick={() => setVista('ingresos')} className={'inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ' + (vista === 'ingresos' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50')}><List size={16} />Hospitalizaciones</button><button type="button" role="tab" aria-selected={vista === 'camas'} onClick={() => setVista('camas')} className={'inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ' + (vista === 'camas' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50')}><LayoutGrid size={16} />Mapa de camas</button></div>{vista === 'ingresos' && <div className="flex flex-wrap gap-2"><button type="button" className={BOTON_SECUNDARIO} onClick={() => exportar(true)} disabled={!filtrados.length}><ClipboardList size={15} />Censo PDF</button><button type="button" className={BOTON_SECUNDARIO} onClick={() => exportar(false)} disabled={!filtrados.length}><ArrowDownToLine size={15} />Descargar CSV</button></div>}</div>
+      {cargando && !datos ? <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500"><Loader2 size={20} className="animate-spin" />Cargando hospitalizaciones y camas...</p> : vista === 'ingresos' ? <>
+        <div className="grid min-w-0 gap-3 border-b border-slate-100 bg-slate-50/40 p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]"><label className="min-w-0 text-xs font-semibold text-slate-600">Buscar hospitalización<span className="relative mt-2 block"><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input type="search" className={CAMPO_CLINICO + ' !mt-0 pl-9'} placeholder="Paciente, médico o habitación..." value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setPagina(1) }} /></span></label><label className="min-w-0 text-xs font-semibold text-slate-600">Estado<select aria-label="Filtrar estado de hospitalización" className={CAMPO_CLINICO} value={estado} onChange={(e) => { setEstado(e.target.value); setPagina(1) }}><option value="todos">Todos los estados</option>{Object.entries(ESTADOS_HOSPITAL).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}</select></label><label className="min-w-0 text-xs font-semibold text-slate-600">Médico<select aria-label="Filtrar médico de hospitalización" className={CAMPO_CLINICO} value={medico} onChange={(e) => { setMedico(e.target.value); setPagina(1) }}><option value="todos">Todos los médicos</option>{medicosLista.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}</select></label></div>
+        {!filtrados.length ? <div className="px-5 py-14 text-center"><BedDouble size={30} className="mx-auto text-slate-300" /><p className="mt-4 text-sm font-semibold text-slate-700">No hay hospitalizaciones con esos filtros</p><button type="button" className="mt-3 text-sm font-medium text-blue-600" onClick={() => { setBusqueda(''); setEstado('todos'); setMedico('todos') }}>Limpiar filtros</button></div> : <><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead><tr className="border-b border-slate-100 text-xs text-slate-500">{['Paciente', 'Ubicación', 'Ingreso / Estancia', 'Médico responsable', 'Estado', 'Acciones'].map((texto) => <th key={texto} className="px-5 py-4 font-semibold">{texto}</th>)}</tr></thead><tbody>{visibles.map((i) => <tr key={i.id} className="border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50/50"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700">{i.paciente.split(/\s+/).slice(0, 2).map((n) => n[0]).join('')}</span><div><p className="font-semibold text-slate-800">{i.paciente}</p><p className="mt-1 text-xs text-slate-500">ING-{String(i.id).padStart(4, '0')}</p></div></div></td><td className="px-5 py-4"><p className="font-medium text-slate-700">Habitación {i.habitacion}</p><p className="mt-1 text-xs text-slate-500">Cama {i.cama} · {i.tipoHabitacion}</p>{i.estado !== 'activa' && <p className="mt-1 text-[11px] text-slate-400">Ubicación al cierre</p>}</td><td className="px-5 py-4 text-slate-700"><p>{fechaHospital(i.ingreso)}</p><p className="mt-1 text-xs text-slate-500">{diasHospital(i.ingreso, i.alta)} día(s){i.alta ? ` · Egreso ${fechaHospital(i.alta)}` : ''}</p></td><td className="px-5 py-4 text-slate-700">{i.medico}</td><td className="px-5 py-4"><span className={'inline-block rounded-full px-3 py-1 text-xs font-semibold ' + (i.estado === 'activa' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700')}>{ESTADOS_HOSPITAL[i.estado]}</span></td><td className="px-5 py-4"><div className="flex gap-2"><button type="button" aria-label={`Ver hospitalización de ${i.paciente}`} title="Ver hospitalización" onClick={() => setDetalle({ id: i.id, modo: 'ver' })} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"><Eye size={16} /></button><button type="button" aria-label={`Editar hospitalización de ${i.paciente}`} title="Editar hospitalización" onClick={() => setDetalle({ id: i.id, modo: 'editar' })} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"><Pencil size={16} /></button></div></td></tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-xs text-slate-500"><p>{filtrados.length} hospitalización(es) · Página {actual} de {paginas}</p><div className="flex gap-2"><button type="button" className={BOTON_SECUNDARIO} disabled={actual <= 1} onClick={() => setPagina(actual - 1)}>Anterior</button><button type="button" className={BOTON_SECUNDARIO} disabled={actual >= paginas} onClick={() => setPagina(actual + 1)}>Siguiente</button></div></div></>}
+      </> : <div className="space-y-5 p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4"><div><h3 className="text-base font-semibold text-slate-900">Disponibilidad por habitación</h3><p className="mt-1 text-sm text-slate-500">Las camas libres permiten iniciar una admisión.</p></div><label className="text-xs font-semibold text-slate-600">Habitación<select aria-label="Filtrar habitación en el mapa" className={CAMPO_CLINICO} value={habitacion} onChange={(e) => setHabitacion(e.target.value)}><option value="todas">Todas</option>{habitaciones.map((n) => <option key={n}>{n}</option>)}</select></label></div>
+        {inconsistencias.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-900">{inconsistencias.length} cama(s) requieren revisar su ocupación.</p>{rol === 'admin' && <button type="button" className={BOTON_SECUNDARIO} disabled={sincronizando} onClick={sincronizar}>{sincronizando && <Loader2 size={15} className="animate-spin" />}Actualizar ocupación</button>}</div>}
+        {habitaciones.filter((n) => habitacion === 'todas' || habitacion === n).map((n) => <section key={n} className="rounded-2xl border border-slate-200 p-4"><div className="mb-4 flex items-center gap-2"><Building2 size={18} className="text-blue-600" /><h4 className="font-semibold text-slate-800">Habitación {n}</h4><span className="ml-auto text-xs text-slate-500">{camas.filter((c) => c.habitacion === n && !c.ocupada).length} disponibles</span></div><div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{camas.filter((c) => c.habitacion === n).map((c) => <div key={c.id} className={'min-w-0 rounded-xl border p-4 ' + (c.inconsistente ? 'border-amber-200 bg-amber-50/50' : c.ocupada ? 'border-blue-100 bg-blue-50/40' : 'border-emerald-200 bg-emerald-50/40')}><div className="flex items-center justify-between gap-2"><h5 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><BedDouble size={18} />Cama {c.numero}</h5><span className="text-xs font-medium text-slate-600">{c.inconsistente ? 'Revisión' : c.ocupada ? 'Ocupada' : 'Libre'}</span></div><p className="mt-3 text-xs text-slate-500">{c.tipo}</p><p className="mt-2 break-words text-sm text-slate-700">{c.paciente || (c.ocupada ? 'No disponible para asignación' : 'Disponible para un nuevo ingreso')}</p>{c.internacionId ? <button type="button" className={BOTON_SECUNDARIO + ' mt-4'} onClick={() => setDetalle({ id: c.internacionId!, modo: 'ver' })}>Ver ingreso</button> : !c.ocupada && <button type="button" className={BOTON_SECUNDARIO + ' mt-4 text-emerald-700'} onClick={() => setAdmision({ camaId: c.id })}><Plus size={15} />Asignar cama</button>}</div>)}</div></section>)}
+      </div>}
+    </div>
+    {admision && <ModalNuevaAdmision camaIdInicial={admision.camaId} onClose={() => setAdmision(null)} onSave={notify} />}
+    {detalle && <ModalDetalleInternacion key={`${detalle.id}-${detalle.modo}`} internacion={{ id: detalle.id }} modo={detalle.modo} onClose={() => setDetalle(null)} onSave={notify} />}
+  </section>
+}

@@ -389,6 +389,8 @@ const openModal = (title: string) => {
         }
         return (
           <ModalDetalleInternacion
+            key={modal}
+            modo={parts[6] === 'editar' ? 'editar' : 'ver'}
             internacion={internacionObj}
             onClose={() => setModal(null)}
             onSave={(msg) => { notify(msg); setModal(null) }}

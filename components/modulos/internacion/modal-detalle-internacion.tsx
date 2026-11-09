@@ -1,162 +1,54 @@
 'use client'
 
-import { useState } from 'react'
-import { ModalMarco, CAMPO, ETIQUETA } from '../compartidos/modal-marco'
-import { darAltaPaciente } from '@/lib/supabase/datos'
-import { AlertCircle, Bed, CheckCircle2, Loader2, User, Calendar, Stethoscope } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowRightLeft, BedDouble, CalendarDays, CheckCircle2, ClipboardList, History, Loader2, Pencil, Stethoscope, UserRound } from 'lucide-react'
+import { ModalMarco } from '../compartidos/modal-marco'
+import { AvisoClinico, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO_CLINICO, DatoClinico, ETIQUETA_CLINICA, PanelClinico } from '../compartidos/editor-clinico'
+import { consultarHospital, diasHospital, ESTADOS_HOSPITAL, fechaHospital, guardarHospital, ubicacionHospital, type DatosHospital, type IngresoHospital, type MovimientoHospital } from '@/lib/internacion/modelo'
+import { FormularioIngreso, INGRESO_VACIO, type BorradorIngreso } from './formulario-ingreso'
 
-type PropsModalDetalleInternacion = {
-  internacion: {
-    id: number
-    habitacionCama: string
-    paciente: string
-    ingreso: string
-    medico: string
-    estado: string
-  }
-  onClose: () => void
-  onSave?: (mensaje: string) => void
-}
-
-export function ModalDetalleInternacion({
-  internacion,
-  onClose,
-  onSave,
-}: PropsModalDetalleInternacion) {
+export function ModalDetalleInternacion({ internacion, modo: inicial = 'ver', onClose, onSave }: { internacion: { id: number }; modo?: 'ver' | 'editar'; onClose: () => void; onSave?: (mensaje: string) => void }) {
+  const [modo, setModo] = useState<'ver' | 'editar' | 'alta'>(inicial)
+  const [detalle, setDetalle] = useState<{ ingreso: IngresoHospital; movimientos: MovimientoHospital[] } | null>(null)
+  const [datos, setDatos] = useState<DatosHospital | null>(null)
+  const [borrador, setBorrador] = useState<BorradorIngreso>(INGRESO_VACIO)
   const [notaAlta, setNotaAlta] = useState('')
-  const [procesando, setProcesando] = useState(false)
+  const [confirmado, setConfirmado] = useState(false)
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const estaActiva = internacion.estado.toLowerCase().includes('ocupad') || internacion.estado.toLowerCase() === 'activa'
-
-  const handleDarAlta = async () => {
-    setProcesando(true)
-    setError(null)
-    const res = await darAltaPaciente(internacion.id, notaAlta)
-    setProcesando(false)
-
-    if (res.error) {
-      setError(res.error)
-      return
-    }
-
-    if (onSave) onSave('Paciente dado de alta y cama liberada con exito')
-    onClose()
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController(); setCargando(true)
+    Promise.all([consultarHospital<{ ingreso: IngresoHospital; movimientos: MovimientoHospital[] }>(`/${internacion.id}`, { signal: controller.signal }), consultarHospital<DatosHospital>('', { signal: controller.signal })]).then(([res, opciones]) => {
+      setDetalle(res); setDatos(opciones); const i = res.ingreso; setBorrador({ pacienteId: i.pacienteId, medicoId: i.medicoId, camaId: i.camaId, motivo: i.motivo, diagnostico: i.diagnostico, notaCambio: '' })
+    }).catch((err) => { if (!controller.signal.aborted) setError(err.message) }).finally(() => { if (!controller.signal.aborted) setCargando(false) })
+    return () => controller.abort()
+  }, [internacion.id, revision])
+  const ingreso = detalle?.ingreso
+  const activa = ingreso?.estado === 'activa'
+  async function guardar(event: React.FormEvent) {
+    event.preventDefault()
+    if (!ingreso || guardando || cargando) return
+    if (modo === 'alta' && (!confirmado || !notaAlta.trim())) return
+    setGuardando(true); setError(null); setAviso(null)
+    try {
+      const res = await guardarHospital<{ id: number; advertencia?: string }>(`/${ingreso.id}`, modo === 'alta' ? { accion: 'alta', notaAlta, confirmado, version: ingreso.version } : { ...borrador, accion: 'editar', version: ingreso.version }, 'PATCH')
+      window.dispatchEvent(new Event('datos-actualizados'))
+      if (res.advertencia) { setAviso(res.advertencia); setModo('ver'); setRevision((v) => v + 1); return }
+      onSave?.(modo === 'alta' ? 'Alta registrada y cama liberada correctamente' : 'Hospitalización actualizada correctamente'); onClose()
+    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo guardar la hospitalización.') }
+    finally { setGuardando(false) }
   }
-
-  return (
-    <ModalMarco
-      title="Detalle de Hospitalizacion / Alta"
-      onClose={onClose}
-      footer={
-        <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={procesando}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Cerrar
-          </button>
-
-          {estaActiva ? (
-            <button
-              type="button"
-              onClick={handleDarAlta}
-              disabled={procesando}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {procesando ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Liberando cama...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={14} />
-                  <span>Dar de alta y liberar cama</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              <CheckCircle2 size={13} className="text-slate-500" /> Paciente ya dado de alta
-            </span>
-          )}
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        {error && (
-          <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200/70">
-            <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 p-4">
-          <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ubicacion hospitalaria</span>
-            <p className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-              <Bed size={15} className="text-blue-600" /> {internacion.habitacionCama}
-            </p>
-          </div>
-          <div>
-            {estaActiva ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200/60">
-                Cama Ocupada
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
-                Alta (Liberada)
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="rounded-lg border border-slate-100 p-3 bg-white shadow-xs">
-            <span className="text-slate-400 block mb-0.5">Paciente internado</span>
-            <span className="font-semibold text-slate-800 flex items-center gap-1">
-              <User size={13} className="text-blue-600" /> {internacion.paciente}
-            </span>
-          </div>
-          <div className="rounded-lg border border-slate-100 p-3 bg-white shadow-xs">
-            <span className="text-slate-400 block mb-0.5">Medico responsable</span>
-            <span className="font-semibold text-slate-800 flex items-center gap-1">
-              <Stethoscope size={13} className="text-blue-600" /> {internacion.medico}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-100 p-3 bg-slate-50/50 text-xs">
-          <span className="text-slate-400 block mb-0.5">Fecha de ingreso</span>
-          <span className="font-semibold text-slate-700 flex items-center gap-1">
-            <Calendar size={13} className="text-slate-500" /> {internacion.ingreso}
-          </span>
-        </div>
-
-        {estaActiva && (
-          <div>
-            <label className={ETIQUETA}>
-              <span className="text-slate-700">Notas de egreso / evolucion clinica (opcional)</span>
-              <textarea
-                className={(CAMPO + ' h-20 resize-none text-xs')}
-                placeholder="Ej. Paciente cumple criterios de egreso clinico. Se indica tratamiento ambulatorio y seguimiento..."
-                value={notaAlta}
-                onChange={(e) => setNotaAlta(e.target.value)}
-              />
-            </label>
-          </div>
-        )}
-
-        <div className="rounded-lg bg-emerald-50/50 border border-emerald-100 p-3 text-xs text-emerald-800 space-y-1">
-          <p className="font-semibold">Gestion automatizada de camas:</p>
-          <p className="text-[11px] text-emerald-700">
-            Al confirmar el alta, la cama queda automaticamente libre y disponible para nuevas admisiones, y se actualizan las metricas de ocupacion en tiempo real.
-          </p>
-        </div>
-      </div>
-    </ModalMarco>
-  )
+  const invalido = modo === 'alta' ? !confirmado || !notaAlta.trim() : !borrador.medicoId || !borrador.camaId || !borrador.motivo.trim() || (!activa && !borrador.notaCambio.trim())
+  return <ModalMarco title={modo === 'ver' ? 'Detalle de hospitalización' : modo === 'editar' ? 'Editar hospitalización' : 'Alta hospitalaria'} ancho="max-w-6xl" contenidoFijo onClose={() => { if (!guardando) onClose() }} footer={<div className="flex flex-wrap items-center justify-between gap-3"><button type="button" className={BOTON_SECUNDARIO} disabled={guardando} onClick={onClose}>Cerrar</button><div className="flex flex-wrap gap-3">{modo === 'ver' ? <>{activa && <button key="abrir-alta" type="button" className={BOTON_SECUNDARIO + ' text-emerald-700'} disabled={cargando} onClick={(e) => { e.preventDefault(); setModo('alta'); setError(null) }}><CheckCircle2 size={16} />Dar de alta</button>}<button key="abrir-edicion" type="button" className={BOTON_PRIMARIO} disabled={cargando || !ingreso} onClick={(e) => { e.preventDefault(); setModo('editar'); setError(null) }}><Pencil size={16} />Editar ingreso</button></> : <><button key="volver" type="button" className={BOTON_SECUNDARIO} disabled={guardando} onClick={() => { setModo('ver'); setError(null); setConfirmado(false) }}>Volver al detalle</button><button key="guardar" type="submit" form="form-gestion-internacion" className={BOTON_PRIMARIO} disabled={guardando || cargando || !ingreso || Boolean(invalido)}>{guardando && <Loader2 size={16} className="animate-spin" />}{guardando ? 'Guardando...' : modo === 'alta' ? 'Confirmar alta y liberar cama' : 'Guardar cambios'}</button></>}</div></div>}>
+    <p className="mb-5 text-sm text-slate-500">{modo === 'ver' ? 'Información de la estancia, atención y movimientos del paciente.' : modo === 'alta' ? 'Registra el egreso y confirma la liberación de la cama.' : 'Actualiza la atención o traslada al paciente a una cama disponible.'}</p><AvisoClinico mensaje={error || aviso} />
+    {error && <button type="button" className={BOTON_SECUNDARIO + ' mb-4'} disabled={guardando} onClick={() => { setError(null); setRevision((v) => v + 1) }}>Actualizar datos del ingreso</button>}
+    {cargando ? <p role="status" className="py-12 text-center text-sm text-slate-500">Cargando hospitalización...</p> : ingreso && <>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-5"><div className="flex min-w-0 items-center gap-3"><span className="rounded-xl bg-blue-100 p-3 text-blue-700"><UserRound size={22} /></span><div className="min-w-0"><p className="text-xs font-semibold text-blue-600">ING-{String(ingreso.id).padStart(4, '0')}</p><h4 className="mt-1 break-words text-lg font-semibold text-slate-900">{ingreso.paciente}</h4><p className="mt-1 break-words text-sm text-slate-600">{ubicacionHospital(ingreso.habitacion, ingreso.cama)}</p></div></div><span className={'rounded-full border px-3 py-1.5 text-xs font-semibold ' + (activa ? 'border-blue-200 bg-white text-blue-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700')}>{ESTADOS_HOSPITAL[ingreso.estado]}</span></div>
+      {modo === 'editar' && datos ? <><AvisoClinico mensaje={!activa ? 'Estás corrigiendo un ingreso cerrado. Los cambios quedarán registrados en los movimientos y la cama conservará su estado actual.' : null} /><form id="form-gestion-internacion" onSubmit={guardar}><FormularioIngreso ingreso={ingreso} datos={datos} borrador={borrador} onChange={setBorrador} disabled={guardando} /></form></> : modo === 'alta' ? <form id="form-gestion-internacion" onSubmit={guardar}><fieldset disabled={guardando} className="grid min-w-0 gap-5 md:grid-cols-2"><PanelClinico icon={BedDouble} titulo="Resumen de la estancia" suave><dl className="space-y-4"><DatoClinico etiqueta="Médico responsable" valor={ingreso.medico} /><DatoClinico etiqueta="Fecha de ingreso" valor={fechaHospital(ingreso.ingreso, true)} /><DatoClinico etiqueta="Estancia" valor={`${diasHospital(ingreso.ingreso, ingreso.alta)} día(s)`} /><DatoClinico etiqueta="Cama que se liberará" valor={ubicacionHospital(ingreso.habitacion, ingreso.cama)} /></dl></PanelClinico><PanelClinico icon={CheckCircle2} titulo="Egreso del paciente" ayuda="La nota quedará en el historial de movimientos."><label className={ETIQUETA_CLINICA}>Nota de egreso / Seguimiento <span className="text-blue-600">*</span><textarea rows={6} className={CAMPO_CLINICO + ' resize-y'} value={notaAlta} onChange={(e) => setNotaAlta(e.target.value)} maxLength={8000} required placeholder="Resumen del egreso y seguimiento indicado por el equipo médico..." /></label><label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-900"><input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-emerald-600" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} />Confirmo el alta del paciente y la liberación de la cama de esta hospitalización.</label></PanelClinico></fieldset></form> : <div className="space-y-5"><div className="grid min-w-0 gap-5 md:grid-cols-2"><PanelClinico icon={CalendarDays} titulo="Datos de la estancia" suave><dl className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2"><DatoClinico etiqueta="Médico responsable" valor={ingreso.medico} /><DatoClinico etiqueta="Tipo de habitación" valor={ingreso.tipoHabitacion} /><DatoClinico etiqueta="Ingreso" valor={fechaHospital(ingreso.ingreso, true)} /><DatoClinico etiqueta="Egreso" valor={ingreso.alta ? fechaHospital(ingreso.alta, true) : activa ? 'En hospitalización' : 'No registrado'} /><DatoClinico etiqueta="Estancia" valor={`${diasHospital(ingreso.ingreso, ingreso.alta)} día(s)`} /></dl></PanelClinico><PanelClinico icon={ClipboardList} titulo="Información clínica"><h5 className="text-xs font-semibold text-slate-500">Motivo del internamiento</h5><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{ingreso.motivo || 'Sin motivo registrado.'}</p><h5 className="mt-5 text-xs font-semibold text-slate-500">Diagnóstico de ingreso / Observaciones</h5><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{ingreso.diagnostico || 'Sin diagnóstico registrado.'}</p></PanelClinico></div>
+      <PanelClinico icon={History} titulo="Movimientos y seguimiento" ayuda="Registro de ingresos, cambios, traslados y egresos.">{detalle.movimientos.length ? <ol className="ml-2 space-y-5 border-l-2 border-blue-100 pl-5">{detalle.movimientos.map((mov) => <li key={mov.id} className="relative min-w-0"><span className="absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white bg-blue-500" /><div className="flex flex-wrap justify-between gap-2"><h5 className="flex items-center gap-2 text-sm font-semibold text-slate-800">{mov.tipo.toLowerCase().includes('traslado') ? <ArrowRightLeft size={15} className="text-blue-600" /> : <Stethoscope size={15} className="text-blue-600" />}{mov.tipo}</h5><time dateTime={mov.fecha} className="text-xs text-slate-500">{fechaHospital(mov.fecha, true)}</time></div><p className="mt-2 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">{mov.descripcion || 'Sin observaciones adicionales.'}</p><p className="mt-2 text-xs text-slate-500">Registrado por {mov.autor}</p></li>)}</ol> : <p className="rounded-xl border border-dashed border-slate-200 p-5 text-sm text-slate-500">Aún no hay movimientos registrados para este ingreso.</p>}</PanelClinico></div>}
+    </>}
+  </ModalMarco>
 }

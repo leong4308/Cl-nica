@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { InternacionPage } from '../internacion/internacion-page'
 import { AlertCircle, Search, X } from 'lucide-react'
 import { modules } from './configuracion'
 import type { ClinicActions, Row } from '../compartidos/types'
@@ -17,7 +18,12 @@ import { precargarPerfilPaciente, registrarPerfilPacienteEnCache } from '@/lib/s
 
 type DatosModulo = { modulo: string; filas: Row[]; error: string | null }
 
-export function ModulePage({ active, notify, openModal, onAccion, rol, usuarioNombre }: ClinicActions & { active: string }) {
+export function ModulePage(props: ClinicActions & { active: string }) {
+  if (props.active === 'Internación') return <InternacionPage {...props} />
+  return <ModulePageGenerico {...props} />
+}
+
+function ModulePageGenerico({ active, notify, openModal, onAccion, rol, usuarioNombre }: ClinicActions & { active: string }) {
   const [busqueda, setBusqueda] = useState('')
   const [version, setVersion] = useState(0)
   const config = modules[active]

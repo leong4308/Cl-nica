@@ -12,6 +12,8 @@ export function BotonNavLateral({
   return (
     <button
       type="button"
+      aria-label={etiqueta}
+      aria-current={activo ? 'page' : undefined}
       onClick={() => onNavegar(etiqueta)}
       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] font-medium ${activo ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}
     >

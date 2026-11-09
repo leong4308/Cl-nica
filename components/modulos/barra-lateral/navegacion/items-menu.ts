@@ -52,7 +52,7 @@ export const navItems: NavItem[] = [
   {
     label: 'Internación',
     icon: Bed,
-    roles: ['admin', 'enfermero'],
+    roles: ['admin', 'medico', 'enfermero'],
   },
   {
     label: 'Órdenes médicas',

@@ -8,13 +8,8 @@ export type InternacionExportar = {
 
 export function exportarInternacionExcel(internaciones: InternacionExportar[]): void {
   const encabezados = ['Habitacion / Cama', 'Paciente', 'Fecha de Ingreso', 'Medico Tratante', 'Estado']
-  const lineas = internaciones.map((i) => [
-    '"' + (i.ubicacion || '').replace(/"/g, '""') + '"',
-    '"' + (i.paciente || '').replace(/"/g, '""') + '"',
-    '"' + (i.ingreso || '').replace(/"/g, '""') + '"',
-    '"' + (i.medico || '').replace(/"/g, '""') + '"',
-    '"' + (i.estado || '').replace(/"/g, '""') + '"',
-  ].join(','))
+  const celda = (valor: string) => '"' + (/^[=+\-@\t\r]/.test(valor) ? "'" + valor : valor).replace(/"/g, '""') + '"'
+  const lineas = internaciones.map((i) => [i.ubicacion, i.paciente, i.ingreso, i.medico, i.estado].map((valor) => celda(valor || '')).join(','))
 
   const contenidoCsv = '\uFEFF' + [encabezados.join(','), ...lineas].join('\r\n')
   const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' })
@@ -26,17 +21,19 @@ export function exportarInternacionExcel(internaciones: InternacionExportar[]): 
   URL.revokeObjectURL(url)
 }
 
-export function exportarInternacionPDF(internaciones: InternacionExportar[]): void {
+export function exportarInternacionPDF(internaciones: InternacionExportar[]): boolean {
   const ventana = window.open('', '_blank')
-  if (!ventana) return
+  if (!ventana) return false
+  ventana.opener = null
+  const escapar = (valor: string) => String(valor ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 
   const filasHtml = internaciones.map((i, idx) => 
     '<tr style="border-bottom: 1px solid #e2e8f0; ' + (idx % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f8fafc;') + '">' +
-    '<td style="padding: 10px 12px; font-weight: 600; color: #1e293b;">' + i.ubicacion + '</td>' +
-    '<td style="padding: 10px 12px; font-weight: 500; color: #0f172a;">' + i.paciente + '</td>' +
-    '<td style="padding: 10px 12px; color: #475569;">' + i.ingreso + '</td>' +
-    '<td style="padding: 10px 12px; color: #475569;">' + i.medico + '</td>' +
-    '<td style="padding: 10px 12px; font-semibold;">' + i.estado + '</td>' +
+    '<td style="padding: 10px 12px; font-weight: 600; color: #1e293b;">' + escapar(i.ubicacion) + '</td>' +
+    '<td style="padding: 10px 12px; font-weight: 500; color: #0f172a;">' + escapar(i.paciente) + '</td>' +
+    '<td style="padding: 10px 12px; color: #475569;">' + escapar(i.ingreso) + '</td>' +
+    '<td style="padding: 10px 12px; color: #475569;">' + escapar(i.medico) + '</td>' +
+    '<td style="padding: 10px 12px; font-semibold;">' + escapar(i.estado) + '</td>' +
     '</tr>'
   ).join('')
 
@@ -44,4 +41,5 @@ export function exportarInternacionPDF(internaciones: InternacionExportar[]): vo
 
   ventana.document.write(html)
   ventana.document.close()
+  return true
 }

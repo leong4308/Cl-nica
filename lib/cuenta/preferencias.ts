@@ -7,6 +7,7 @@ export function opcionesInicio(rol: RolUsuario): string[] {
   if (rol !== 'paciente' && rol !== 'medico') comunes.push('Resumen')
   if (['admin', 'medico', 'recepcionista'].includes(rol)) comunes.push('Expedientes')
   if (['admin', 'medico', 'enfermero'].includes(rol)) comunes.push('Órdenes médicas', 'Laboratorio')
+  if (['admin', 'medico', 'enfermero'].includes(rol)) comunes.push('Internación')
   if (rol === 'medico') comunes.push('Mi Consulta')
   return rol === 'paciente' ? ['Predeterminada'] : comunes
 }
