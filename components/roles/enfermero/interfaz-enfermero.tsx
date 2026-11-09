@@ -14,6 +14,7 @@ import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { ModalNuevaAdmision } from '@/components/modulos/internacion'
 import { ModalNuevaOrden } from '@/components/modulos/ordenes-medicas'
+import { ModalRegistrarResultado } from '@/components/modulos/laboratorio'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
 import { actualizarEstadoCita, eliminarCita, type CitaPanel, type EstadoCita } from '@/lib/supabase/datos'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
@@ -49,8 +50,9 @@ export function InterfazEnfermero({
     'Buscar paciente',
     'Nueva admisión',
     'Nueva orden',
+    'Registrar resultado',
   ]
-  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle']
+  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle', 'GestionLaboratorio:']
 
   const openModal = (title: string) => {
     const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -148,6 +150,15 @@ export function InterfazEnfermero({
       )}
 
       {/* Modales */}
+      {(modal === 'Registrar resultado' || (modal && /^GestionLaboratorio:(ver|editar):\d+$/.test(modal))) && (
+        <ModalRegistrarResultado
+          key={modal}
+          modo={modal === 'Registrar resultado' ? 'registrar' : modal.split(':')[1] as 'ver' | 'editar'}
+          solicitudIdInicial={modal === 'Registrar resultado' ? undefined : Number(modal.split(':')[2])}
+          onClose={() => setModal(null)}
+          onSave={(msg) => { notify(msg); setModal(null) }}
+        />
+      )}
       {(modal === 'Registrar paciente' || modal === 'Nuevo paciente') && (
         <ModalRegistrarPaciente
           onClose={() => setModal(null)}

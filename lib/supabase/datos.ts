@@ -660,6 +660,7 @@ export async function cargarOrdenesMedicas(): Promise<{ filas: Row[]; error: str
 
 type SolicitudFila = {
   id: number; estado_analisis: string; fecha_solicitud: string; resultado: string | null; observaciones: string | null
+  archivo_resultado: string | null; fecha_resultado: string | null
   catalogo_analisis: { nombre: string } | { nombre: string }[] | null
   ordenes_medicas: {
     id: number
@@ -671,11 +672,13 @@ type SolicitudFila = {
   } | null
 }
 
-export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string | null }> {
+export async function cargarLaboratorio(solicitudId?: number): Promise<{ filas: Row[]; error: string | null }> {
   const supabase = createClient()
+  let consulta = supabase.from('solicitudes_analisis')
+    .select('id, estado_analisis, fecha_solicitud, resultado, observaciones, archivo_resultado, fecha_resultado, catalogo_analisis(nombre), ordenes_medicas(id, episodios_medicos(internaciones(perfiles_pacientes(usuarios(nombre_completo)))))')
+  if (solicitudId !== undefined) consulta = consulta.eq('id', solicitudId)
   const { filas, error } = await consultar<SolicitudFila>(
-    supabase.from('solicitudes_analisis')
-      .select('id, estado_analisis, fecha_solicitud, resultado, observaciones, catalogo_analisis(nombre), ordenes_medicas(id, episodios_medicos(internaciones(perfiles_pacientes(usuarios(nombre_completo)))))')
+    consulta
       .order('fecha_solicitud', { ascending: false })
       .limit(100)
   )
@@ -693,6 +696,8 @@ export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string
         String(solicitud.id),
         solicitud.resultado ?? '',
         solicitud.observaciones ?? '',
+        solicitud.archivo_resultado ?? '',
+        solicitud.fecha_resultado ?? '',
       ]
     }),
   }
@@ -1654,24 +1659,26 @@ export async function registrarResultadoLaboratorio(
   resultado: string,
   observaciones?: string,
   nuevoEstado: 'en proceso' | 'completado' = 'completado',
+  archivo?: File,
+  confirmarCompletado = false,
+  version = '',
 ): Promise<{ error: string | null }> {
-  const supabase = createClient()
-  const updates: Record<string, any> = {
-    resultado,
-    observaciones: observaciones || null,
-    estado_analisis: nuevoEstado,
+  try {
+    const form = new FormData()
+    form.set('resultado', resultado)
+    form.set('observaciones', observaciones ?? '')
+    form.set('estado', nuevoEstado)
+    form.set('confirmarCompletado', String(confirmarCompletado))
+    form.set('version', version)
+    if (archivo) form.set('archivo', archivo)
+    const res = await fetch(`/api/laboratorio/${solicitudId}`, { method: 'POST', body: form })
+    const data = await res.json()
+    if (!res.ok) return { error: data.error || 'No se pudo guardar el resultado.' }
+    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    return { error: null }
+  } catch {
+    return { error: 'No se pudo conectar para guardar el resultado. Inténtalo de nuevo.' }
   }
-  if (nuevoEstado === 'completado') {
-    updates.fecha_resultado = new Date().toISOString()
-  }
-  const { error } = await supabase
-    .from('solicitudes_analisis')
-    .update(updates)
-    .eq('id', solicitudId)
-
-  if (error) return { error: error.message }
-  window.dispatchEvent(new CustomEvent('datos-actualizados'))
-  return { error: null }
 }
 
 export async function marcarLaboratorioEnProceso(

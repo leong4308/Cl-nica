@@ -123,7 +123,7 @@ export function AccionesFilaModulo({
           return
         }
         if (modulo === 'Laboratorio') {
-          onAbrirModal('Registrar resultado')
+          onAbrirModal(`GestionLaboratorio:ver:${id}`)
           return
         }
         if (modulo === 'Internación') {
@@ -170,7 +170,7 @@ export function AccionesFilaModulo({
                 return
               }
               if (modulo === 'Laboratorio') {
-                onAbrirModal('Registrar resultado')
+                onAbrirModal(`GestionLaboratorio:editar:${id}`)
                 return
               }
               if (modulo === 'Internación') {

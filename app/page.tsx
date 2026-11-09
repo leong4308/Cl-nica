@@ -79,7 +79,7 @@ const MODALES_CON_FORMULARIO = [
   'Nueva orden',
   'Registrar resultado',
 ]
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden', 'GestionInternacion', 'GestionExpediente']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden', 'GestionInternacion', 'GestionExpediente', 'GestionLaboratorio:']
 
 const openModal = (title: string) => {
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
@@ -360,6 +360,15 @@ const openModal = (title: string) => {
       })()}
       {modal === 'Registrar resultado' && (
         <ModalRegistrarResultado
+          onClose={() => setModal(null)}
+          onSave={(msg) => { notify(msg); setModal(null) }}
+        />
+      )}
+      {modal && /^GestionLaboratorio:(ver|editar):\d+$/.test(modal) && (
+        <ModalRegistrarResultado
+          key={modal}
+          modo={modal.split(':')[1] as 'ver' | 'editar'}
+          solicitudIdInicial={Number(modal.split(':')[2])}
           onClose={() => setModal(null)}
           onSave={(msg) => { notify(msg); setModal(null) }}
         />
