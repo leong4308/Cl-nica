@@ -1,535 +1,137 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import {
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  Droplet,
-  Heart,
-  Pill,
-  Save,
-  Scale,
-  ShieldAlert,
-  Thermometer,
-  Wind,
-  X,
-  Edit3,
-} from 'lucide-react'
-import {
-  guardarFichaImportante,
-  parsearFichaImportante,
-  type FichaImportante,
-  type SignosVitales,
-} from '@/lib/supabase/datos'
+import { useEffect, useId, useState } from 'react'
+import { Activity, AlertTriangle, CheckCircle2, Droplet, Heart, Loader2, Pencil, Pill, Save, Scale, ShieldAlert, Thermometer, Wind } from 'lucide-react'
+import { guardarFichaImportante, type FichaImportante } from '@/lib/supabase/datos'
+import { leerFichaClinica, type SeccionFichaClinica } from '@/lib/pacientes/ficha-clinica'
 import { createClient } from '@/lib/supabase/client'
+import { leerPerfilPacienteEnCache, registrarPerfilPacienteEnCache } from '@/lib/supabase/cache-pacientes'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
+import { AvisoClinico, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO_CLINICO, ETIQUETA_CLINICA } from '../compartidos/editor-clinico'
 
-type PropsFichaImportante = {
+type Props = {
   pacienteId: number
   notasMedicasRaw?: string
   rol?: RolUsuario
   usuarioNombre?: string
-  onActualizado?: (nuevaFicha: FichaImportante) => void
+  onActualizado?: (ficha: FichaImportante) => void
   modoCompacto?: boolean
+  solicitudEdicion?: number
+  onEditandoChange?: (editando: boolean) => void
+  onGuardandoChange?: (guardando: boolean) => void
 }
+const GRUPOS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const SIGNOS = [
+  { campo: 'presionArterial', titulo: 'Presión arterial', unidad: 'mmHg', icon: Heart },
+  { campo: 'frecuenciaCardiaca', titulo: 'Frecuencia cardíaca', unidad: 'lpm', icon: Activity },
+  { campo: 'temperatura', titulo: 'Temperatura', unidad: '°C', icon: Thermometer },
+  { campo: 'saturacionOxigeno', titulo: 'Saturación de oxígeno', unidad: '%', icon: Wind },
+  { campo: 'peso', titulo: 'Peso', unidad: 'kg', icon: Scale },
+  { campo: 'glucosa', titulo: 'Glucosa', unidad: 'mg/dL', icon: Droplet },
+] as const
 
-export function FichaImportantePaciente({
-  pacienteId,
-  notasMedicasRaw,
-  rol,
-  usuarioNombre,
-  onActualizado,
-  modoCompacto = false,
-}: PropsFichaImportante) {
-  const [ficha, setFicha] = useState<FichaImportante>(() => parsearFichaImportante(notasMedicasRaw))
-  const [editando, setEditando] = useState(false)
+export function FichaImportantePaciente({ pacienteId, notasMedicasRaw, rol, onActualizado, solicitudEdicion = 0, onEditandoChange, onGuardandoChange }: Props) {
+  const [ficha, setFicha] = useState<FichaImportante>(() => leerFichaClinica(notasMedicasRaw))
+  const [borrador, setBorrador] = useState<FichaImportante>({})
+  const [seccion, setSeccion] = useState<'alertas' | 'signos' | null>(null)
+  const [rolSesion, setRolSesion] = useState(rol)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
-  const [error, setError] = useState('')
-  const [nombreSesion, setNombreSesion] = useState<string>(usuarioNombre ?? '')
-  const [rolSesion, setRolSesion] = useState<RolUsuario | undefined>(rol)
+  const [error, setError] = useState<string | null>(null)
+  const prefijo = useId()
+  const puedeEditar = ['admin', 'medico', 'enfermero', 'recepcionista'].includes(rol ?? rolSesion ?? '')
 
-  // Campos de formulario
-  const [alergias, setAlergias] = useState(ficha.alergias ?? '')
-  const [tipoSangre, setTipoSangre] = useState(ficha.tipoSangre ?? '')
-  const [condiciones, setCondiciones] = useState(ficha.condicionesCronicas ?? '')
-  const [medicamento, setMedicamento] = useState(ficha.medicamentoActual ?? '')
-
-  // Signos vitales
-  const [pa, setPa] = useState(ficha.signosVitales?.presionArterial ?? '')
-  const [fc, setFc] = useState(ficha.signosVitales?.frecuenciaCardiaca ?? '')
-  const [temp, setTemp] = useState(ficha.signosVitales?.temperatura ?? '')
-  const [spo2, setSpo2] = useState(ficha.signosVitales?.saturacionOxigeno ?? '')
-  const [peso, setPeso] = useState(ficha.signosVitales?.peso ?? '')
-  const [glucosa, setGlucosa] = useState(ficha.signosVitales?.glucosa ?? '')
-
-  // Sincronizar datos reactivamente si notasMedicasRaw llega de manera asíncrona
+  useEffect(() => { setFicha(leerFichaClinica(notasMedicasRaw)) }, [notasMedicasRaw])
   useEffect(() => {
-    const parsed = parsearFichaImportante(notasMedicasRaw)
-    setFicha(parsed)
-    if (!editando) {
-      setAlergias(parsed.alergias ?? '')
-      setTipoSangre(parsed.tipoSangre ?? '')
-      setCondiciones(parsed.condicionesCronicas ?? '')
-      setMedicamento(parsed.medicamentoActual ?? '')
-      setPa(parsed.signosVitales?.presionArterial ?? '')
-      setFc(parsed.signosVitales?.frecuenciaCardiaca ?? '')
-      setTemp(parsed.signosVitales?.temperatura ?? '')
-      setSpo2(parsed.signosVitales?.saturacionOxigeno ?? '')
-      setPeso(parsed.signosVitales?.peso ?? '')
-      setGlucosa(parsed.signosVitales?.glucosa ?? '')
-    }
-  }, [notasMedicasRaw, editando])
-
-  // Obtener nombre y rol de sesión si no vinieron por props
-  useEffect(() => {
-    if (usuarioNombre && rol) return
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    if (rol) { setRolSesion(rol); return }
+    let vigente = true
+    const db = createClient()
+    db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
-      supabase
-        .from('usuarios')
-        .select('nombre_completo, rol')
-        .eq('id', user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.nombre_completo && !usuarioNombre) {
-            setNombreSesion(data.nombre_completo)
-          }
-          if (data?.rol && !rol) {
-            setRolSesion(data.rol as RolUsuario)
-          }
-        })
-    })
-  }, [usuarioNombre, rol])
+      const { data } = await db.from('usuarios').select('rol').eq('auth_user_id', user.id).maybeSingle()
+      if (vigente && data) setRolSesion(data.rol as RolUsuario)
+    }).catch(() => {})
+    return () => { vigente = false }
+  }, [rol])
+  useEffect(() => { onEditandoChange?.(seccion !== null) }, [seccion, onEditandoChange])
+  useEffect(() => { onGuardandoChange?.(guardando) }, [guardando, onGuardandoChange])
+  useEffect(() => {
+    if (solicitudEdicion > 0) abrirEdicion('alertas')
+  }, [solicitudEdicion])
 
-  const abrirEdicion = () => {
-    setAlergias(ficha.alergias ?? '')
-    setTipoSangre(ficha.tipoSangre ?? '')
-    setCondiciones(ficha.condicionesCronicas ?? '')
-    setMedicamento(ficha.medicamentoActual ?? '')
-    setPa(ficha.signosVitales?.presionArterial ?? '')
-    setFc(ficha.signosVitales?.frecuenciaCardiaca ?? '')
-    setTemp(ficha.signosVitales?.temperatura ?? '')
-    setSpo2(ficha.signosVitales?.saturacionOxigeno ?? '')
-    setPeso(ficha.signosVitales?.peso ?? '')
-    setGlucosa(ficha.signosVitales?.glucosa ?? '')
-    setError('')
-    setEditando(true)
+  function abrirEdicion(destino: 'alertas' | 'signos') {
+    if (!puedeEditar || guardando) return
+    setBorrador({ ...ficha, signosVitales: { ...ficha.signosVitales } })
+    setSeccion(destino)
+    setError(null)
+    setMensaje('')
   }
-
-  const guardar = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
+  function cambiarAlerta(campo: 'alergias' | 'tipoSangre' | 'condicionesCronicas' | 'medicamentoActual', valor: string) {
+    setBorrador((prev) => ({ ...prev, [campo]: valor }))
+  }
+  async function guardar(event: React.FormEvent) {
+    event.preventDefault()
+    if (!seccion || guardando || !puedeEditar) return
     setGuardando(true)
-    setError('')
-
-    const rolEfectivo = rol || rolSesion
-    const rolTexto = rolEfectivo === 'enfermero' ? 'Enfermería' : rolEfectivo === 'medico' ? 'Médico' : 'Clínica'
-    const nombreEfectivo = usuarioNombre || nombreSesion
-    const nombreRegistrador = nombreEfectivo ? `${nombreEfectivo} (${rolTexto})` : rolTexto
-
-    const ahora = new Date().toLocaleDateString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-
-    const tieneSignos = Boolean(
-      pa.trim() || fc.trim() || temp.trim() || spo2.trim() || peso.trim() || glucosa.trim()
-    )
-
-    const signosActualizados: SignosVitales | undefined = tieneSignos ? {
-      presionArterial: pa.trim() || undefined,
-      frecuenciaCardiaca: fc.trim() || undefined,
-      temperatura: temp.trim() || undefined,
-      saturacionOxigeno: spo2.trim() || undefined,
-      peso: peso.trim() || undefined,
-      glucosa: glucosa.trim() || undefined,
-      tomadoPor: nombreRegistrador,
-      fechaHora: ahora,
-    } : undefined
-
-    const nuevaFicha: FichaImportante = {
-      alergias: alergias.trim() || undefined,
-      tipoSangre: tipoSangre.trim() || undefined,
-      condicionesCronicas: condiciones.trim() || undefined,
-      medicamentoActual: medicamento.trim() || undefined,
-      signosVitales: signosActualizados,
-    }
-
-    const { ok, error: errGuardar } = await guardarFichaImportante(pacienteId, nuevaFicha)
-    setGuardando(false)
-
-    if (!ok || errGuardar) {
-      setError(errGuardar || 'No se pudo guardar la información')
-      return
-    }
-
-    setFicha(nuevaFicha)
-    setEditando(false)
-    setMensaje('Signos y alertas actualizados correctamente')
-    setTimeout(() => setMensaje(''), 3000)
-
-    if (onActualizado) onActualizado(nuevaFicha)
-    window.dispatchEvent(new CustomEvent('datos-actualizados'))
+    setError(null)
+    try {
+      const cambios: FichaImportante = seccion === 'alertas'
+        ? { alergias: borrador.alergias ?? '', tipoSangre: borrador.tipoSangre ?? '', condicionesCronicas: borrador.condicionesCronicas ?? '', medicamentoActual: borrador.medicamentoActual ?? '' }
+        : { signosVitales: borrador.signosVitales }
+      const resultado = await guardarFichaImportante(pacienteId, cambios, seccion as SeccionFichaClinica)
+      if (!resultado.ok || !resultado.ficha) { setError(resultado.error || 'No se pudo guardar la información.'); return }
+      const actualizada = resultado.ficha
+      setFicha(actualizada)
+      const perfil = leerPerfilPacienteEnCache(pacienteId)
+      if (perfil) registrarPerfilPacienteEnCache({ ...perfil, notasMedicas: JSON.stringify(actualizada) })
+      onActualizado?.(actualizada)
+      setMensaje(seccion === 'alertas' ? 'Alertas y antecedentes guardados correctamente.' : 'Signos vitales guardados correctamente.')
+      setSeccion(null)
+      window.dispatchEvent(new Event('datos-actualizados'))
+    } finally { setGuardando(false) }
   }
+  const signos = ficha.signosVitales
+  const haySignos = SIGNOS.some(({ campo }) => signos?.[campo])
+  const fechaSignos = signos?.fechaHora && !Number.isNaN(Date.parse(signos.fechaHora))
+    ? new Date(signos.fechaHora).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
+    : signos?.fechaHora
 
-  const sv = ficha.signosVitales
-  const haySignos = Boolean(
-    sv?.presionArterial || sv?.frecuenciaCardiaca || sv?.temperatura || sv?.saturacionOxigeno || sv?.peso || sv?.glucosa
-  )
-
-  return (
-    <div className="space-y-4">
-      {/* Mensajes de aviso */}
-      {mensaje && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
-          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-          {mensaje}
+  return <div className="space-y-5">
+    {mensaje && <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 size={18} className="mt-0.5 shrink-0" />{mensaje}</p>}
+    <AvisoClinico mensaje={error} />
+    {seccion ? <form onSubmit={guardar} aria-label={seccion === 'alertas' ? 'Editar alertas y antecedentes' : 'Registrar signos vitales'} className="rounded-2xl border border-blue-200 bg-white p-4 sm:p-5">
+      <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-4">
+        <span className="rounded-xl bg-blue-50 p-2.5 text-blue-600">{seccion === 'alertas' ? <ShieldAlert size={20} /> : <Activity size={20} />}</span>
+        <div><h4 className="text-base font-semibold text-slate-900">{seccion === 'alertas' ? 'Editar alertas y antecedentes' : 'Registrar signos vitales'}</h4><p className="mt-1 text-sm leading-relaxed text-slate-500">{seccion === 'alertas' ? 'Actualiza la información clínica relevante del paciente.' : 'Captura los valores obtenidos durante la atención.'}</p></div>
+      </div>
+      <fieldset disabled={guardando} className="min-w-0 space-y-5">
+        {seccion === 'alertas' ? <>
+          <div className="grid min-w-0 gap-5 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <label className={ETIQUETA_CLINICA}>Alergias conocidas<textarea rows={3} maxLength={4000} className={CAMPO_CLINICO + ' resize-y'} value={borrador.alergias ?? ''} onChange={(e) => cambiarAlerta('alergias', e.target.value)} placeholder="Alergias y reacciones registradas..." /></label>
+            <label className={ETIQUETA_CLINICA}>Grupo sanguíneo<select className={CAMPO_CLINICO} value={borrador.tipoSangre ?? ''} onChange={(e) => cambiarAlerta('tipoSangre', e.target.value)}><option value="">No registrado</option>{borrador.tipoSangre && !GRUPOS.includes(borrador.tipoSangre) && <option value={borrador.tipoSangre}>{borrador.tipoSangre}</option>}{GRUPOS.map((grupo) => <option key={grupo}>{grupo}</option>)}</select></label>
+          </div>
+          <label className={ETIQUETA_CLINICA}>Padecimientos crónicos y antecedentes<textarea rows={3} maxLength={4000} className={CAMPO_CLINICO + ' resize-y'} value={borrador.condicionesCronicas ?? ''} onChange={(e) => cambiarAlerta('condicionesCronicas', e.target.value)} placeholder="Condiciones y antecedentes relevantes..." /></label>
+          <label className={ETIQUETA_CLINICA}>Medicamentos o tratamiento actual<textarea rows={3} maxLength={4000} className={CAMPO_CLINICO + ' resize-y'} value={borrador.medicamentoActual ?? ''} onChange={(e) => cambiarAlerta('medicamentoActual', e.target.value)} placeholder="Tratamiento que el paciente tiene registrado..." /></label>
+        </> : <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">{SIGNOS.map(({ campo, titulo, unidad }) => <label key={campo} className={ETIQUETA_CLINICA} htmlFor={`${prefijo}-${campo}`}>{titulo} <span className="text-xs font-normal text-slate-500">({unidad})</span><input id={`${prefijo}-${campo}`} type="text" inputMode={campo === 'presionArterial' ? 'text' : 'decimal'} className={CAMPO_CLINICO} maxLength={40} value={borrador.signosVitales?.[campo] ?? ''} onChange={(e) => setBorrador((prev) => ({ ...prev, signosVitales: { ...prev.signosVitales, [campo]: e.target.value } }))} /></label>)}</div>}
+      </fieldset>
+      <div className="sticky bottom-0 mt-5 flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-white pt-4">
+        <button type="button" className={BOTON_SECUNDARIO} disabled={guardando} onClick={() => { setSeccion(null); setError(null) }}>Cancelar edición</button>
+        <button key="guardar-ficha" type="submit" className={BOTON_PRIMARIO} disabled={guardando}>{guardando ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}{guardando ? 'Guardando...' : seccion === 'alertas' ? 'Guardar alertas' : 'Guardar signos vitales'}</button>
+      </div>
+    </form> : <>
+      <section aria-label="Alertas y antecedentes" className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-amber-50 p-2.5 text-amber-600"><ShieldAlert size={20} /></span><div><h4 className="text-base font-semibold text-slate-900">Alertas y antecedentes</h4><p className="mt-1 text-xs text-slate-500">Información relevante para la atención.</p></div></div>{puedeEditar && <button key="editar-alertas" type="button" onClick={(event) => { event.preventDefault(); abrirEdicion('alertas') }} className={BOTON_SECUNDARIO}><Pencil size={15} />Editar alertas</button>}</div>
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+          <div className="min-w-0 rounded-xl border border-amber-200 bg-amber-50/60 p-4"><p className="flex items-center gap-2 text-xs font-semibold text-amber-800"><AlertTriangle size={15} />Alergias</p><p className="mt-3 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-slate-800">{ficha.alergias || 'No registradas'}</p></div>
+          <div className="min-w-0 rounded-xl border border-blue-100 bg-blue-50/60 p-4"><p className="flex items-center gap-2 text-xs font-semibold text-blue-700"><Droplet size={15} />Grupo sanguíneo</p><p className="mt-3 break-words text-xl font-semibold text-slate-900">{ficha.tipoSangre || 'No registrado'}</p></div>
+          <div className="min-w-0 rounded-xl border border-violet-100 bg-violet-50/60 p-4"><p className="text-xs font-semibold text-violet-700">Padecimientos crónicos</p><p className="mt-3 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-slate-800">{ficha.condicionesCronicas || 'No registrados'}</p></div>
         </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold text-rose-800">
-          <ShieldAlert size={16} className="text-rose-600 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* MODO VISTA NORMAL */}
-      {!editando && (
-        <div className="space-y-4">
-          {/* 1. Alertas de Seguridad Inmediata */}
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 p-4 shadow-xs space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-              <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
-                <AlertTriangle size={15} className="text-amber-500" />
-                Alertas de Seguridad Clínica
-              </span>
-              <button
-                type="button"
-                onClick={abrirEdicion}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-teal-700 active:scale-95 transition-all"
-              >
-                {haySignos ? (
-                  <>
-                    <Edit3 size={13} />
-                    Editar signos vitales
-                  </>
-                ) : (
-                  <>
-                    <Activity size={13} />
-                    Tomar signos vitales
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Alergias */}
-              <div
-                className={`rounded-xl border p-3 ${ficha.alergias
-                  ? 'border-rose-200 bg-rose-50/80 text-rose-900'
-                  : 'border-emerald-200 bg-emerald-50/50 text-emerald-900'
-                  }`}
-              >
-                <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">Alergias</p>
-                <p className="mt-1 text-xs font-bold leading-snug">
-                  {ficha.alergias ? `⚠️ ${ficha.alergias}` : '✓ Sin alergias reportadas'}
-                </p>
-              </div>
-
-              {/* Tipo de sangre */}
-              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-blue-950">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
-                  <Droplet size={12} />
-                  Grupo Sanguíneo
-                </p>
-                <p className="mt-1 text-sm font-black">{ficha.tipoSangre || 'No registrado'}</p>
-              </div>
-
-              {/* Padecimientos crónicos */}
-              <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3 text-purple-950">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Padecimientos Crónicos</p>
-                <p className="mt-1 text-xs font-semibold leading-snug">
-                  {ficha.condicionesCronicas || 'Ninguno reportado'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Signos Vitales Recientes (Triage) - Solo se muestra si hay signos tomados */}
-          {haySignos && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
-                  <Activity size={15} className="text-teal-600" />
-                  Signos Vitales Recientes (Triage)
-                </span>
-                {sv?.fechaHora && (
-                  <span className="text-[11px] font-medium text-slate-500">
-                    {sv.fechaHora}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                  {/* PA */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center gap-1">
-                      <Heart size={11} className="text-rose-500" />
-                      Presión
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold text-slate-900">{sv?.presionArterial || '—'}</p>
-                    <p className="text-[9px] text-slate-400">mmHg</p>
-                  </div>
-
-                  {/* FC */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center gap-1">
-                      <Activity size={11} className="text-blue-500" />
-                      Pulso / FC
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold text-slate-900">{sv?.frecuenciaCardiaca || '—'}</p>
-                    <p className="text-[9px] text-slate-400">lpm</p>
-                  </div>
-
-                  {/* Temp */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center gap-1">
-                      <Thermometer size={11} className="text-amber-500" />
-                      Temperatura
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold text-slate-900">{sv?.temperatura || '—'}</p>
-                    <p className="text-[9px] text-slate-400">°C</p>
-                  </div>
-
-                  {/* SpO2 */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center gap-1">
-                      <Wind size={11} className="text-cyan-500" />
-                      SpO2
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold text-slate-900">{sv?.saturacionOxigeno || '—'}</p>
-                    <p className="text-[9px] text-slate-400">%</p>
-                  </div>
-
-                  {/* Glucosa */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center gap-1">
-                      <Droplet size={11} className="text-indigo-500" />
-                      Glucosa
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold text-slate-900">{sv?.glucosa || '—'}</p>
-                    <p className="text-[9px] text-slate-400">mg/dL</p>
-                  </div>
-
-                  {/* Peso */}
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-2.5 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center justify-center gap-1">
-                      <Scale size={11} className="text-emerald-500" />
-                      Peso
-                    </p>
-                    <p className="mt-1 text-sm font-extrabold text-slate-900">{sv?.peso || '—'}</p>
-                    <p className="text-[9px] text-slate-400">kg</p>
-                  </div>
-                </div>
-
-                {sv?.tomadoPor && (
-                  <p className="mt-3 text-[11px] text-slate-400 text-right">
-                    Tomado por: <span className="font-semibold text-slate-600">{sv.tomadoPor}</span>
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 3. Medicación / Tratamiento actual */}
-          {ficha.medicamentoActual && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-              <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-2">
-                <Pill size={14} className="text-emerald-600" />
-                Medicamento / Tratamiento en Curso
-              </span>
-              <p className="mt-2.5 text-xs font-medium text-slate-800 leading-relaxed bg-emerald-50/40 border border-emerald-100 rounded-xl p-3">
-                {ficha.medicamentoActual}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* MODO FORMULARIO / EDICIÓN (Médico o Enfermero) */}
-      {editando && (
-        <form onSubmit={guardar} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                <Edit3 size={14} className="text-blue-600" />
-                Registro de Signos Vitales y Alertas
-              </h4>
-              <p className="text-[11px] text-slate-400">Disponible para toma por Enfermería o Médico tratante</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setEditando(false)}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Bloque A: Signos Vitales */}
-          <div className="space-y-2">
-            <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-              <Activity size={13} className="text-teal-600" />
-              Signos Vitales del Paciente
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Presión Arterial (PA)</label>
-                <input
-                  type="text"
-                  placeholder="ej. 120/80"
-                  value={pa}
-                  onChange={(e) => setPa(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Frec. Cardíaca (lpm)</label>
-                <input
-                  type="text"
-                  placeholder="ej. 78"
-                  value={fc}
-                  onChange={(e) => setFc(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Temperatura (°C)</label>
-                <input
-                  type="text"
-                  placeholder="ej. 36.6"
-                  value={temp}
-                  onChange={(e) => setTemp(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Oxígeno SpO2 (%)</label>
-                <input
-                  type="text"
-                  placeholder="ej. 98"
-                  value={spo2}
-                  onChange={(e) => setSpo2(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Glucosa (mg/dL)</label>
-                <input
-                  type="text"
-                  placeholder="ej. 95"
-                  value={glucosa}
-                  onChange={(e) => setGlucosa(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Peso (kg)</label>
-                <input
-                  type="text"
-                  placeholder="ej. 68.5"
-                  value={peso}
-                  onChange={(e) => setPeso(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Bloque B: Alertas y Antecedentes */}
-          <div className="space-y-2.5 pt-2 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-              <AlertTriangle size={13} className="text-amber-500" />
-              Alertas y Datos Críticos
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Alergias conocidas</label>
-                <input
-                  type="text"
-                  placeholder="ej. Penicilina, Sulfas (o dejar vacío si no tiene)"
-                  value={alergias}
-                  onChange={(e) => setAlergias(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-500">Tipo de Sangre y Factor Rh</label>
-                <input
-                  type="text"
-                  placeholder="ej. O+, A+, B-, etc."
-                  value={tipoSangre}
-                  onChange={(e) => setTipoSangre(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-500">Padecimientos Crónicos o Condiciones de Riesgo</label>
-              <input
-                type="text"
-                placeholder="ej. Hipertensión arterial, Diabetes mellitus tipo 2, Anticoagulado"
-                value={condiciones}
-                onChange={(e) => setCondiciones(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-500">Medicamentos o Tratamiento Actual</label>
-              <input
-                type="text"
-                placeholder="ej. Losartán 50mg cada 12h, Metformina 850mg"
-                value={medicamento}
-                onChange={(e) => setMedicamento(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setEditando(false)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={guardando}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              <Save size={13} />
-              {guardando ? 'Guardando…' : 'Guardar información'}
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
-  )
+        <div className="mt-4 rounded-xl border border-slate-200 p-4"><p className="flex items-center gap-2 text-xs font-semibold text-slate-600"><Pill size={15} className="text-emerald-600" />Medicamentos o tratamiento actual</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{ficha.medicamentoActual || 'Sin información registrada.'}</p></div>
+      </section>
+      <section aria-label="Signos vitales" className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-teal-50 p-2.5 text-teal-700"><Activity size={20} /></span><div><h4 className="text-base font-semibold text-slate-900">Signos vitales</h4><p className="mt-1 text-xs text-slate-500">{fechaSignos || 'Aún no se han registrado mediciones.'}</p></div></div>{puedeEditar && <button key="editar-signos" type="button" onClick={(event) => { event.preventDefault(); abrirEdicion('signos') }} className={BOTON_SECUNDARIO}><Activity size={15} />{haySignos ? 'Actualizar signos vitales' : 'Tomar signos vitales'}</button>}</div>
+        {haySignos ? <><div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3">{SIGNOS.map(({ campo, titulo, unidad, icon: Icon }) => <div key={campo} className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5"><p className="flex items-center gap-2 text-xs text-slate-500"><Icon size={14} className="shrink-0 text-teal-600" />{titulo}</p><p className="mt-3 break-words text-xl font-semibold text-slate-900">{signos?.[campo] || '—'} <span className="text-xs font-normal text-slate-500">{unidad}</span></p></div>)}</div>{signos?.tomadoPor && <p className="mt-3 text-xs text-slate-500">Registrado por: <span className="font-medium text-slate-700">{signos.tomadoPor}</span></p>}</> : <p className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">Las mediciones aparecerán aquí cuando se capture el primer registro.</p>}
+      </section>
+    </>}
+  </div>
 }

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import {
   CalendarDays,
-  ClipboardList,
   History,
   Phone,
   ShieldAlert,
@@ -25,6 +24,7 @@ import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { Status } from '@/components/modulos/citas/estado'
 import { FichaImportantePaciente } from './ficha-importante-paciente'
 import { ModalEditarPaciente } from './modal-editar-paciente'
+import { HistorialClinicoPaciente } from './historial-clinico-paciente'
 
 type Tab = 'perfil' | 'importante' | 'historial'
 
@@ -45,6 +45,11 @@ export function ModalPerfilPaciente({
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>(rol === 'enfermero' ? 'importante' : 'perfil')
   const [editando, setEditando] = useState(false)
+  const [editandoImportante, setEditandoImportante] = useState(false)
+  const [guardandoImportante, setGuardandoImportante] = useState(false)
+  const [solicitudEdicion, setSolicitudEdicion] = useState(0)
+  const [errorHistorial, setErrorHistorial] = useState<string | null>(null)
+  const [revisionHistorial, setRevisionHistorial] = useState(0)
 
   useEffect(() => {
     let vigente = true
@@ -71,35 +76,27 @@ export function ModalPerfilPaciente({
       }
     })
 
-    // Pre-cargar historial silenciosamente para que la pestaña también sea instantánea
-    if (!cacheActual.historial) {
-      cargarHistorialPaciente(pacienteId).then(({ filas }) => {
-        if (!vigente) return
-        if (filas) {
-          setHistorial(filas)
-          registrarHistorialPacienteEnCache(pacienteId, filas)
-        }
-      })
-    }
-
     return () => { vigente = false }
   }, [pacienteId])
 
-  const cargarHistorial = () => {
-    if (historial !== null || cargandoHistorial) return
+  useEffect(() => {
+    if (rol === 'recepcionista') return
+    let vigente = true
     setCargandoHistorial(true)
+    setErrorHistorial(null)
     cargarHistorialPaciente(pacienteId).then(({ filas, error: e }) => {
-      setCargandoHistorial(false)
-      if (!e && filas) {
-        setHistorial(filas)
-        registrarHistorialPacienteEnCache(pacienteId, filas)
-      }
-    })
-  }
+      if (!vigente) return
+      if (e) { setErrorHistorial('No se pudo actualizar el historial. Inténtalo de nuevo.'); return }
+      setHistorial(filas)
+      registrarHistorialPacienteEnCache(pacienteId, filas)
+    }).catch(() => { if (vigente) setErrorHistorial('No se pudo conectar para cargar el historial.') })
+      .finally(() => { if (vigente) setCargandoHistorial(false) })
+    return () => { vigente = false }
+  }, [pacienteId, rol, revisionHistorial])
 
   const handleTab = (t: Tab) => {
     setTab(t)
-    if (t === 'historial') cargarHistorial()
+    setSolicitudEdicion(0)
   }
 
   if (editando) return <ModalEditarPaciente pacienteId={pacienteId} onClose={() => setEditando(false)} onSave={() => {
@@ -113,7 +110,7 @@ export function ModalPerfilPaciente({
       role="dialog"
       aria-modal="true"
       aria-labelledby="perfil-paciente-titulo"
-      onMouseDown={onClose}
+      onMouseDown={() => { if (!guardandoImportante) onClose() }}
     >
       <div
         className="my-auto flex max-h-[90dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
@@ -140,6 +137,7 @@ export function ModalPerfilPaciente({
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
+              disabled={guardandoImportante}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors"
             >
               <X size={18} />
@@ -152,6 +150,7 @@ export function ModalPerfilPaciente({
           <button
             type="button"
             role="tab"
+            disabled={guardandoImportante || editandoImportante}
             aria-selected={tab === 'perfil'}
             onClick={() => handleTab('perfil')}
             className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors shrink-0 ${
@@ -167,6 +166,7 @@ export function ModalPerfilPaciente({
           <button
             type="button"
             role="tab"
+            disabled={guardandoImportante || editandoImportante}
             aria-selected={tab === 'importante'}
             onClick={() => handleTab('importante')}
             className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-bold transition-colors shrink-0 ${
@@ -183,6 +183,7 @@ export function ModalPerfilPaciente({
             <button
               type="button"
               role="tab"
+            disabled={guardandoImportante || editandoImportante}
               aria-selected={tab === 'historial'}
               onClick={() => handleTab('historial')}
               className={`flex items-center gap-2 border-b-2 px-3 pb-2.5 text-xs font-semibold transition-colors shrink-0 ${
@@ -224,10 +225,13 @@ export function ModalPerfilPaciente({
           )}
 
           {/* PESTAÑA IMPORTANTE */}
-          {tab === 'importante' && (
+          {tab === 'importante' && perfil && (
             <FichaImportantePaciente
               pacienteId={pacienteId}
-              notasMedicasRaw={perfil?.notasMedicas}
+              notasMedicasRaw={perfil.notasMedicas}
+              solicitudEdicion={solicitudEdicion}
+              onEditandoChange={setEditandoImportante}
+              onGuardandoChange={setGuardandoImportante}
               rol={rol}
               onActualizado={(nuevaFicha) => {
                 setPerfil((prev) => (prev ? { ...prev, notasMedicas: JSON.stringify(nuevaFicha) } : null))
@@ -243,55 +247,17 @@ export function ModalPerfilPaciente({
           )}
 
           {rol !== 'recepcionista' && tab === 'historial' && (
-            <div>
-              {cargandoHistorial && !historial ? (
-                <div className="space-y-3 py-4">
-                  <div className="h-16 rounded-xl bg-slate-50 border border-slate-100" />
-                  <div className="h-16 rounded-xl bg-slate-50 border border-slate-100" />
-                </div>
-              ) : historial !== null && historial.length === 0 ? (
-                <div className="py-12 text-center">
-                  <ClipboardList size={28} className="mx-auto text-slate-300 mb-3" />
-                  <p className="text-xs font-medium text-slate-500">Sin consultas previas registradas</p>
-                  <p className="mt-1 text-[11px] text-slate-400">Este paciente no tiene expedientes en el sistema.</p>
-                </div>
-              ) : historial === null ? (
-                <div className="space-y-3 py-4">
-                  <div className="h-16 rounded-xl bg-slate-50 border border-slate-100" />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {historial?.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-blue-200"
-                    >
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
-                        <span className="font-bold text-xs text-slate-900">{item.motivo}</span>
-                        <span className="text-[11px] text-slate-400">{item.fecha}</span>
-                      </div>
-                      <div className="space-y-1.5 text-xs text-slate-700">
-                        <p><span className="font-semibold text-slate-800">Diagnóstico:</span> {item.diagnostico}</p>
-                        <p><span className="font-semibold text-slate-800">Receta:</span> {item.receta}</p>
-                        {item.notas && (
-                          <p className="text-slate-500"><span className="font-semibold text-slate-700">Notas:</span> {item.notas}</p>
-                        )}
-                        <p className="text-[11px] text-slate-400">Atendió: {item.medico}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <HistorialClinicoPaciente historial={historial} cargando={cargandoHistorial} error={errorHistorial} onReintentar={() => setRevisionHistorial((v) => v + 1)} />
           )}
         </div>
 
         {/* Pie */}
         <div className="flex shrink-0 justify-between gap-3 border-t border-slate-100 bg-white px-5 py-4">
-          {['admin', 'medico', 'enfermero', 'recepcionista'].includes(rol ?? '') && <button type="button" onClick={(event) => { event.preventDefault(); setEditando(true) }} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">Editar información</button>}
+          {['admin', 'medico', 'enfermero', 'recepcionista'].includes(rol ?? '') && <button type="button" disabled={guardandoImportante || editandoImportante || cargando} onClick={(event) => { event.preventDefault(); if (tab === 'importante') setSolicitudEdicion((v) => v + 1); else setEditando(true) }} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">{tab === 'importante' ? 'Editar alertas y antecedentes' : tab === 'historial' ? 'Editar datos personales' : 'Editar información'}</button>}
           <button
             type="button"
             onClick={onClose}
+            disabled={guardandoImportante}
             className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
           >
             Cerrar

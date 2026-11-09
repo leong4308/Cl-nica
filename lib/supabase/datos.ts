@@ -320,6 +320,8 @@ type ExpedienteFila = {
 }
 
 export type HistorialPaciente = {
+  id?: number
+  fechaIso?: string
   fecha: string
   motivo: string
   diagnostico: string
@@ -360,19 +362,20 @@ export function parsearFichaImportante(raw: string | null | undefined): FichaImp
 
 export async function guardarFichaImportante(
   pacienteId: number,
-  ficha: FichaImportante
-): Promise<{ ok: boolean; error: string | null }> {
+  ficha: FichaImportante,
+  seccion: 'alertas' | 'signos' | 'completa' = 'completa',
+): Promise<{ ok: boolean; error: string | null; ficha?: FichaImportante }> {
   try {
     const res = await fetch('/api/pacientes/ficha-importante', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pacienteId, ficha }),
+      body: JSON.stringify({ pacienteId, ficha, seccion }),
     })
     const data = await res.json()
     if (!res.ok || data.error) {
       return { ok: false, error: data.error || 'Error al guardar ficha importante' }
     }
-    return { ok: true, error: null }
+    return { ok: true, error: null, ficha: data.ficha }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error de conexión' }
   }
@@ -434,9 +437,9 @@ export async function cargarHistorialPaciente(pacienteId: number): Promise<{ fil
     }),
   )
   const motivoDe = new Map<number, string>(citas.map((cita) => [cita.id, cita.motivo ?? 'Consulta general']))
-  const { filas, error } = await consultar<{ cita_id: number; diagnostico: string | null; receta: string | null; notas_doctor: string | null; creado_en: string }>(
+  const { filas, error } = await consultar<{ id: number; cita_id: number; diagnostico: string | null; receta: string | null; notas_doctor: string | null; creado_en: string }>(
     supabase.from('expedientes')
-      .select('cita_id, diagnostico, receta, notas_doctor, creado_en')
+      .select('id, cita_id, diagnostico, receta, notas_doctor, creado_en')
       .in('cita_id', ids)
       .order('creado_en', { ascending: false })
       .limit(20)
@@ -444,6 +447,8 @@ export async function cargarHistorialPaciente(pacienteId: number): Promise<{ fil
   return {
     error,
     filas: filas.map((item) => ({
+      id: item.id,
+      fechaIso: item.creado_en,
       fecha: fechaDe(item.creado_en),
       motivo: motivoDe.get(item.cita_id) ?? 'Consulta general',
       diagnostico: item.diagnostico ?? 'Sin diagnóstico',
