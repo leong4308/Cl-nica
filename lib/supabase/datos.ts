@@ -659,7 +659,7 @@ export async function cargarOrdenesMedicas(): Promise<{ filas: Row[]; error: str
 }
 
 type SolicitudFila = {
-  id: number; estado_analisis: string; fecha_solicitud: string; resultado: string | null
+  id: number; estado_analisis: string; fecha_solicitud: string; resultado: string | null; observaciones: string | null
   catalogo_analisis: { nombre: string } | { nombre: string }[] | null
   ordenes_medicas: {
     id: number
@@ -675,7 +675,7 @@ export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string
   const supabase = createClient()
   const { filas, error } = await consultar<SolicitudFila>(
     supabase.from('solicitudes_analisis')
-      .select('id, estado_analisis, fecha_solicitud, resultado, catalogo_analisis(nombre), ordenes_medicas(id, episodios_medicos(internaciones(perfiles_pacientes(usuarios(nombre_completo)))))')
+      .select('id, estado_analisis, fecha_solicitud, resultado, observaciones, catalogo_analisis(nombre), ordenes_medicas(id, episodios_medicos(internaciones(perfiles_pacientes(usuarios(nombre_completo)))))')
       .order('fecha_solicitud', { ascending: false })
       .limit(100)
   )
@@ -691,6 +691,8 @@ export async function cargarLaboratorio(): Promise<{ filas: Row[]; error: string
         fechaDe(solicitud.fecha_solicitud),
         solicitud.estado_analisis,
         String(solicitud.id),
+        solicitud.resultado ?? '',
+        solicitud.observaciones ?? '',
       ]
     }),
   }
