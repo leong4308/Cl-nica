@@ -1,0 +1,7 @@
+[
+  { "rol": "admin", "etiqueta": "Administrador", "nombre": "Administrador", "correo": "admin@admin.com" },
+  { "rol": "medico", "etiqueta": "Médico", "nombre": "Dra. Ana López", "correo": "ana.lopez@clinicanova.com" },
+  { "rol": "recepcionista", "etiqueta": "Recepcionista", "nombre": "Recepcionista de pruebas", "correo": "recepcionista@clinicanova.com" },
+  { "rol": "enfermero", "etiqueta": "Enfermero", "nombre": "Enfermero de pruebas", "correo": "enfermero@clinicanova.com" },
+  { "rol": "paciente", "etiqueta": "Paciente", "nombre": "Mariana Torres", "correo": "mariana.torres@gmail.com" }
+]
