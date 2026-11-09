@@ -17,6 +17,8 @@ export async function POST(request: Request) {
   const sessionClient = await createServerClient()
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  const { data: solicitante } = await sessionClient.from('usuarios').select('rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
+  if (!solicitante?.esta_activo || !['admin', 'medico', 'enfermero', 'recepcionista'].includes(solicitante.rol)) return NextResponse.json({ error: 'No tienes permiso para registrar pacientes.' }, { status: 403 })
 
   const body = (await request.json()) as CuerpoPaciente
   const nombre = body.nombre?.trim()

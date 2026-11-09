@@ -28,12 +28,16 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+    const { data: solicitante } = await sessionClient.from('usuarios').select('rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
+    if (!solicitante?.esta_activo || !['admin', 'medico', 'enfermero', 'recepcionista'].includes(solicitante.rol)) return NextResponse.json({ error: 'No tienes permiso para modificar esta ficha.' }, { status: 403 })
 
     const body = await request.json()
     const pacienteId = Number(body.pacienteId)
     if (!pacienteId || Number.isNaN(pacienteId)) {
       return NextResponse.json({ error: 'ID de paciente inválido' }, { status: 400 })
     }
+    const { data: paciente } = await sessionClient.from('perfiles_pacientes').select('id').eq('id', pacienteId).maybeSingle()
+    if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado o sin acceso.' }, { status: 404 })
 
     const ficha: FichaImportante = body.ficha ?? {}
 

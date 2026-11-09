@@ -80,7 +80,7 @@ export function AccionesFilaModulo({
       <RowActions
         onView={handleVerPaciente}
         onHoverView={!Number.isNaN(numId) ? () => void precargarPerfilPaciente(numId) : undefined}
-        onEdit={puedeEditar ? () => onAbrirModal(`PacienteDetalle: ${id}`) : undefined}
+        onEdit={puedeEditar ? () => onAbrirModal(`PacienteEditar: ${id}`) : undefined}
         onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
       />
     )

@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { aplicarPreferencias, PREFERENCIAS_INICIALES } from '@/lib/cuenta/preferencias'
+import { abrirSeccionCuenta } from '@/lib/cuenta/menu'
 import { Dashboard } from '@/components/modulos/resumen/dashboard'
 import { ModulePage } from '@/components/modulos/citas/module-page'
 import { MedicosPage } from '@/components/modulos/medicos'
@@ -24,7 +27,7 @@ import {
   type EstadoCita,
 } from '@/lib/supabase/datos'
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
-import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
+import { ModalPerfilPaciente, ModalEditarPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
@@ -39,6 +42,8 @@ type CitaEnEdicion = { cita: CitaPanel; accion: AccionCita } | null
 
 export default function Page() {
   const [authenticated, setAuthenticated] = useState(false)
+  const [comprobandoSesion, setComprobandoSesion] = useState(true)
+  const autenticadoRef = useRef(false)
   const [active, setActive] = useState('Resumen')
   const [menuOpen, setMenuOpen] = useState(false)
   const [modal, setModal] = useState<string | null>(null)
@@ -46,10 +51,56 @@ export default function Page() {
   const [notice, setNotice] = useState('')
   const [perfil, setPerfil] = useState<PerfilSesion>({ nombre: 'Usuario', rol: 'paciente' })
 
+  useEffect(() => {
+    let vigente = true
+    let version = 0
+    const temporizadores = new Set<ReturnType<typeof setTimeout>>()
+    const restaurar = async () => {
+      const actual = ++version
+      try {
+        const perfilActual = await cargarPerfilSesion()
+        if (!vigente || actual !== version) return
+        setPerfil(perfilActual)
+        autenticadoRef.current = true
+        setAuthenticated(true)
+      } catch {
+        if (!vigente || actual !== version) return
+        if (!autenticadoRef.current) setAuthenticated(false)
+      } finally {
+        if (vigente && actual === version) setComprobandoSesion(false)
+      }
+    }
+    const programarRestauracion = () => {
+      const timer = setTimeout(() => { temporizadores.delete(timer); if (vigente) void restaurar() }, 0)
+      temporizadores.add(timer)
+    }
+    const { data: { subscription } } = createClient().auth.onAuthStateChange((evento) => {
+      if (evento === 'SIGNED_OUT') {
+        ++version
+        const estabaAutenticado = autenticadoRef.current
+        autenticadoRef.current = false
+        setAuthenticated(false)
+        setComprobandoSesion(false)
+        aplicarPreferencias(PREFERENCIAS_INICIALES)
+        // Reiniciar también elimina de memoria los datos del usuario anterior.
+        if (estabaAutenticado) window.location.replace('/')
+      } else if (evento === 'SIGNED_IN' || evento === 'USER_UPDATED') {
+        // Ejecutar fuera del callback evita bloquear la renovación de Auth.
+        programarRestauracion()
+      }
+    })
+    window.addEventListener('cuenta-actualizada', programarRestauracion)
+    void restaurar()
+    return () => { vigente = false; ++version; subscription.unsubscribe(); temporizadores.forEach(clearTimeout); window.removeEventListener('cuenta-actualizada', programarRestauracion) }
+  }, [])
+
+  useEffect(() => { if (authenticated) aplicarPreferencias(perfil.preferencias ?? PREFERENCIAS_INICIALES) }, [authenticated, perfil.preferencias])
+
   // Cuando cambia el rol, navegar al item por default de ese rol
   useEffect(() => {
     if (authenticated) {
-      setActive(obtenerItemDefaultPorRol(perfil.rol))
+      const inicio = perfil.preferencias?.paginaInicio
+      setActive(inicio && inicio !== 'Predeterminada' ? inicio : obtenerItemDefaultPorRol(perfil.rol))
     }
   }, [perfil.rol, authenticated])
 
@@ -79,9 +130,10 @@ const MODALES_CON_FORMULARIO = [
   'Nueva orden',
   'Registrar resultado',
 ]
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'GestionOrden', 'GestionInternacion', 'GestionExpediente', 'GestionLaboratorio:']
+const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'PacienteEditar', 'GestionOrden', 'GestionInternacion', 'GestionExpediente', 'GestionLaboratorio:']
 
 const openModal = (title: string) => {
+  if (abrirSeccionCuenta(title)) return
   const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
   if (MODALES_CON_FORMULARIO.includes(title) || esAccionCita) {
     setModal(title)
@@ -124,6 +176,8 @@ const openModal = (title: string) => {
     usuarioNombre: perfil.nombre,
   }
 
+  if (comprobandoSesion) return <main className="flex min-h-screen items-center justify-center bg-slate-50"><p role="status" className="text-sm text-slate-600">Restaurando tu sesión...</p></main>
+
   if (!authenticated) {
     return (
       <LoginForm
@@ -134,6 +188,7 @@ const openModal = (title: string) => {
             setPerfil(await cargarPerfilSesion())
           }
           setAuthenticated(true)
+          autenticadoRef.current = true
         }}
       />
     )
@@ -167,7 +222,7 @@ const openModal = (title: string) => {
   }
 
   const handleCerrarSesion = async () => {
-    await cerrarSesion()
+    try { await cerrarSesion() } catch { notify('No se pudo cerrar la sesión. Inténtalo de nuevo.'); return }
     setAuthenticated(false)
     setMenuOpen(false)
     setModal(null)
@@ -183,6 +238,7 @@ const openModal = (title: string) => {
     return (
       <InterfazRecepcionista
         usuario={perfil}
+        paginaInicio={perfil.preferencias?.paginaInicio}
         onCerrarSesion={handleCerrarSesion}
         onCambiarVistaRol={handleCambiarVistaRol}
       />
@@ -193,6 +249,7 @@ const openModal = (title: string) => {
     return (
       <InterfazEnfermero
         usuario={perfil}
+        paginaInicio={perfil.preferencias?.paginaInicio}
         onCerrarSesion={handleCerrarSesion}
         onCambiarVistaRol={handleCambiarVistaRol}
       />
@@ -243,6 +300,9 @@ const openModal = (title: string) => {
       )}
       {modal !== null && modal.startsWith('HistorialDetalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
+      )}
+      {modal !== null && /^PacienteEditar: [0-9]+$/.test(modal) && (
+        <ModalEditarPaciente key={modal} pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
       {modal !== null && modal.startsWith('PacienteDetalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} rol={perfil.rol} onClose={() => setModal(null)} />

@@ -4,6 +4,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html[data-texto-grande='true'] { font-size: 18px; }
+html[data-alto-contraste='true'] :is(.text-slate-400, .text-slate-500) { color: #334155; }
+html[data-alto-contraste='true'] :is(.border-slate-100, .border-slate-200) { border-color: #64748b; }
+html[data-reducir-animaciones='true'] *, html[data-reducir-animaciones='true'] *::before, html[data-reducir-animaciones='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 @theme inline {
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

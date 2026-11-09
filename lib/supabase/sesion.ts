@@ -1,5 +1,6 @@
 import { createClient } from './client'
 import type { RolUsuario } from './tipos-rol'
+import { normalizarPreferencias, type PreferenciasUsuario } from '@/lib/cuenta/preferencias'
 
 export type PerfilSesion = {
   usuarioId?: number
@@ -7,23 +8,22 @@ export type PerfilSesion = {
   rol: RolUsuario
   medicoId?: number
   clinicaId?: number
+  preferencias?: PreferenciasUsuario
 }
-
-const NOMBRE_POR_DEFECTO: PerfilSesion = { nombre: 'Usuario', rol: 'paciente' }
 
 export async function cargarPerfilSesion(): Promise<PerfilSesion> {
   const supabase = createClient()
   const { data: sesion } = await supabase.auth.getUser()
-  const correo = sesion.user?.email
-  if (!correo) return NOMBRE_POR_DEFECTO
+  const user = sesion.user
+  if (!user) throw new Error('No hay una sesión activa.')
 
   const { data: usuario } = await supabase
     .from('usuarios')
-    .select('id, nombre_completo, rol')
-    .eq('correo', correo.toLowerCase())
+    .select('id, nombre_completo, rol, esta_activo')
+    .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  if (!usuario) return NOMBRE_POR_DEFECTO
+  if (!usuario || usuario.esta_activo === false) throw new Error('No se encontró un perfil activo para esta cuenta.')
 
   let medicoId: number | undefined
   let clinicaId: number | undefined
@@ -47,9 +47,11 @@ export async function cargarPerfilSesion(): Promise<PerfilSesion> {
     rol: usuario.rol as RolUsuario,
     medicoId,
     clinicaId,
+    preferencias: normalizarPreferencias(user.user_metadata?.clinica_preferencias, usuario.rol as RolUsuario),
   }
 }
 
 export async function cerrarSesion() {
-  await createClient().auth.signOut()
+  const { error } = await createClient().auth.signOut({ scope: 'local' })
+  if (error) throw error
 }

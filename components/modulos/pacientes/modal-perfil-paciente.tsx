@@ -24,6 +24,7 @@ import {
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 import { Status } from '@/components/modulos/citas/estado'
 import { FichaImportantePaciente } from './ficha-importante-paciente'
+import { ModalEditarPaciente } from './modal-editar-paciente'
 
 type Tab = 'perfil' | 'importante' | 'historial'
 
@@ -43,6 +44,7 @@ export function ModalPerfilPaciente({
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>(rol === 'enfermero' ? 'importante' : 'perfil')
+  const [editando, setEditando] = useState(false)
 
   useEffect(() => {
     let vigente = true
@@ -99,6 +101,11 @@ export function ModalPerfilPaciente({
     setTab(t)
     if (t === 'historial') cargarHistorial()
   }
+
+  if (editando) return <ModalEditarPaciente pacienteId={pacienteId} onClose={() => setEditando(false)} onSave={() => {
+    setEditando(false)
+    cargarPerfilPaciente(pacienteId).then(({ perfil: actualizado }) => { if (actualizado) { setPerfil(actualizado); registrarPerfilPacienteEnCache(actualizado) } })
+  }} />
 
   return (
     <div
@@ -280,7 +287,8 @@ export function ModalPerfilPaciente({
         </div>
 
         {/* Pie */}
-        <div className="flex shrink-0 justify-end border-t border-slate-100 bg-white px-5 py-4">
+        <div className="flex shrink-0 justify-between gap-3 border-t border-slate-100 bg-white px-5 py-4">
+          {['admin', 'medico', 'enfermero', 'recepcionista'].includes(rol ?? '') && <button type="button" onClick={(event) => { event.preventDefault(); setEditando(true) }} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">Editar información</button>}
           <button
             type="button"
             onClick={onClose}

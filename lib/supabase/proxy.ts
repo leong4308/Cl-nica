@@ -21,6 +21,8 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  await supabase.auth.getUser()
+  // Verifica la firma y la vigencia del JWT; el SDK renueva la sesión si expiró.
+  await supabase.auth.getClaims()
+  response.headers.set('Cache-Control', 'private, no-store')
   return response
 }

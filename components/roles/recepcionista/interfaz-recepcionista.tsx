@@ -1,5 +1,7 @@
 'use client'
 
+import { abrirSeccionCuenta } from '@/lib/cuenta/menu'
+
 import { useState } from 'react'
 import { BarraLateralRecepcionista } from './barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
@@ -10,7 +12,7 @@ import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nu
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/proximas-citas/modal-accion-cita'
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
-import { ModalPerfilPaciente } from '@/components/modulos/pacientes'
+import { ModalPerfilPaciente, ModalEditarPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { ModalNuevoExpediente } from '@/components/modulos/expedientes'
 import { BotonCerrarMenu, BotonCerrarAviso } from '@/app/botones-pagina'
@@ -18,6 +20,7 @@ import { actualizarEstadoCita, eliminarCita, type CitaPanel, type EstadoCita } f
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 type PropsInterfazRecepcionista = {
+  paginaInicio?: string
   usuario: { nombre: string; rol: RolUsuario }
   onCerrarSesion: () => void
   onCambiarVistaRol?: (nuevoRol: RolUsuario) => void
@@ -27,10 +30,11 @@ type CitaEnEdicion = { cita: CitaPanel; accion: AccionCita } | null
 
 export function InterfazRecepcionista({
   usuario,
+  paginaInicio,
   onCerrarSesion,
   onCambiarVistaRol,
 }: PropsInterfazRecepcionista) {
-  const [active, setActive] = useState('Resumen')
+  const [active, setActive] = useState(paginaInicio && paginaInicio !== 'Predeterminada' ? paginaInicio : 'Resumen')
   const [menuOpen, setMenuOpen] = useState(false)
   const [modal, setModal] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
@@ -48,9 +52,10 @@ export function InterfazRecepcionista({
     'Buscar paciente',
     'Nuevo expediente',
   ]
-  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle']
+  const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'PacienteDetalle', 'PacienteEditar']
 
   const openModal = (title: string) => {
+    if (abrirSeccionCuenta(title)) return
     const esAccionCita = MODALES_ACCIONES_CITA.some((prefijo) => title.startsWith(prefijo))
     if (MODALES_CON_FORMULARIO.includes(title) || esAccionCita) {
       setModal(title)
@@ -191,6 +196,9 @@ export function InterfazRecepcionista({
         <ModalDetalleCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
 
+      {modal !== null && /^PacienteEditar: [0-9]+$/.test(modal) && (
+        <ModalEditarPaciente key={modal} pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
+      )}
       {modal !== null && modal.startsWith('PacienteDetalle: ') && (
         <ModalPerfilPaciente pacienteId={Number(modal.split(': ')[1])} rol={usuario.rol} onClose={() => setModal(null)} />
       )}

@@ -7,6 +7,8 @@ import { opcionCerrarSesion, opcionesMenuUsuario, fechaEncabezado, saludoEncabez
 import { BotonNotificaciones } from './notificaciones'
 import { BotonAbrirMenu } from './abrir-menu'
 import { BotonAvatarMenu, BotonOpcionMenu, BotonCerrarSesion } from './menu-usuario'
+import { esSeccionCuenta, type SeccionCuenta } from '@/lib/cuenta/menu'
+import { ModalCuenta } from './cuenta/modal-cuenta'
 
 type BarraSuperiorProps = {
   onAbrirMenu: () => void
@@ -24,8 +26,18 @@ export function BarraSuperior({
   usuario,
 }: BarraSuperiorProps) {
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [seccionCuenta, setSeccionCuenta] = useState<SeccionCuenta | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
   const contenedor = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const abrir = (evento: Event) => {
+      const seccion = (evento as CustomEvent<string>).detail
+      if (esSeccionCuenta(seccion)) { setMenuAbierto(false); setSeccionCuenta(seccion) }
+    }
+    window.addEventListener('abrir-cuenta', abrir)
+    return () => window.removeEventListener('abrir-cuenta', abrir)
+  }, [])
 
   useEffect(() => {
     const intervalo = window.setInterval(() => setAhora(new Date()), 60_000)
@@ -54,10 +66,12 @@ export function BarraSuperior({
 
   const elegirOpcion = (titulo: string) => {
     setMenuAbierto(false)
+    if (esSeccionCuenta(titulo)) { setSeccionCuenta(titulo); return }
     onAbrirModal(titulo)
   }
 
   return (
+    <>
     <header className="flex h-[82px] items-center justify-between border-b border-slate-200 bg-white px-5 sm:px-9">
       {/* Lado izquierdo: Menú móvil y saludo */}
       <div className="flex items-center gap-4">
@@ -132,5 +146,7 @@ export function BarraSuperior({
         </div>
       </div>
     </header>
+    {seccionCuenta && <ModalCuenta key={seccionCuenta} inicial={seccionCuenta} onClose={() => setSeccionCuenta(null)} />}
+    </>
   )
 }
