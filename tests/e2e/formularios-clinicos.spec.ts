@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 
 async function preparar(page: Page, modulo: string) {
@@ -5,6 +6,7 @@ async function preparar(page: Page, modulo: string) {
   const encode = (obj: object) => Buffer.from(JSON.stringify(obj)).toString('base64url')
   const token = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: usuario.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })}.firma-prueba`
   const paciente = { id: 1, usuario_id: 2, genero: 'F', fecha_nacimiento: '1995-04-10', notas_medicas: '', esta_activo: true, usuarios: { nombre_completo: 'Paciente de prueba', correo: 'paciente@example.test', telefono: '5555555555' } }
+  await simularDirectorioPacientes(page, [paciente])
   const medico = { id: 1, usuarios: { nombre_completo: 'Dra. de prueba' } }
   const cita = { id: 1, motivo: 'Seguimiento', inicio: '2026-11-05T12:00:00Z', fin: '2026-11-05T12:50:00Z', estado: 'atendida', perfiles_pacientes: paciente, perfiles_medicos: medico }
   const expediente = { id: 1, cita_id: 1, diagnostico: 'Diagnóstico registrado', receta: 'Receta registrada', notas_doctor: 'Evolución registrada', creado_en: '2026-11-05T12:00:00Z', citas: cita }

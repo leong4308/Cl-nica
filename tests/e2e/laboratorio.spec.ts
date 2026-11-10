@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 
 // Las solicitudes de datos y las escrituras se simulan para no alterar resultados clínicos.
@@ -9,6 +10,7 @@ async function preparar(page: Page, rol = 'admin') {
     { id: 15, estado_analisis: 'completado', fecha_solicitud: '2026-11-05T12:00:00Z', fecha_resultado: '2026-11-06T12:00:00Z', resultado: 'Glucosa: 92 mg/dL\nInterpretación registrada.', observaciones: 'Muestra sin hemólisis.', archivo_resultado: '15/informe.pdf', catalogo_analisis: { nombre: 'Glucosa en ayuno' }, ordenes_medicas: { id: 16 } },
     { id: 13, estado_analisis: 'en proceso', fecha_solicitud: '2026-10-26T12:00:00Z', fecha_resultado: null, resultado: null, observaciones: null, archivo_resultado: null, catalogo_analisis: { nombre: 'Perfil lipídico' }, ordenes_medicas: { id: 14 } },
   ]
+  await simularDirectorioPacientes(page, [])
   await page.route('**/auth/v1/**', async (route) => {
     const url = new URL(route.request().url())
     await route.fulfill({ json: url.pathname.endsWith('/user') ? usuario : { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-de-prueba', user: usuario } })

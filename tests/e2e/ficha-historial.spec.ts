@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 
 async function preparar(page: Page) {
@@ -7,6 +8,7 @@ async function preparar(page: Page) {
   let ficha = { alergias: 'Alergia registrada', tipoSangre: 'A+', condicionesCronicas: 'Antecedente registrado', medicamentoActual: 'Tratamiento registrado', signosVitales: { presionArterial: '110/70', frecuenciaCardiaca: '70', tomadoPor: 'Profesional anterior', fechaHora: '2026-10-01T12:00:00Z' } }
   const escrituras: { pacienteId: number; ficha: Partial<typeof ficha>; seccion: string }[] = []
   const paciente = () => ({ id: 7, usuario_id: 70, fecha_nacimiento: '1990-01-01', genero: 'F', esta_activo: true, notas_medicas: JSON.stringify(ficha), usuarios: { nombre_completo: 'Paciente de prueba', correo: 'paciente@example.test', telefono: '5555555555' } })
+  await simularDirectorioPacientes(page, () => [paciente()])
   const citas = [
     { id: 21, paciente_id: 7, motivo: 'Control de seguimiento', inicio: '2026-11-05T12:00:00Z', perfiles_medicos: { usuarios: { nombre_completo: 'Dra. Ana de prueba' } } },
     { id: 22, paciente_id: 7, motivo: 'Valoración de cardiología', inicio: '2026-09-03T12:00:00Z', perfiles_medicos: { usuarios: { nombre_completo: 'Dr. Jorge de prueba' } } },

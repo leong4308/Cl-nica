@@ -136,8 +136,8 @@ function ModulePageGenerico({ active, notify, openModal, onAccion, rol, usuarioN
       <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="mb-1 flex items-center gap-2 text-sm font-medium text-blue-600"><Icon size={17} />{config.eyebrow}</p>
-          <h2 className="text-[27px] font-bold tracking-tight">{config.title}</h2>
-          <p className="mt-1 text-sm text-slate-400">{config.description}</p>
+          <h2 className="text-[27px] font-bold tracking-tight">{active === 'Pacientes' && esMedico ? 'Mis pacientes' : config.title}</h2>
+          <p className="mt-1 text-sm text-slate-400">{active === 'Pacientes' && esMedico ? 'Pacientes vinculados a tus citas e internaciones.' : config.description}</p>
         </div>
         {botonPrincipal && (
           <div className="flex gap-2">
@@ -147,7 +147,7 @@ function ModulePageGenerico({ active, notify, openModal, onAccion, rol, usuarioN
       </div>
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Stat icon={Icon} label="Registros totales" value={cargando ? '—' : String(filas.length)} meta="Total en el sistema" tone="blue" />
+        <Stat icon={Icon} label={active === 'Pacientes' && esMedico ? 'Pacientes a tu cargo' : 'Registros totales'} value={cargando ? '—' : String(filas.length)} meta={active === 'Pacientes' && esMedico ? 'Vinculados a tu atención' : 'Total en el sistema'} tone="blue" />
         {active !== 'Citas' && (
           <Stat icon={Icon} label="Estado de conexión" value={error ? 'Error' : 'Activo'} meta={error ? 'Revisa tus políticas RLS' : 'Consulta en vivo'} tone={error ? 'orange' : 'green'} />
         )}
@@ -160,7 +160,7 @@ function ModulePageGenerico({ active, notify, openModal, onAccion, rol, usuarioN
             <p className="mt-0.5 text-xs text-slate-400">
               {busqueda.trim()
                 ? `${filasFiltradas.length} de ${filas.length} registros encontrados`
-                : 'Todos los registros del sistema'}
+                : active === 'Pacientes' && esMedico ? 'Solo pacientes vinculados a tu atención' : 'Todos los registros del sistema'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -200,7 +200,7 @@ function ModulePageGenerico({ active, notify, openModal, onAccion, rol, usuarioN
 
         {!cargando && error && <div className="flex flex-col items-center gap-2 px-5 py-16 text-center"><AlertCircle size={22} className="text-amber-500" /><p className="text-sm font-semibold text-slate-700">No se pudieron cargar los datos</p><p className="max-w-md text-xs text-slate-400">{error}</p></div>}
 
-        {!cargando && !error && filas.length === 0 && <div className="px-5 py-16 text-center text-sm text-slate-400">No hay registros en la base de datos.</div>}
+        {!cargando && !error && filas.length === 0 && <div className="px-5 py-16 text-center text-sm text-slate-400">{active === 'Pacientes' && esMedico ? 'Aún no tienes pacientes vinculados mediante citas o internaciones.' : 'No hay registros en la base de datos.'}</div>}
 
         {!cargando && !error && filas.length > 0 && filasFiltradas.length === 0 && (
           <div className="flex flex-col items-center gap-2 px-5 py-16 text-center text-xs text-slate-400">

@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 import { resumirAgenda } from '../../lib/agenda/modelo'
 async function preparar(page: Page, rol = 'admin', configurado = true) {
@@ -5,6 +6,7 @@ async function preparar(page: Page, rol = 'admin', configurado = true) {
   const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'prueba@example.test',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'}
   const encode=(v:object)=>Buffer.from(JSON.stringify(v)).toString('base64url'),token=`${encode({alg:'HS256',typ:'JWT'})}.${encode({sub:user.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+7200})}.firma-prueba`
   const pacientes=[{id:7,usuario_id:70,esta_activo:true,fecha_nacimiento:null,genero:null,notas_medicas:null,usuarios:{nombre_completo:'Paciente de prueba',esta_activo:true}},{id:8,usuario_id:80,esta_activo:true,fecha_nacimiento:'1990-01-01',genero:'F',notas_medicas:JSON.stringify({tipoSangre:'A+',signosVitales:{presionArterial:'110/70',frecuenciaCardiaca:'68',fechaHora:'2026-11-08T12:00:00Z',tomadoPor:'Personal registrado'}}),usuarios:{nombre_completo:'Otra paciente',esta_activo:true}}]
+  await simularDirectorioPacientes(page, pacientes)
   const medicos=[1,2,3].map(id=>({id,usuario_id:id+10,clinica_id:id===3?2:1,duracion_consulta:id===1?20:30,especialidad:'Medicina general',cedula_profesional:'CED-REAL-'+id,esta_activo:true,clinicas:{nombre:'Clínica de prueba'},usuarios:{nombre_completo:'Profesional '+id,esta_activo:true}}))
   const citas=[{id:101,medico_id:1,paciente_id:7,inicio:'2026-11-09T16:00:00Z',fin:'2026-11-09T16:20:00Z',estado:'pendiente',motivo:'Control de seguimiento',perfiles_pacientes:pacientes[0]},{id:102,medico_id:1,paciente_id:8,inicio:'2026-11-09T17:00:00Z',fin:'2026-11-09T17:20:00Z',estado:'confirmada',motivo:'Consulta de revisión',perfiles_pacientes:pacientes[1]}]
   let bloques=configurado?[{dia:0,inicio:'08:00',fin:'14:00'},{dia:1,inicio:'08:00',fin:'14:00'},{dia:2,inicio:'08:00',fin:'14:00'}]:[]
@@ -95,6 +97,25 @@ test('médico entra a Citas y no tiene acceso al módulo Mi Consulta',async({pag
   await expect(page.getByRole('button',{name:'Mi Consulta',exact:true})).toHaveCount(0)
   await expect(page.getByRole('heading',{name:'Citas médicas',exact:true})).toBeVisible()
   await expect(page.getByRole('tab',{name:'Registrar consulta'})).toHaveCount(0)
+})
+
+test('el directorio médico muestra sus pacientes y permite buscarlos sin incorporar pacientes ajenos',async({page})=>{
+  await preparar(page,'medico')
+  await simularDirectorioPacientes(page, [{id:7,esta_activo:true,fecha_nacimiento:null,genero:null,notas_medicas:null,usuarios:{nombre_completo:'Paciente a mi cargo',telefono:null}}])
+  await page.getByRole('button',{name:'Pacientes',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Mis pacientes',exact:true})).toBeVisible()
+  await expect(page.getByRole('row').filter({hasText:'Paciente a mi cargo'})).toBeVisible()
+  await expect(page.getByRole('row').filter({hasText:'Otra paciente'})).toHaveCount(0)
+  await page.getByPlaceholder('Buscar en pacientes...').fill('Otra paciente')
+  await expect(page.getByText(/No se encontraron resultados/)).toBeVisible()
+})
+
+test('un médico sin pacientes recibe un estado vacío y no ve pacientes del directorio general',async({page})=>{
+  await preparar(page,'medico')
+  await simularDirectorioPacientes(page, [])
+  await page.getByRole('button',{name:'Pacientes',exact:true}).click()
+  await expect(page.getByText('Aún no tienes pacientes vinculados mediante citas o internaciones.')).toBeVisible()
+  await expect(page.getByRole('row').filter({hasText:'Paciente de prueba'})).toHaveCount(0)
 })
 test('recepción conserva las agendas y los descansos sin la pantalla de consulta',async({page})=>{
   await preparar(page,'recepcionista')

@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 
 async function preparar(page: Page, rol = 'admin') {
@@ -5,6 +6,7 @@ async function preparar(page: Page, rol = 'admin') {
   const usuario = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'prueba@example.test', app_metadata: {}, user_metadata: {} as Record<string, unknown>, created_at: '2026-01-01T00:00:00Z' }
   const propio = { id: 1, auth_user_id: usuario.id, correo: usuario.email, nombre_completo: 'Usuario de prueba', rol, esta_activo: true }
   const datosPaciente = { id: 7, nombre: 'Paciente de prueba', correo: 'paciente@example.test', telefono: '5555555555', fechaNacimiento: '1990-01-01', genero: 'F', contactoEmergencia: '', telefonoEmergencia: '' }
+  await simularDirectorioPacientes(page, () => [{ id: 7, usuario_id: 70, fecha_nacimiento: datosPaciente.fechaNacimiento, genero: datosPaciente.genero, esta_activo: true, notas_medicas: '', usuarios: { nombre_completo: datosPaciente.nombre, correo: datosPaciente.correo, telefono: datosPaciente.telefono } }])
   let prefs = { textoGrande: false, reducirAnimaciones: false, altoContraste: false, paginaInicio: 'Predeterminada' }
   const solicitudes: { ruta: string; cuerpo: Record<string, unknown> }[] = []
   let renovaciones = 0

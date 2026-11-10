@@ -1,6 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { cuentaAutenticada } from '@/lib/cuenta/servidor'
+import { listarPacientes } from '@/lib/pacientes/listado'
+
+export async function GET() {
+  try {
+    const acceso = await cuentaAutenticada()
+    if (acceso.respuesta) return acceso.respuesta
+    if (!['admin', 'medico', 'enfermero', 'recepcionista'].includes(acceso.usuario.rol)) return NextResponse.json({ error: 'No tienes permiso para consultar el directorio.' }, { status: 403 })
+    const pacientes = await listarPacientes(acceso.db, acceso.usuario)
+    return NextResponse.json({ pacientes }, { headers: { 'Cache-Control': 'private, no-store' } })
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'No se pudo cargar el directorio de pacientes.' }, { status: 500 })
+  }
+}
 
 type CuerpoPaciente = {
   nombre?: string

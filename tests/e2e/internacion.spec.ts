@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 import type { DatosHospital, IngresoHospital } from '../../lib/internacion/modelo'
 async function preparar(page: Page) {
@@ -10,6 +11,7 @@ async function preparar(page: Page) {
     { id: 11, habitacionId: 100, clinicaId: 1, numero: 'B', habitacion: '100', tipo: 'Doble', ocupada: false, paciente: null, internacionId: null, inconsistente: false },
     { id: 12, habitacionId: 100, clinicaId: 1, numero: 'C', habitacion: '100', tipo: 'Doble', ocupada: false, paciente: null, internacionId: null, inconsistente: false }], medicos: [{ id: 3, nombre: 'Dra. de prueba', especialidad: 'General', clinicaId: 1 }], pacientes: [{ id: 7, nombre: 'María de prueba', ingresoActivo: true }, { id: 8, nombre: 'Carlos de prueba', ingresoActivo: false }] }
   const escrituras: { id: number; body: any }[] = []
+  await simularDirectorioPacientes(page, [])
   await page.route('**/auth/v1/**', (r) => r.fulfill({ json: new URL(r.request().url()).pathname.endsWith('/user') ? user : { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-prueba', user } }))
   await page.route('**/rest/v1/**', (r) => {
     const tabla = new URL(r.request().url()).pathname.split('/').pop()

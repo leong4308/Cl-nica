@@ -1,3 +1,4 @@
+import { simularDirectorioPacientes } from './pacientes-fixture'
 import { test, expect, type Page } from '@playwright/test'
 import cuentas from '../../lib/cuenta/cuentas-prueba.json'
 
@@ -9,6 +10,7 @@ async function preparar(page: Page, rol = 'admin', habilitado = true, retrasar =
   const ingresos: { email: string; password: string }[] = []
   let liberar!: () => void
   const puerta = new Promise<void>((resolve) => { liberar = resolve })
+  await simularDirectorioPacientes(page, [])
   await page.route('**/api/accesos-prueba', async (route) => {
     if (retrasar) await puerta
     await route.fulfill({ json: habilitado ? { habilitado: true, cuentas, clave: 'Clinica123*' } : { habilitado: false } })

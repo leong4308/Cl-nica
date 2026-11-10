@@ -241,20 +241,18 @@ type PacienteFila = {
 }
 
 export async function cargarPacientes(): Promise<{ filas: Row[]; error: string | null }> {
-  const supabase = createClient()
-  const [{ filas, error }, { data: citasData }] = await Promise.all([
-    consultar<PacienteFila>(
-      supabase.from('perfiles_pacientes')
-        .select('id, esta_activo, fecha_nacimiento, genero, notas_medicas, usuarios(nombre_completo, correo, telefono)')
-        .order('id', { ascending: true })
-        .limit(100)
-    ),
-    supabase
-      .from('citas')
-      .select('paciente_id, inicio, motivo, perfiles_medicos(usuarios(nombre_completo))')
-      .order('inicio', { ascending: false })
-      .limit(200),
-  ])
+  let filas: PacienteFila[]
+  try {
+    const respuesta = await fetch('/api/pacientes', { cache: 'no-store' })
+    const resultado = await respuesta.json()
+    if (!respuesta.ok) return { filas: [], error: resultado.error || 'No se pudo cargar el directorio.' }
+    filas = resultado.pacientes
+  } catch { return { filas: [], error: 'No se pudo conectar con el directorio de pacientes.' } }
+  if (!filas.length) return { filas: [], error: null }
+  const { data: citasData } = await createClient().from('citas')
+    .select('paciente_id, inicio, motivo, perfiles_medicos(usuarios(nombre_completo))')
+    .in('paciente_id', filas.map((p) => p.id)).in('estado', ['pendiente', 'confirmada', 'atendida'])
+    .order('inicio', { ascending: false }).limit(200)
 
   type CitaResumenPaciente = {
     medico: string
@@ -280,7 +278,7 @@ export async function cargarPacientes(): Promise<{ filas: Row[]; error: string |
   }
 
   return {
-    error,
+    error: null,
     filas: filas.map((paciente) => {
       const usuario = Array.isArray(paciente.usuarios) ? paciente.usuarios[0] : paciente.usuarios
       const infoCita = citasPorPaciente.get(paciente.id)
