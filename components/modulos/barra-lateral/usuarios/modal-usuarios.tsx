@@ -125,10 +125,8 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
         setForm(USUARIO_VACIO)
         window.dispatchEvent(new CustomEvent('datos-actualizados'))
         await cargarUsuarios()
-        setTimeout(() => {
-          setPestana('lista')
-          setMensajeForm(null)
-        }, 1200)
+        setPestana('lista')
+        setMensajeForm(null)
       }
     } catch {
       setMensajeForm({ tipo: 'error', texto: 'Ocurrió un error inesperado de red.' })

@@ -97,9 +97,7 @@ export function ModalEditarCita({
 
     setExito(true)
     window.dispatchEvent(new CustomEvent('datos-actualizados'))
-    setTimeout(() => {
-      onClose()
-    }, 1100)
+    onClose()
   }
 
   return (

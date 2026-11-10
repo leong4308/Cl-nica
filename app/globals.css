@@ -4,6 +4,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Los estados de carga se comunican con texto, sin movimiento continuo. */
+.animate-spin, .animate-pulse, .animate-bounce {
+  animation: none !important;
+}
+svg.lucide-loader-circle, svg.lucide-loader {
+  display: none;
+}
+
 html[data-texto-grande='true'] { font-size: 18px; }
 html[data-alto-contraste='true'] :is(.text-slate-400, .text-slate-500) { color: #334155; }
 html[data-alto-contraste='true'] :is(.border-slate-100, .border-slate-200) { border-color: #64748b; }
