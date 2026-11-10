@@ -9,7 +9,7 @@ function cargar(ruta, dependencias = {}) {
   const fuente = readFileSync(new URL(ruta, import.meta.url), 'utf8')
   const js = ts.transpileModule(fuente, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  new Function('require', 'exports', js)((id) => dependencias[id] ?? require(id), exports)
+  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : dependencias[id] ?? require(id), exports)
   return exports
 }
 const pdf = cargar('../lib/laboratorio/archivo-pdf.ts')
@@ -28,7 +28,7 @@ test('los documentos clínicos permiten hasta 2 MB inclusive y laboratorio conse
 
 function escenario({ tipo = 'expedientes', rol = 'admin', sinSesion = false, inactivo = false, noExiste = false } = {}) {
   const llamadas = { subidas: [], firmas: [], listas: [] }
-  const db = {
+  const db = { rpc: async () => ({ data: null, error: null }),
     auth: { getUser: async () => ({ data: { user: sinSesion ? null : { id: 'prueba' } }, error: null }) },
     from(tabla) {
       const query = { select() { return query }, eq() { return query }, async maybeSingle() { return { data: tabla === 'usuarios' ? { rol, esta_activo: !inactivo } : noExiste ? null : { id: 1 }, error: null } } }

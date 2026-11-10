@@ -14,6 +14,7 @@ import { cargarPerfilSesion, cerrarSesion, type PerfilSesion } from '@/lib/supab
 import { type RolUsuario } from '@/lib/supabase/tipos-rol'
 import { obtenerItemDefaultPorRol } from '@/components/modulos/barra-lateral/navegacion/items-menu'
 import { ModalUsuarios } from '@/components/modulos/barra-lateral/usuarios'
+import { ModalAuditoria } from '@/components/modulos/barra-lateral/usuarios/modal-auditoria'
 import { ModalBuscarPaciente } from '@/components/modulos/resumen/acciones-rapidas/buscar-paciente'
 import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
 import { ModalRegistrarPaciente } from '@/components/modulos/resumen/acciones-rapidas/registrar-paciente'
@@ -119,6 +120,7 @@ export default function Page() {
   }
 
 const MODALES_CON_FORMULARIO = [
+  'Historial de cambios',
   'Usuarios',
   'Buscar paciente',
   'Nueva cita',
@@ -291,6 +293,7 @@ const openModal = (title: string) => {
           <BotonCerrarAviso onCerrar={() => setNotice('')} />
         </div>
       )}
+      {modal === 'Historial de cambios' && perfil.rol === 'admin' && <ModalAuditoria onClose={() => setModal(null)} />}
 
       {modal === 'Nueva cita' && (
         <ModalNuevaCita

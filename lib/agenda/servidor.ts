@@ -21,6 +21,9 @@ export async function medicoAgenda(db: any, id: number, usuario: { rol: string; 
   return data
 }
 export async function configuracionMedico(db: any, medico: any): Promise<{ bloques: BloqueAgenda[]; descansos: DescansoAgenda[] }> {
+  const publicada = await db.from('configuracion_agenda').select('bloques,descansos').eq('medico_id', medico.id).maybeSingle()
+  if (publicada.error && publicada.error.code !== 'PGRST205') throw Error('No se pudo leer la agenda publicada.')
+  if (publicada.data) return { bloques: validarBloques(publicada.data.bloques), descansos: validarDescansos(publicada.data.descansos) }
   const archivo = await db.storage.from('agenda-medica').download(`${medico.id}/horario.json`)
   if (archivo.data) {
     const config = JSON.parse(await archivo.data.text())
@@ -38,15 +41,10 @@ export async function configuracionMedico(db: any, medico: any): Promise<{ bloqu
   return { bloques: validarBloques((data ?? []).map((b: any) => ({ dia: b.dia_semana, inicio: b.hora_inicio.slice(0, 5), fin: b.hora_fin.slice(0, 5), paso: b.duracion_slot }))), descansos: [] }
 }
 export async function guardarConfiguracionMedico(db: any, medicoId: number, config: { bloques: BloqueAgenda[]; descansos: DescansoAgenda[] }, usuarioId: number) {
-  const bucket = await db.storage.getBucket('agenda-medica')
-  if (bucket.error) {
-    const creada = await db.storage.createBucket('agenda-medica', { public: false, fileSizeLimit: 65536, allowedMimeTypes: ['application/json'] })
-    if (creada.error && !['409', 'Duplicate'].includes(String(creada.error.statusCode)) && !/already exists/i.test(creada.error.message)) throw Error('No se pudo preparar el almacenamiento de horarios.')
-  }
-  const contenido = JSON.stringify({ ...config, actualizado: new Date().toISOString(), usuarioId })
-  const { error } = await db.storage.from('agenda-medica').upload(`${medicoId}/horario.json`, new Blob([contenido], { type: 'application/json' }), { contentType: 'application/json', upsert: true, cacheControl: '0' })
-  if (error) throw Error('No se pudo guardar la configuración de horarios y descansos.')
+  const { error } = await db.rpc('clinica_guardar_agenda', { p_medico: medicoId, p_bloques: config.bloques, p_descansos: config.descansos })
+  if (error) throw new ErrorAgenda(error.code === 'PGRST202' ? 'El administrador debe completar la actualización de la base de datos.' : error.message, error.code === 'PGRST202' ? 503 : error.code === '23P01' ? 409 : error.code === '42501' ? 403 : 400)
 }
+
 export async function citasAgenda(db: any, medicoId: number, fecha: string) {
   const desde = instanteClinica(fecha, '00:00'), hasta = instanteClinica(sumarDias(fecha, 7), '00:00')
   const { data, error } = await db.from('citas').select('id,inicio,fin,estado,paciente_id').eq('medico_id', medicoId).in('estado', ['pendiente', 'confirmada', 'atendida']).lt('inicio', hasta).gt('fin', desde).order('inicio')

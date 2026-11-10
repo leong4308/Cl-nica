@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import ts from 'typescript'
 const require = createRequire(import.meta.url)
-function cargar(ruta, deps = {}) { const js = ts.transpileModule(readFileSync(new URL(ruta, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText; const exports = {}; new Function('require', 'exports', js)((id) => deps[id] ?? require(id), exports); return exports }
+function cargar(ruta, deps = {}) { const js = ts.transpileModule(readFileSync(new URL(ruta, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText; const exports = {}; new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : deps[id] ?? require(id), exports); return exports }
 const m = cargar('../lib/agenda/modelo.ts'), bloques = [{ dia: 1, inicio: '09:00', fin: '10:00' }], ahora = new Date('2026-11-09T14:00:00Z')
 const consulta = cargar('../lib/agenda/consulta.ts')
 test('calcula turnos y ocupación reales de 20 minutos sin horarios fijos', () => {
@@ -37,9 +37,9 @@ test('usa el día de Ciudad de México, valida fechas y bloques', () => {
 function apiEscenario({ rol = 'recepcionista', sinSesion = false, pausas = [] }={}) {
   const citas=[], perfiles=[{id:1,clinica_id:4,duracion_consulta:20},{id:2,clinica_id:8,duracion_consulta:30}]
   let secuencia=0
-  const db={from(tabla){let filtros=[], or='', insertado;const q={select(){return q},in(k,vs){filtros.push(f=>vs.includes(f[k]));return q},limit(){return q},eq(k,v){filtros.push(f=>f[k]===v);return q},or(v){or=v;return q},lt(k,v){filtros.push(f=>f[k]<v);return q},gt(k,v){filtros.push(f=>f[k]>v);return q},insert(v){insertado=v;return q},async single(){const c={id:++secuencia,...insertado};citas.push(c);return {data:c,error:null}},async maybeSingle(){return {data:{id:7,esta_activo:true,usuarios:{esta_activo:true}},error:null}},then(ok,err){return Promise.resolve({data:citas.filter(f=>filtros.every(fn=>fn(f))&&(!or||or.split(',').some(v=>{const[k,,n]=v.split('.');return f[k]===Number(n)}))),error:null}).then(ok,err)}};return q}}
+  const db={async rpc(nombre,args){ const med=perfiles.find(p=>p.id===args.p_medico);const inicio=args.p_inicio,fin=new Date(Date.parse(inicio)+med.duracion_consulta*60000).toISOString();const c={id:++secuencia,paciente_id:args.p_paciente,medico_id:args.p_medico,clinica_id:med.clinica_id,inicio,fin,motivo:args.p_motivo,estado:'pendiente'};citas.push(c);return {data:c,error:null} },from(tabla){let filtros=[], or='', insertado;const q={select(){return q},in(k,vs){filtros.push(f=>vs.includes(f[k]));return q},limit(){return q},eq(k,v){filtros.push(f=>f[k]===v);return q},or(v){or=v;return q},lt(k,v){filtros.push(f=>f[k]<v);return q},gt(k,v){filtros.push(f=>f[k]>v);return q},insert(v){insertado=v;return q},async single(){const c={id:++secuencia,...insertado};citas.push(c);return {data:c,error:null}},async maybeSingle(){return {data:{id:7,esta_activo:true,usuarios:{esta_activo:true}},error:null}},then(ok,err){return Promise.resolve({data:citas.filter(f=>filtros.every(fn=>fn(f))&&(!or||or.split(',').some(v=>{const[k,,n]=v.split('.');return f[k]===Number(n)}))),error:null}).then(ok,err)}};return q}}
   const srv=cargar('../lib/agenda/servidor.ts',{'./modelo':m,'@/lib/cuenta/servidor':{}})
-  const api=cargar('../app/api/citas/route.ts',{'@/lib/agenda/modelo':m,'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/agenda/servidor':{...srv,accesoAgenda:async()=>sinSesion?{respuesta:Response.json({error:'Sin sesión'},{status:401})}:{admin:db,usuario:{id:99,rol}},medicoAgenda:async(_db,id)=>{const med=perfiles.find(p=>p.id===id);if(!med)throw new srv.ErrorAgenda('Médico no disponible',404);return med},configuracionMedico:async()=>({bloques:[],descansos:pausas})}})
+  const api=cargar('../app/api/citas/route.ts',{'@/lib/agenda/modelo':m,'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/agenda/servidor':{...srv,accesoAgenda:async()=>sinSesion?{respuesta:Response.json({error:'Sin sesión'},{status:401})}:{admin:db,db,usuario:{id:99,rol}},medicoAgenda:async(_db,id)=>{const med=perfiles.find(p=>p.id===id);if(!med)throw new srv.ErrorAgenda('Médico no disponible',404);return med},configuracionMedico:async()=>({bloques:[],descansos:pausas})}})
   const fecha=m.sumarDias(m.fechaClinica(),3)
   const crear=(extra={})=>api.POST(new Request('http://localhost/api/citas',{method:'POST',body:JSON.stringify({pacienteId:7,medicoId:1,fecha,hora:'10:00',motivo:'Prueba',...extra})}))
   return {crear,citas}
@@ -75,15 +75,15 @@ test('descansos rotativos retiran turnos y minutos de atención solo en la fecha
 function horarioApi({rol='admin',conflicto=false}={}) {
   const escrituras=[]
   const medico={id:1,duracion_consulta:20,usuarios:{auth_user_id:'doctor-auth'}}
-  const db={storage:{getBucket:async()=>({data:{id:'agenda-medica'},error:null}),from:()=>({upload:async(path,blob)=>{escrituras.push({path,body:JSON.parse(await blob.text())});return {error:null}}})},auth:{admin:{getUserById:async()=>({data:{user:{app_metadata:{provider:'email'}}},error:null}),updateUserById:async(id,body)=>{escrituras.push({id,body});return {error:null}}}},from(){const q={select(){return q},eq(){return q},in(){return q},or(){return q},limit(){return q},lt(){return q},gt(){return q},then(ok,err){return Promise.resolve({data:conflicto?[{id:31,inicio:'2026-11-09T15:00:00Z',fin:'2026-11-09T15:20:00Z',estado:'pendiente'}]:[],error:null}).then(ok,err)}};return q}}
+  const db={rpc:async(nombre,args)=>{escrituras.push({nombre,args});return {data:{ok:true},error:null}},storage:{getBucket:async()=>({data:{id:'agenda-medica'},error:null}),from:()=>({upload:async(path,blob)=>{escrituras.push({path,body:JSON.parse(await blob.text())});return {error:null}}})},auth:{admin:{getUserById:async()=>({data:{user:{app_metadata:{provider:'email'}}},error:null}),updateUserById:async(id,body)=>{escrituras.push({id,body});return {error:null}}}},from(){const q={select(){return q},eq(){return q},in(){return q},or(){return q},limit(){return q},lt(){return q},gt(){return q},then(ok,err){return Promise.resolve({data:conflicto?[{id:31,inicio:'2026-11-09T15:00:00Z',fin:'2026-11-09T15:20:00Z',estado:'pendiente'}]:[],error:null}).then(ok,err)}};return q}}
   const srv=cargar('../lib/agenda/servidor.ts',{'./modelo':m,'@/lib/cuenta/servidor':{}})
-  const api=cargar('../app/api/agenda/[id]/route.ts',{'@/lib/agenda/modelo':m,'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/agenda/servidor':{...srv,accesoAgenda:async()=>({admin:db,usuario:{rol,id:90}}),medicoAgenda:async()=>medico,configuracionMedico:async()=>({bloques:[],descansos:[]})}})
+  const api=cargar('../app/api/agenda/[id]/route.ts',{'@/lib/agenda/modelo':m,'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/agenda/servidor':{...srv,accesoAgenda:async()=>({admin:db,db,usuario:{rol,id:90}}),medicoAgenda:async()=>medico,configuracionMedico:async()=>({bloques:[],descansos:[]})}})
   const guardar=(body={bloques,descansos:[{fecha:'2026-11-09',inicio:'09:00',fin:'09:20'}]})=>api.PATCH(new Request('http://localhost/api/agenda/1',{method:'PATCH',body:JSON.stringify(body)}),{params:Promise.resolve({id:'1'})})
   return {guardar,escrituras}
 }
 test('solo administración asigna descansos y persiste la configuración privada',async()=>{
   const sinPermiso=horarioApi({rol:'recepcionista'});assert.equal((await sinPermiso.guardar()).status,403);assert.equal(sinPermiso.escrituras.length,0)
-  const e=horarioApi();assert.equal((await e.guardar()).status,200);assert.equal(e.escrituras[0].path,'1/horario.json');assert.equal(e.escrituras[0].body.descansos.length,1);assert.equal(e.escrituras[0].body.usuarioId,90)
+  const e=horarioApi();assert.equal((await e.guardar()).status,200);assert.equal(e.escrituras[0].nombre,'clinica_guardar_agenda');assert.equal(e.escrituras[0].args.p_descansos.length,1);assert.equal(e.escrituras[0].args.p_medico,1)
 })
 test('asignar descanso sobre una cita activa devuelve conflicto sin modificar el horario',async()=>{
   const e=horarioApi({conflicto:true});const r=await e.guardar();assert.equal(r.status,409);assert.match((await r.json()).error,/cita #31/);assert.equal(e.escrituras.length,0)
@@ -99,7 +99,7 @@ test('incluso sin jornada publicada no se agenda durante un descanso',async()=>{
 })
 test('si faltan la tabla y la configuración, devuelve jornada vacía en lugar de inventarla',async()=>{
   const srv=cargar('../lib/agenda/servidor.ts',{'./modelo':m,'@/lib/cuenta/servidor':{}})
-  const db={storage:{from:()=>({download:async()=>({data:null,error:{statusCode:404,message:'Object not found'}})})},from:()=>{const q={select(){return q},eq(){return q},then(ok,err){return Promise.resolve({data:null,error:{code:'PGRST205'}}).then(ok,err)}};return q}}
+  const db={storage:{from:()=>({download:async()=>({data:null,error:{statusCode:404,message:'Object not found'}})})},from:()=>{const q={select(){return q},eq(){return q},async maybeSingle(){return {data:null,error:{code:'PGRST205'}}},then(ok,err){return Promise.resolve({data:null,error:{code:'PGRST205'}}).then(ok,err)}};return q}}
   assert.deepEqual(await srv.configuracionMedico(db,{id:1,usuarios:{auth_user_id:null}}),{bloques:[],descansos:[]})
 })
 

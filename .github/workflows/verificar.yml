@@ -1,0 +1,26 @@
+name: Verificar Clínica Nova
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://clinica-pruebas.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: clave-publica-simulada
+      SUPABASE_SERVICE_ROLE_KEY: clave-servidor-simulada
+      HABILITAR_ACCESOS_PRUEBA: 'false'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm install --global pnpm@12.15.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:unit
+      - run: pnpm test:sql
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm test:e2e

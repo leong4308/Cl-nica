@@ -72,6 +72,47 @@ async function abrir(page: Page, opcion: string) {
   return page.getByRole('dialog')
 }
 
+test('administración asigna médicos y un conflicto conserva el motivo escrito',async({page})=>{
+  await preparar(page)
+  const cambios:any[]=[]
+  let version='v1'
+  await page.route('**/api/pacientes/7/medicos',r=>{
+    if(r.request().method()==='PATCH'){const b=r.request().postDataJSON();cambios.push(b);if(version==='v1'){version='v2';return r.fulfill({status:409,json:{error:'La asignación cambió. Vuelve a cargarla.'}})}return r.fulfill({json:{ok:true,version:'v3'}})}
+    return r.fulfill({json:{version,asignaciones:[{medico_id:1,activo:true,tipo:'principal'}],medicos:[{id:1,nombre:'Dra. Ana de prueba',especialidad:'General'},{id:2,nombre:'Dr. Jorge de prueba',especialidad:'Cardiología'}]}})
+  })
+  await page.getByRole('button',{name:'Pacientes',exact:true}).click()
+  await page.getByRole('row').filter({hasText:'Paciente de prueba'}).getByRole('button',{name:'Ver detalle',exact:true}).click()
+  await page.getByRole('button',{name:'Administrar médicos'}).click()
+  await page.getByRole('checkbox',{name:/Dra. Ana de prueba/}).uncheck()
+  await page.getByRole('checkbox',{name:/Dr. Jorge de prueba/}).check()
+  await page.getByLabel('Médico principal',{exact:true}).selectOption('2')
+  await page.getByLabel('Motivo de la asignación o transferencia').fill('Transferencia registrada')
+  await page.getByRole('button',{name:'Guardar médicos tratantes'}).click()
+  await expect(page.getByRole('alert').filter({hasText:'La asignación cambió.'})).toBeVisible()
+  await expect(page.getByLabel('Motivo de la asignación o transferencia')).toHaveValue('Transferencia registrada')
+  await page.getByRole('button',{name:'Volver a cargar asignación'}).click()
+  await expect(page.getByLabel('Motivo de la asignación o transferencia')).toHaveValue('')
+  await page.getByRole('checkbox',{name:/Dra. Ana de prueba/}).uncheck()
+  await page.getByRole('checkbox',{name:/Dr. Jorge de prueba/}).check()
+  await page.getByLabel('Médico principal',{exact:true}).selectOption('2')
+  await page.getByLabel('Motivo de la asignación o transferencia').fill('Transferencia confirmada')
+  await page.getByRole('button',{name:'Guardar médicos tratantes'}).click()
+  await expect(page.getByRole('status').filter({hasText:'Asignación actualizada.'})).toBeVisible()
+  expect(cambios[1]).toMatchObject({version:'v2',medicos:[{id:2,tipo:'principal'}]})
+})
+
+test('la bitácora administrativa muestra autor y diferencias sin permitir editarlas',async({page})=>{
+  await preparar(page)
+  await page.route('**/api/auditoria*',r=>r.fulfill({json:{eventos:[{id:1,fecha:'2026-11-10T12:00:00Z',autor:'Administrador verificado',tabla:'expedientes',registro_id:'7',accion:'UPDATE',anterior:{diagnostico:'Diagnóstico anterior'},nuevo:{diagnostico:'Diagnóstico actualizado'}}],siguiente:null}}))
+  await page.getByRole('button',{name:'Historial de cambios',exact:true}).click()
+  const modal=page.getByRole('dialog',{name:'Historial de cambios'})
+  await modal.locator('summary').click()
+  await expect(modal.getByText('Administrador verificado',{exact:false})).toBeVisible()
+  await expect(modal.getByText('Diagnóstico anterior',{exact:true})).toBeVisible()
+  await expect(modal.getByText('Diagnóstico actualizado',{exact:true})).toBeVisible()
+  await expect(modal.getByRole('textbox')).toHaveCount(0)
+})
+
 test('editar paciente abre la fila correcta y guarda los datos sin PDF', async ({ page }) => {
   const { solicitudes } = await preparar(page)
   await page.getByRole('button', { name: 'Pacientes', exact: true }).click()

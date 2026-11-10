@@ -7,12 +7,13 @@ const require = createRequire(import.meta.url)
 function cargar(ruta, deps = {}) {
   const js = ts.transpileModule(readFileSync(new URL(ruta, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  new Function('require', 'exports', js)((id) => deps[id] ?? require(id), exports)
+  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : deps[id] ?? require(id), exports)
   return exports
 }
 const listado = cargar('../lib/pacientes/listado.ts')
 function escenario({ sinPerfil = false, fallo = false } = {}) {
   const tablas = {
+    paciente_medicos: [],
     perfiles_medicos: sinPerfil ? [] : [{ id: 1, usuario_id: 10, esta_activo: true }, { id: 2, usuario_id: 20, esta_activo: true }],
     perfiles_pacientes: [7,8,9,10,11].map(id => ({ id, usuarios: { nombre_completo: `Paciente ${id}` } })),
     citas: [

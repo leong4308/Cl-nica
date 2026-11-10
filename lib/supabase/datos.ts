@@ -419,6 +419,9 @@ export async function cargarPerfilPaciente(pacienteId: number): Promise<{ perfil
 
 export async function cargarHistorialPaciente(pacienteId: number): Promise<{ filas: HistorialPaciente[]; error: string | null }> {
   const supabase = createClient()
+  const historial = await supabase.rpc('clinica_historial_paciente', { p_paciente: pacienteId })
+  if (!historial.error) return { filas: (historial.data ?? []).map((h: any) => ({ id: h.id, fechaIso: h.creado_en, fecha: fechaDe(h.creado_en), motivo: h.motivo || 'Sin motivo registrado', diagnostico: h.diagnostico || 'Sin diagnóstico registrado', receta: h.receta || '', notas: h.notas_doctor || '', medico: h.medico || 'Sin médico registrado' })), error: null }
+  if (historial.error.code !== 'PGRST202') return { filas: [], error: 'No se pudo consultar el historial del paciente.' }
   const { filas: citas, error: errorCitas } = await consultar<{ id: number; motivo: string | null; perfiles_medicos: { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null } | { usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null }[] | null }>(
     supabase.from('citas')
       .select('id, motivo, perfiles_medicos(usuarios(nombre_completo))')

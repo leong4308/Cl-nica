@@ -6,7 +6,7 @@ import ts from 'typescript'
 const require = createRequire(import.meta.url)
 function cargar(ruta, deps = {}) {
   const js = ts.transpileModule(readFileSync(new URL(ruta, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
-  const exports = {}; new Function('require', 'exports', js)((id) => deps[id] ?? require(id), exports); return exports
+  const exports = {}; new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : deps[id] ?? require(id), exports); return exports
 }
 const modelo = cargar('../lib/internacion/modelo.ts')
 const servidor = cargar('../lib/internacion/servidor.ts', { './modelo': modelo, '@/lib/cuenta/servidor': {} })

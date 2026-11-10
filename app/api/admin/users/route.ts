@@ -1,3 +1,4 @@
+import { origenValido } from '@/lib/cuenta/servidor'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
@@ -20,15 +21,15 @@ export async function GET() {
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { 'x-clinica-actor': user.id } } })
 
   const { data: solicitante } = await admin
     .from('usuarios')
-    .select('rol')
+    .select('rol, esta_activo')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  if (solicitante?.rol !== 'admin') {
+  if (solicitante?.rol !== 'admin' || !solicitante?.esta_activo) {
     return NextResponse.json({ error: 'Solo un administrador puede ver y gestionar usuarios.' }, { status: 403 })
   }
 
@@ -43,19 +44,20 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })
   const sessionClient = await createServerClient()
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { 'x-clinica-actor': user.id } } })
 
   const { data: solicitante } = await admin
     .from('usuarios')
-    .select('rol')
+    .select('rol, esta_activo')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  if (solicitante?.rol !== 'admin') {
+  if (solicitante?.rol !== 'admin' || !solicitante?.esta_activo) {
     return NextResponse.json({ error: 'Solo un administrador puede modificar usuarios.' }, { status: 403 })
   }
 
@@ -72,6 +74,7 @@ export async function PATCH(request: Request) {
   const updates: Record<string, unknown> = {}
   if (esta_activo !== undefined) updates.esta_activo = Boolean(esta_activo)
   if (nombre) updates.nombre_completo = nombre.trim()
+  if (rol && !['admin','medico','recepcionista','enfermero','paciente'].includes(rol.trim())) return NextResponse.json({ error: 'Rol inválido.' }, { status: 400 })
   if (rol) updates.rol = rol.trim()
   if (telefono !== undefined) updates.telefono = telefono.trim()
 
@@ -82,19 +85,20 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })
   const sessionClient = await createServerClient()
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { 'x-clinica-actor': user.id } } })
 
   const { data: solicitante } = await admin
     .from('usuarios')
-    .select('rol')
+    .select('rol, esta_activo')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  if (solicitante?.rol !== 'admin') {
+  if (solicitante?.rol !== 'admin' || !solicitante?.esta_activo) {
     return NextResponse.json({ error: 'Solo un administrador puede crear cuentas de personal.' }, { status: 403 })
   }
 
@@ -103,6 +107,8 @@ export async function POST(request: Request) {
   const password = body.password?.trim()
   const nombre = body.nombre?.trim()
   const rol = body.rol?.trim() || 'medico'
+  if (!['admin','medico','recepcionista','enfermero'].includes(rol)) return NextResponse.json({ error: 'Rol de personal inválido.' }, { status: 400 })
+  if (rol === 'medico' && body.duracion && (!Number.isInteger(Number(body.duracion)) || Number(body.duracion) < 5 || Number(body.duracion) > 240)) return NextResponse.json({ error: 'La duración de consulta debe estar entre 5 y 240 minutos.' }, { status: 400 })
   if (!email || !password || !nombre || password.length < 6) {
     return NextResponse.json({ error: 'Nombre, correo y una contraseña de al menos 6 caracteres son obligatorios.' }, { status: 400 })
   }
@@ -117,33 +123,26 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
   const usuarioId = data.user.id
+  async function revertir(mensaje: string) {
+    const desactivada = await admin.from('usuarios').update({ esta_activo: false }).eq('auth_user_id', usuarioId)
+    const borrado = await admin.auth.admin.deleteUser(usuarioId)
+    return NextResponse.json({ error: borrado.error ? (desactivada.error ? 'No se completó el registro. La cuenta requiere revisión administrativa.' : 'La cuenta quedó inactiva y requiere revisión administrativa.') : mensaje }, { status: 400 })
+  }
   const { data: fila } = await admin.from('usuarios').select('id').eq('auth_user_id', usuarioId).maybeSingle()
-  if (!fila) return NextResponse.json({ error: 'El usuario se creó, pero no se pudo localizar su perfil.' }, { status: 500 })
-
-  if (rol === 'medico') {
-    const { data: clinica } = await admin.from('clinicas').select('id').order('id').limit(1).maybeSingle()
-    if (clinica) {
-      const { error: errorMedico } = await admin.from('perfiles_medicos').insert({
-        usuario_id: fila.id,
-        clinica_id: clinica.id,
-        especialidad: body.especialidad!.trim(),
-        cedula_profesional: body.cedula!.trim(),
-        duracion_consulta: Number(body.duracion) > 0 ? Number(body.duracion) : 20,
-      })
-      if (errorMedico) return NextResponse.json({ error: `Usuario creado, pero falló el perfil médico: ${errorMedico.message}` }, { status: 500 })
-    }
+  if (!fila) return revertir('No se pudo crear el perfil. No se completó el registro.')
+  const configurada = await admin.from('usuarios').update({ nombre_completo: nombre, rol, esta_activo: false, telefono: body.telefono?.trim() || null }).eq('id', fila.id)
+  if (configurada.error) return revertir('No se pudo configurar la cuenta.')
+  if (rol === 'medico' || rol === 'enfermero') {
+    const { data: clinica } = await admin.from('clinicas').select('id').eq('esta_activo', true).order('id').limit(1).maybeSingle()
+    if (!clinica) return revertir('Registra una clínica activa antes de crear personal clínico.')
+    const tabla = rol === 'medico' ? 'perfiles_medicos' : 'perfiles_enfermeros'
+    const existente = await admin.from(tabla).select('id').eq('usuario_id', fila.id).eq('clinica_id', clinica.id).maybeSingle()
+    const perfil: Record<string, unknown> = rol === 'medico' ? { usuario_id: fila.id, clinica_id: clinica.id, especialidad: body.especialidad!.trim(), cedula_profesional: body.cedula!.trim(), duracion_consulta: Number(body.duracion) || 20, esta_activo: true } : { usuario_id: fila.id, clinica_id: clinica.id, especialidad: body.especialidad?.trim() || null, esta_activo: true }
+    const guardado = existente.data ? await admin.from(tabla).update(perfil).eq('id', existente.data.id) : await admin.from(tabla).insert(perfil)
+    if (guardado.error) return revertir(guardado.error.code === '23505' ? 'La cédula o el perfil ya están registrados.' : 'No se pudo crear el perfil profesional.')
   }
-
-  if (rol === 'enfermero') {
-    const { data: clinica } = await admin.from('clinicas').select('id').order('id').limit(1).maybeSingle()
-    if (clinica) {
-      await admin.from('perfiles_enfermeros').insert({ usuario_id: fila.id, clinica_id: clinica.id, especialidad: body.especialidad?.trim() || null })
-    }
-  }
-
-  if (body.telefono?.trim()) {
-    await admin.from('usuarios').update({ telefono: body.telefono.trim() }).eq('id', fila.id)
-  }
+  const activa = await admin.from('usuarios').update({ esta_activo: true }).eq('id', fila.id)
+  if (activa.error) return revertir('No se pudo activar la cuenta.')
 
   return NextResponse.json({ id: data.user.id, email: data.user.email })
 }

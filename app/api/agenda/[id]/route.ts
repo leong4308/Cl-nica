@@ -30,7 +30,7 @@ export async function PATCH(request: Request, contexto: Contexto) {
       const conflicto = (reservadas.data ?? []).find((c) => descansos.some((d) => seCruzan(c, intervaloDescanso(d))))
       if (conflicto) return NextResponse.json({ error: `El descanso coincide con la cita #${conflicto.id}. Reagenda esa cita antes de asignarlo.` }, { status: 409 })
     }
-    await guardarConfiguracionMedico(acceso.admin, id, { bloques, descansos }, acceso.usuario.id)
+    await guardarConfiguracionMedico(acceso.db, id, { bloques, descansos }, acceso.usuario.id)
     return NextResponse.json({ ok: true })
     })
   } catch (err) { return errorAgenda(err) }

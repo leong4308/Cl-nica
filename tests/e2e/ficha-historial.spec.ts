@@ -25,6 +25,7 @@ async function preparar(page: Page) {
     if (tabla === 'perfiles_pacientes') data = [paciente()]
     if (tabla === 'citas') data = citas
     if (tabla === 'expedientes') data = expedientes
+    if (tabla === 'clinica_historial_paciente') data = expedientes.map(e=>({...e,motivo:e.citas.motivo,medico:e.citas.perfiles_medicos.usuarios.nombre_completo}))
     await route.fulfill({ json: data, headers: { 'content-range': `0-${Math.max(data.length - 1, 0)}/${data.length}` } })
   })
   await page.route('**/api/pacientes/ficha-importante', async (route) => {

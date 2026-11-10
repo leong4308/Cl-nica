@@ -53,7 +53,7 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
       : 'Sistema Médico'
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-[82px] items-center gap-3 border-b border-slate-100 px-7">
         <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-200"><HeartPulse size={23} /></div>
         <div>

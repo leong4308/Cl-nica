@@ -1,3 +1,4 @@
+import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { NextResponse } from 'next/server'
 import { accesoHospital, datosHospital, operarHospital, respuestaErrorHospital } from '@/lib/internacion/servidor'
 import { crearIngreso, sincronizarOcupacion } from '@/lib/internacion/operaciones'
@@ -7,7 +8,7 @@ export async function GET() {
   try {
     const acceso = await accesoHospital()
     if ('respuesta' in acceso) return acceso.respuesta
-    return NextResponse.json(await datosHospital(acceso.db), { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json(await datosHospital(acceso.db, acceso.usuario.rol), { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) { return respuestaErrorHospital(error) }
 }
 export async function POST(request: Request) {
@@ -17,12 +18,7 @@ export async function POST(request: Request) {
     if ('respuesta' in acceso) return acceso.respuesta
     const body = await request.json()
     if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Revisa los datos del ingreso.' }, { status: 400 })
-    if (body.accion === 'sincronizar') {
-      if (acceso.usuario.rol !== 'admin') return NextResponse.json({ error: 'Solo un administrador puede corregir la ocupación.' }, { status: 403 })
-      const corregidas = await operarHospital(() => sincronizarOcupacion(acceso.admin))
-      return NextResponse.json({ ok: true, corregidas })
-    }
-    if (body.accion !== undefined && body.accion !== 'crear') return NextResponse.json({ error: 'Acción inválida.' }, { status: 400 })
-    return NextResponse.json(await operarHospital(() => crearIngreso(acceso.admin, body, acceso.usuario)))
+    const r = await acceso.db.rpc('clinica_hospital', { p_id: null, p_datos: body })
+    return r.error ? errorOperacion(r.error) : NextResponse.json(r.data)
   } catch (error) { return respuestaErrorHospital(error) }
 }

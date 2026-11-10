@@ -79,5 +79,6 @@ export const insigniasMenu: Record<string, string> = { Citas: '0', Internación:
 
 export const itemsAdministracion: { label: string; icono: LucideIcon; soloAdmin?: boolean }[] = [
   { label: 'Usuarios', icono: UserRound, soloAdmin: true },
+  { label: 'Historial de cambios', icono: ClipboardList, soloAdmin: true },
   { label: 'Configuración', icono: Settings, soloAdmin: true },
 ]

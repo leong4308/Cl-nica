@@ -1,3 +1,5 @@
+import { errorOperacion } from '@/lib/supabase/error-operacion'
+import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
@@ -13,9 +15,11 @@ async function autorizar(contexto: Contexto, escritura = false) {
   const db = await createClient()
   const { data: { user }, error: errorSesion } = await db.auth.getUser()
   if (!user || errorSesion) return { respuesta: fallo('Inicia sesión para consultar documentos.', 401) } as const
-  const { data: perfil } = await db.from('usuarios').select('rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
+  const { data: perfil } = await db.from('usuarios').select('id, rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
   const roles = tipo === 'expedientes' ? (escritura ? ['admin', 'medico'] : ['admin', 'medico', 'recepcionista']) : ['admin', 'medico', 'enfermero']
   if (!perfil?.esta_activo || !roles.includes(perfil.rol)) return { respuesta: fallo('No tienes permiso para acceder a estos documentos.', 403) } as const
+  const denegado = await autorizarRegistro(db, tipo as 'expedientes' | 'ordenes', id, perfil)
+  if (denegado) return { respuesta: denegado } as const
   const { data, error } = await db.from(tipo === 'expedientes' ? 'expedientes' : 'ordenes_medicas').select('id').eq('id', id).maybeSingle()
   if (error) return { respuesta: fallo('No se pudo consultar el registro.', 500) } as const
   if (!data) return { respuesta: fallo('Registro no encontrado o sin acceso.', 404) } as const
@@ -23,7 +27,7 @@ async function autorizar(contexto: Contexto, escritura = false) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return { respuesta: fallo('El almacenamiento de documentos no está configurado.', 500) } as const
   const admin = createAdminClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-  return { tipo, id, prefijo: `${tipo}/${id}`, storage: admin.storage } as const
+  return { db, tipo, id, prefijo: `${tipo}/${id}`, storage: admin.storage } as const
 }
 
 export async function GET(request: Request, contexto: Contexto) {
@@ -36,6 +40,8 @@ export async function GET(request: Request, contexto: Contexto) {
       if (!/^[a-zA-Z0-9._-]+\.pdf$/i.test(archivo) || archivo.includes('..')) return fallo('Documento inválido.', 400)
       const { data, error } = await storage.from(BUCKET_DOCUMENTOS_CLINICOS).createSignedUrl(`${prefijo}/${archivo}`, 300)
       if (error || !data) return fallo('No se pudo abrir el documento.', 404)
+      const auditoria = await acceso.db.rpc('clinica_auditar_documento', { p_tipo: tipo, p_id: id, p_accion: 'ABRIR_DOCUMENTO', p_nombre: archivo })
+      if (auditoria.error) return errorOperacion(auditoria.error)
       const respuesta = NextResponse.redirect(data.signedUrl)
       respuesta.headers.set('Cache-Control', 'private, no-store')
       respuesta.headers.set('Referrer-Policy', 'no-referrer')
@@ -62,6 +68,8 @@ export async function POST(request: Request, contexto: Contexto) {
     const ruta = `${acceso.prefijo}/${crypto.randomUUID()}-${nombre}`
     const { error } = await acceso.storage.from(BUCKET_DOCUMENTOS_CLINICOS).upload(ruta, archivo, { contentType: 'application/pdf', upsert: false })
     if (error) return fallo('No se pudo adjuntar el PDF. Inténtalo de nuevo.', 500)
+    const auditoria = await acceso.db.rpc('clinica_auditar_documento', { p_tipo: acceso.tipo, p_id: acceso.id, p_accion: 'ADJUNTAR_DOCUMENTO', p_nombre: nombre })
+    if (auditoria.error) { await acceso.storage.from(BUCKET_DOCUMENTOS_CLINICOS).remove([ruta]); return errorOperacion(auditoria.error) }
     return NextResponse.json({ ok: true })
   } catch { return fallo('No se pudo conectar para adjuntar el PDF.', 500) }
 }

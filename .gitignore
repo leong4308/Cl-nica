@@ -44,5 +44,11 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 repomix-output.xml
+respaldos/
+*.cnbak
+*.partial
+.backup.key
 
 
+
+.herramientas/

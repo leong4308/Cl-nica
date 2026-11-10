@@ -1,3 +1,5 @@
+import { origenValido } from '@/lib/cuenta/servidor'
+import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -5,12 +7,13 @@ async function autorizar(soloAdmin = false) {
   const db = await createClient()
   const { data: { user } } = await db.auth.getUser()
   if (!user) return { respuesta: NextResponse.json({ error: 'Inicia sesión para continuar.' }, { status: 401 }) } as const
-  const { data: perfil } = await db.from('usuarios').select('rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
+  const { data: perfil } = await db.from('usuarios').select('id, rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
   if (!perfil?.esta_activo || !(soloAdmin ? ['admin'] : ['admin', 'medico']).includes(perfil.rol)) return { respuesta: NextResponse.json({ error: 'No tienes permiso para modificar expedientes.' }, { status: 403 }) } as const
-  return { db } as const
+  return { db, perfil } as const
 }
 
 export async function POST(request: Request) {
+  if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })
   try {
     const acceso = await autorizar()
     if ('respuesta' in acceso) return acceso.respuesta
@@ -23,6 +26,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'ID de cita inválido' }, { status: 400 })
     }
 
+    const denegado = await autorizarRegistro(admin, expedienteId > 0 ? 'expedientes' : 'citas', expedienteId > 0 ? expedienteId : citaId, acceso.perfil)
+    if (denegado) return denegado
     const fila: Record<string, unknown> = {
       diagnostico: typeof body.diagnostico === 'string' ? body.diagnostico.trim() || null : null,
       receta: typeof body.receta === 'string' ? body.receta.trim() || null : null,
@@ -62,6 +67,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })
   try {
     const acceso = await autorizar(true)
     if ('respuesta' in acceso) return acceso.respuesta

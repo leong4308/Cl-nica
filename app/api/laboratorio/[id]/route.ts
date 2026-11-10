@@ -1,3 +1,5 @@
+import { errorOperacion } from '@/lib/supabase/error-operacion'
+import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
@@ -19,8 +21,10 @@ async function autorizar(idTexto: string) {
   const db = await createClient()
   const { data: { user }, error: authError } = await db.auth.getUser()
   if (authError || !user) return { respuesta: fallo('Inicia sesión para continuar.', 401) } as const
-  const { data: perfil, error: errorPerfil } = await db.from('usuarios').select('rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
+  const { data: perfil, error: errorPerfil } = await db.from('usuarios').select('id, rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
   if (errorPerfil || !perfil?.esta_activo || !['admin', 'medico', 'enfermero'].includes(perfil.rol)) return { respuesta: fallo('No tienes permiso para acceder a los resultados de laboratorio.', 403) } as const
+  const denegado = await autorizarRegistro(db, 'laboratorio', id, perfil)
+  if (denegado) return { respuesta: denegado } as const
   // La consulta y la actualización usan la sesión del usuario y sus políticas RLS.
   const { data: solicitud, error } = await db.from('solicitudes_analisis')
     .select('id, archivo_resultado, estado_analisis, fecha_resultado').eq('id', id).maybeSingle()
@@ -39,6 +43,8 @@ export async function GET(_request: Request, { params }: Contexto) {
     const admin = clienteArchivos()
     const { data, error } = await admin.storage.from(BUCKET_LABORATORIO).createSignedUrl(ruta, 300)
     if (error || !data) return fallo('No se pudo abrir el PDF. Inténtalo de nuevo.', 500)
+    const auditoria = await acceso.db.rpc('clinica_auditar_documento', { p_tipo: 'laboratorio', p_id: acceso.id, p_accion: 'ABRIR_DOCUMENTO', p_nombre: ruta.split('/').pop() })
+    if (auditoria.error) return errorOperacion(auditoria.error)
     const respuesta = NextResponse.redirect(data.signedUrl)
     respuesta.headers.set('Cache-Control', 'private, no-store')
     respuesta.headers.set('Referrer-Policy', 'no-referrer')
@@ -108,9 +114,7 @@ export async function POST(request: Request, { params }: Contexto) {
     }
     // El archivo anterior se conserva hasta que la actualización haya terminado.
     rutaNueva = undefined
-    if (admin && solicitud.archivo_resultado?.startsWith(`${id}/`)) {
-      await admin.storage.from(BUCKET_LABORATORIO).remove([solicitud.archivo_resultado]).catch(() => {})
-    }
+    // El PDF previo permanece privado para que auditoría y respaldos puedan conservar su versión.
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (rutaNueva && admin) await admin.storage.from(BUCKET_LABORATORIO).remove([rutaNueva]).catch(() => {})

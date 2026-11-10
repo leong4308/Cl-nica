@@ -1,7 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 
-const USUARIO = process.env.E2E_USUARIO ?? 'doc@doc.com'
-const CLAVE = process.env.E2E_CLAVE ?? '123456'
+const USUARIO = process.env.E2E_USUARIO ?? ''
+const CLAVE = process.env.E2E_CLAVE ?? ''
+test.skip(!USUARIO || !CLAVE, 'Esta prueba real requiere E2E_USUARIO, E2E_CLAVE y datos de agenda específicos.')
 
 async function entrar(page: Page) {
   await page.goto('/')

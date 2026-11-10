@@ -25,6 +25,7 @@ import { Status } from '@/components/modulos/citas/estado'
 import { FichaImportantePaciente } from './ficha-importante-paciente'
 import { ModalEditarPaciente } from './modal-editar-paciente'
 import { HistorialClinicoPaciente } from './historial-clinico-paciente'
+import { MedicosTratantes } from './medicos-tratantes'
 
 type Tab = 'perfil' | 'importante' | 'historial'
 
@@ -208,6 +209,7 @@ export function ModalPerfilPaciente({
 
           {perfil && tab === 'perfil' && (
             <div className="space-y-3">
+              {rol === 'admin' && <MedicosTratantes pacienteId={pacienteId} />}
               {/* Datos personales */}
               <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">

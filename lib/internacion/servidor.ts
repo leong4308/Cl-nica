@@ -18,7 +18,7 @@ const uno = (relacion: any) => Array.isArray(relacion) ? relacion[0] : relacion
 export function mapearIngreso(fila: any): IngresoHospital {
   return { id: fila.id, pacienteId: fila.paciente_id, paciente: uno(uno(fila.perfiles_pacientes)?.usuarios)?.nombre_completo ?? 'Paciente', medicoId: fila.medico_responsable_id, medico: uno(uno(fila.perfiles_medicos)?.usuarios)?.nombre_completo ?? 'Sin médico', clinicaId: fila.clinica_id, habitacionId: fila.habitacion_id, habitacion: limpiarHabitacion(uno(fila.habitaciones)?.numero ?? ''), tipoHabitacion: uno(fila.habitaciones)?.tipo ?? '', camaId: fila.cama_id, cama: limpiarCama(uno(fila.camas)?.numero ?? ''), ingreso: fila.fecha_ingreso, alta: fila.fecha_alta, estado: fila.estado, motivo: fila.motivo_ingreso ?? '', diagnostico: fila.diagnostico_ingreso ?? '', version: fila.actualizado_en }
 }
-export async function datosHospital(db: SupabaseClient): Promise<DatosHospital> {
+export async function datosHospital(db: SupabaseClient, rol = 'admin'): Promise<DatosHospital> {
   const [ingresos, camas, pacientes, medicos] = await Promise.all([
     db.from('internaciones').select(SELECCION_INGRESO).order('fecha_ingreso', { ascending: false }).limit(1000),
     db.from('camas').select('id,numero,habitacion_id,esta_ocupada,habitaciones(numero,tipo,clinica_id)').order('id'),
@@ -30,7 +30,7 @@ export async function datosHospital(db: SupabaseClient): Promise<DatosHospital> 
   const activas = filas.filter((fila) => fila.estado === 'activa')
   return {
     ingresos: filas,
-    camas: (camas.data ?? []).map((c): CamaHospital => { const actual = activas.find((i) => i.camaId === c.id); const habitacion = uno(c.habitaciones); return { id: c.id, habitacionId: c.habitacion_id, clinicaId: habitacion?.clinica_id, numero: limpiarCama(c.numero), habitacion: limpiarHabitacion(habitacion?.numero ?? ''), tipo: habitacion?.tipo ?? 'General', ocupada: Boolean(actual || c.esta_ocupada), paciente: actual?.paciente ?? null, internacionId: actual?.id ?? null, inconsistente: Boolean(c.esta_ocupada) !== Boolean(actual) } }),
+    camas: (camas.data ?? []).map((c): CamaHospital => { const actual = activas.find((i) => i.camaId === c.id); const habitacion = uno(c.habitaciones); return { id: c.id, habitacionId: c.habitacion_id, clinicaId: habitacion?.clinica_id, numero: limpiarCama(c.numero), habitacion: limpiarHabitacion(habitacion?.numero ?? ''), tipo: habitacion?.tipo ?? 'General', ocupada: Boolean(actual || c.esta_ocupada), paciente: actual?.paciente ?? null, internacionId: actual?.id ?? null, inconsistente: rol !== 'medico' && Boolean(c.esta_ocupada) !== Boolean(actual) } }),
     pacientes: (pacientes.data ?? []).filter((p) => uno(p.usuarios)?.esta_activo !== false).map((p) => ({ id: p.id, nombre: uno(p.usuarios)?.nombre_completo ?? 'Paciente', ingresoActivo: activas.some((i) => i.pacienteId === p.id) })),
     medicos: (medicos.data ?? []).filter((m) => uno(m.usuarios)?.esta_activo !== false).map((m) => ({ id: m.id, nombre: uno(m.usuarios)?.nombre_completo ?? 'Médico', especialidad: m.especialidad, clinicaId: m.clinica_id })),
   }

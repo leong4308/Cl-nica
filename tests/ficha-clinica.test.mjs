@@ -9,7 +9,7 @@ function cargar(ruta, dependencias = {}) {
   const source = readFileSync(new URL(ruta, import.meta.url), 'utf8')
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  new Function('require', 'exports', js)((id) => dependencias[id] ?? require(id), exports)
+  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : dependencias[id] ?? require(id), exports)
   return exports
 }
 const ficha = cargar('../lib/pacientes/ficha-clinica.ts')

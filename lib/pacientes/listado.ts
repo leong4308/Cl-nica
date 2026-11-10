@@ -21,11 +21,15 @@ export async function pacientesDelMedico(db: SupabaseClient, usuarioId: number):
   const { data: medico, error } = await db.from('perfiles_medicos').select('id,usuarios(nombre_completo)').eq('usuario_id', usuarioId).eq('esta_activo', true).maybeSingle()
   if (error) throw Error('No se pudo verificar el perfil del médico.')
   if (!medico) return { ids: [], nombre: '' }
-  const [citas, internaciones] = await Promise.all([
+  const [citas, internaciones, asignaciones] = await Promise.all([
     todasLasFilas((desde, hasta) => db.from('citas').select('id,paciente_id').eq('medico_id', medico.id).in('estado', ['pendiente', 'confirmada', 'atendida']).order('id').range(desde, hasta)),
     todasLasFilas((desde, hasta) => db.from('internaciones').select('id,paciente_id').eq('medico_responsable_id', medico.id).order('id').range(desde, hasta)),
+    db.from('paciente_medicos').select('paciente_id,activo').eq('medico_id', medico.id),
   ])
-  return { ids: [...new Set([...citas, ...internaciones].map((r) => Number(r.paciente_id)))].filter((id) => Number.isSafeInteger(id) && id > 0), nombre: uno(medico.usuarios)?.nombre_completo ?? 'Médico tratante' }
+  if (asignaciones.error && asignaciones.error.code !== 'PGRST205') throw Error('No se pudieron verificar los médicos tratantes.')
+  const ids = new Set<number>([...citas, ...internaciones].map(r => Number(r.paciente_id)))
+  for (const a of asignaciones.data ?? []) { if (a.activo) ids.add(a.paciente_id); else ids.delete(a.paciente_id) }
+  return { ids: [...ids].filter((id) => Number.isSafeInteger(id) && id > 0), nombre: uno(medico.usuarios)?.nombre_completo ?? 'Médico tratante' }
 }
 
 export async function listarPacientes(db: SupabaseClient, solicitante: Solicitante): Promise<PacienteListado[]> {

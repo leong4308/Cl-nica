@@ -33,6 +33,7 @@ for (const cuenta of cuentas) {
       const anterior = comprobar(await db.from('usuarios').select('id').eq('correo', cuenta.correo).maybeSingle(), 'Verificar correo')
       if (anterior) throw Error(`El correo ${cuenta.correo} ya tiene un perfil sin cuenta de acceso. Revisa su vínculo antes de crear otro.`)
       const data = comprobar(await db.auth.admin.createUser({ email: cuenta.correo, password: clave, email_confirm: true, user_metadata: { nombre_completo: cuenta.nombre, rol: cuenta.rol } }), 'Crear cuenta')
+      comprobar(await db.from('usuarios').update({ rol: cuenta.rol }).eq('auth_user_id', data.user.id), 'Asignar rol a la cuenta recién creada')
       auth = data.user
       creado = true
     }

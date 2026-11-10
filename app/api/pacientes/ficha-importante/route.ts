@@ -1,3 +1,4 @@
+import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    const { data: solicitante } = await sessionClient.from('usuarios').select('rol, esta_activo, nombre_completo').eq('auth_user_id', user.id).maybeSingle()
+    const { data: solicitante } = await sessionClient.from('usuarios').select('id, rol, esta_activo, nombre_completo').eq('auth_user_id', user.id).maybeSingle()
     if (!solicitante?.esta_activo || !['admin', 'medico', 'enfermero', 'recepcionista'].includes(solicitante.rol)) return NextResponse.json({ error: 'No tienes permiso para modificar esta ficha.' }, { status: 403 })
 
     const body = await request.json()
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
     if (!Number.isSafeInteger(pacienteId) || pacienteId <= 0) {
       return NextResponse.json({ error: 'ID de paciente inválido' }, { status: 400 })
     }
+    const denegado = await autorizarRegistro(sessionClient, 'pacientes', pacienteId, solicitante)
+    if (denegado) return denegado
     const { data: paciente } = await sessionClient.from('perfiles_pacientes').select('id, notas_medicas').eq('id', pacienteId).maybeSingle()
     if (!paciente) return NextResponse.json({ error: 'Paciente no encontrado o sin acceso.' }, { status: 404 })
 
@@ -57,6 +60,7 @@ export async function POST(request: Request) {
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { 'x-clinica-actor': user.id } },
     })
 
     const payloadTexto = JSON.stringify(ficha)

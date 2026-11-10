@@ -1,3 +1,4 @@
+import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { NextResponse } from 'next/server'
 import { accesoHospital, idHospital, mapearIngreso, operarHospital, respuestaErrorHospital, SELECCION_INGRESO } from '@/lib/internacion/servidor'
 import { modificarIngreso } from '@/lib/internacion/operaciones'
@@ -26,11 +27,7 @@ export async function PATCH(request: Request, contexto: Contexto) {
     if ('respuesta' in acceso) return acceso.respuesta
     const id = idHospital((await contexto.params).id), body = await request.json()
     if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Revisa los datos del ingreso.' }, { status: 400 })
-    return await operarHospital(async () => {
-      const { data, error } = await acceso.db.from('internaciones').select(SELECCION_INGRESO).eq('id', id).maybeSingle()
-      if (error) throw Error('No se pudo consultar el ingreso.')
-      if (!data) return NextResponse.json({ error: 'Ingreso no encontrado o sin acceso.' }, { status: 404 })
-      return NextResponse.json(await modificarIngreso(acceso.admin, data, body, acceso.usuario))
-    })
+    const r = await acceso.db.rpc('clinica_hospital', { p_id: id, p_datos: body })
+    return r.error ? errorOperacion(r.error) : NextResponse.json(r.data)
   } catch (error) { return respuestaErrorHospital(error) }
 }

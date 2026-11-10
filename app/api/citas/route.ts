@@ -1,3 +1,4 @@
+import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { NextResponse } from 'next/server'
 import { accesoAgenda, configuracionMedico, ErrorAgenda, errorAgenda, idAgenda, medicoAgenda, operarCitas, uno } from '@/lib/agenda/servidor'
 import { instanteClinica, intervaloDescanso, ocupaAgenda, resumirAgenda, seCruzan, sumarDias } from '@/lib/agenda/modelo'
@@ -28,9 +29,9 @@ export async function POST(request: Request) {
       if (choque) throw new ErrorAgenda(choque.medico_id === medicoId ? 'El médico ya tiene una cita en ese intervalo. Actualiza los horarios.' : 'El paciente ya tiene otra cita que coincide con ese intervalo.', 409)
       if (config.descansos.some((d) => seCruzan(intervaloDescanso(d), { inicio, fin }))) throw new ErrorAgenda('El médico tiene un descanso asignado en ese intervalo. Selecciona otra hora.', 409)
       if (config.bloques.length && !resumirAgenda(config.bloques, [], body.fecha, duracion).dias[0].slots.some((s) => s.inicio === inicio)) throw new ErrorAgenda('El intervalo no corresponde al horario configurado del médico.', 409)
-      const { data, error } = await acceso.admin.from('citas').insert({ medico_id: medicoId, paciente_id: pacienteId, clinica_id: medico.clinica_id, inicio, fin, motivo, estado: 'pendiente' }).select('id').single()
-      if (error || !data) { if (error?.code === '23P01') throw new ErrorAgenda('Ese horario acaba de ocuparse. Selecciona otro.', 409); throw Error('No se pudo guardar la cita. Vuelve a intentarlo.') }
-      return NextResponse.json({ id: data.id, inicio, fin })
+      const { data, error } = await acceso.db.rpc('clinica_crear_cita', { p_paciente: pacienteId, p_medico: medicoId, p_inicio: inicio, p_motivo: motivo })
+      if (error) return errorOperacion(error)
+      return NextResponse.json(data)
     })
   } catch (err) { return errorAgenda(err) }
 }

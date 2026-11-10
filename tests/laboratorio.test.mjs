@@ -9,7 +9,7 @@ function cargar(ruta, dependencias = {}) {
   const source = readFileSync(new URL(ruta, import.meta.url), 'utf8')
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  new Function('require', 'exports', js)((id) => dependencias[id] ?? require(id), exports)
+  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : dependencias[id] ?? require(id), exports)
   return exports
 }
 const pdf = cargar('../lib/laboratorio/archivo-pdf.ts')
@@ -27,6 +27,7 @@ function escenario(opciones = {}) {
   const registro = { id: 15, archivo_resultado: '15/anterior.pdf', estado_analisis: 'completado', fecha_resultado: '2026-11-09T12:00:00+00:00', ...opciones.registro }
   const llamadas = { actualizaciones: [], subidas: [], eliminados: [], firmas: [] }
   const db = {
+    rpc: async () => ({ data: null, error: null }),
     auth: { getUser: async () => ({ data: { user: opciones.sinSesion ? null : { id: 'usuario-prueba' } }, error: null }) },
     from(tabla) {
       let cambios
@@ -97,12 +98,12 @@ test('editar texto conserva el PDF existente', async () => {
   assert.equal('archivo_resultado' in e.llamadas.actualizaciones[0], false)
   assert.deepEqual(e.llamadas.eliminados, [])
 })
-test('el reemplazo sube el PDF nuevo, actualiza la referencia y después elimina el anterior', async () => {
+test('el reemplazo actualiza la referencia y conserva el PDF anterior privado para auditoría y respaldos', async () => {
   const e = escenario()
   assert.equal((await e.guardar({}, archivo())).status, 200)
   assert.match(e.llamadas.subidas[0], /^15\/.+reporte.pdf$/)
   assert.equal(e.llamadas.actualizaciones[0].archivo_resultado, e.llamadas.subidas[0])
-  assert.deepEqual(e.llamadas.eliminados, ['15/anterior.pdf'])
+  assert.deepEqual(e.llamadas.eliminados, [])
 })
 test('si falla la actualización elimina solo el PDF nuevo y conserva el anterior', async () => {
   const e = escenario({ sinPermisoActualizar: true })

@@ -1,9 +1,11 @@
-# Directorio de pacientes por médico
+# Pacientes y médicos tratantes
 
-El listado y el buscador de pacientes usan `GET /api/pacientes`. El servidor verifica la sesión y el rol en `usuarios`; no acepta un identificador de médico enviado por el navegador.
+El listado y el buscador usan GET /api/pacientes. La cuenta y el rol se verifican en el servidor; no se acepta un médico elegido por el navegador para ampliar el acceso.
 
-Para médicos, el vínculo se obtiene de sus citas pendientes, confirmadas o atendidas y de las internaciones en las que figura como responsable, incluyendo las altas para conservar el seguimiento. Se agrupan los pacientes sin duplicados. Una cita cancelada o una inasistencia por sí sola no establece el vínculo. Un paciente atendido por varios médicos aparece en sus respectivas listas.
+Después de instalar las migraciones 018 y 019, las políticas RLS protegen el acceso directo a pacientes, citas, expedientes, órdenes, laboratorio y usuarios relacionados. Las rutas que generan enlaces de documentos verifican adicionalmente el paciente antes de usar el almacenamiento de servicio.
 
-Administración, recepción y enfermería conservan el directorio general. Un médico sin perfil activo o sin pacientes vinculados obtiene una lista vacía. Un fallo de consulta devuelve un error, sin usar el directorio general como alternativa. Los pacientes recién registrados sin citas ni internaciones permanecen en el directorio general hasta que exista esa relación.
+La relación inicial se obtiene de citas pendientes, confirmadas o atendidas y de internaciones como responsable. Administración puede elegir un médico principal y colaboradores desde el perfil del paciente, justificar transferencias y revocar accesos. Una revocación explícita prevalece sobre la historia anterior. Se exige resolver citas futuras e internaciones activas antes de retirar al médico responsable. Cada cambio verifica una versión y se registra en auditoría.
 
-Este cambio filtra el directorio de la aplicación; no sustituye las políticas RLS de Supabase de los demás módulos.
+El registro de un paciente por un médico crea su vínculo en la misma transacción. Los registros de recepción sin médico quedan en el directorio general. Un paciente compartido aparece en las listas de sus médicos. Un perfil médico inexistente o sin pacientes produce una lista vacía, no el directorio completo.
+
+Instalación: README raíz. Antes de aplicar las migraciones, el listado puede derivar relaciones históricas; eso no sustituye la actualización de permisos en Supabase.

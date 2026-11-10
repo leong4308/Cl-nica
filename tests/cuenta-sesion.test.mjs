@@ -9,7 +9,7 @@ function cargar(ruta, dependencias = {}) {
   const source = readFileSync(new URL(ruta, import.meta.url), 'utf8')
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  new Function('require', 'exports', js)((id) => dependencias[id] ?? require(id), exports)
+  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : dependencias[id] ?? require(id), exports)
   return exports
 }
 const preferencias = cargar('../lib/cuenta/preferencias.ts')
@@ -104,7 +104,7 @@ test('la verificación adicional de contraseña se comunica sin guardar ni revel
 function paciente({ rol = 'medico', sinSesion = false, fallaPerfil = false } = {}) {
   const escrituras = []
   const original = { id: 7, usuario_id: 70, fecha_nacimiento: '1990-01-01', genero: 'F', nombre_contacto_emergencia: null, telefono_emergencia: null, usuarios: { nombre_completo: 'Paciente', correo: 'paciente@example.test', telefono: '5555555555' } }
-  const db = { auth: { getUser: async () => ({ data: { user: sinSesion ? null : { id: 'actual' } } }) }, from(tabla) { const q = { select() { return q }, eq() { return q }, async maybeSingle() { return { data: tabla === 'usuarios' ? { rol, esta_activo: true } : original, error: null } } }; return q } }
+  const db = { rpc: async (operacion, datos) => { escrituras.push({ operacion, datos }); return fallaPerfil ? { data: null, error: { code: '40001', message: 'El paciente cambió' } } : { data: { ok: true }, error: null } }, auth: { getUser: async () => ({ data: { user: sinSesion ? null : { id: 'actual' } } }) }, from(tabla) { const q = { select() { return q }, eq() { return q }, async maybeSingle() { return { data: tabla === 'usuarios' ? { rol, esta_activo: true } : original, error: null } } }; return q } }
   const admin = { from(tabla) { let cambios; const q = { update(payload) { cambios = payload; escrituras.push({ tabla, payload }); return q }, eq() { return q }, is() { return q }, select() { return q }, async maybeSingle() { return { data: fallaPerfil && tabla === 'perfiles_pacientes' ? null : { id: 7 }, error: null } }, then(resolver) { return Promise.resolve({ error: null }).then(resolver) } }; return q } }
   const api = cargar('../app/api/pacientes/[id]/route.ts', { '@/lib/supabase/server': { createClient: async () => db }, '@supabase/supabase-js': { createClient: () => admin }, '@/lib/cuenta/validacion': validacion })
   const contexto = { params: Promise.resolve({ id: '7' }) }
@@ -116,16 +116,16 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'clave-de-prueba'
 test('editar paciente actualiza el registro elegido sin cambiar correo, rol ni notas médicas', async () => {
   const e = paciente()
   assert.equal((await e.guardar()).status, 200)
-  assert.deepEqual(e.escrituras.map((e) => e.tabla), ['usuarios', 'perfiles_pacientes'])
-  assert.deepEqual(Object.keys(e.escrituras[0].payload).sort(), ['nombre_completo', 'telefono'])
-  assert.deepEqual(Object.keys(e.escrituras[1].payload).sort(), ['fecha_nacimiento', 'genero', 'nombre_contacto_emergencia', 'telefono_emergencia'])
+  assert.deepEqual(e.escrituras.map((e) => e.operacion), ['clinica_actualizar_paciente'])
+  assert.equal(e.escrituras[0].datos.p_paciente, 7)
+  assert.deepEqual(Object.keys(e.escrituras[0].datos.p_datos).sort(), ['contactoEmergencia','fechaNacimiento','genero','nombre','telefono','telefonoEmergencia'])
 })
 test('edición de pacientes exige sesión y rol clínico', async () => {
   assert.equal((await paciente({ sinSesion: true }).guardar()).status, 401)
   assert.equal((await paciente({ rol: 'paciente' }).guardar()).status, 403)
 })
-test('si falla el perfil de paciente revierte el cambio de contacto', async () => {
+test('un conflicto de la transacción del paciente se comunica sin simular éxito', async () => {
   const e = paciente({ fallaPerfil: true })
-  assert.equal((await e.guardar()).status, 500)
-  assert.deepEqual(e.escrituras.at(-1), { tabla: 'usuarios', payload: { nombre_completo: 'Paciente', telefono: '5555555555' } })
+  assert.equal((await e.guardar()).status, 409)
+  assert.equal(e.escrituras.length, 1)
 })
