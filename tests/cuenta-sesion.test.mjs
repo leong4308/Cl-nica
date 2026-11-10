@@ -14,10 +14,19 @@ function cargar(ruta, dependencias = {}) {
 }
 const preferencias = cargar('../lib/cuenta/preferencias.ts')
 const validacion = cargar('../lib/cuenta/validacion.ts')
+const navegacion = cargar('../components/modulos/barra-lateral/navegacion/items-menu.ts')
+
+test('Mi Consulta es exclusiva de administración y el médico inicia en Citas', () => {
+  for (const rol of ['admin', 'medico', 'enfermero', 'recepcionista', 'paciente']) {
+    assert.equal(navegacion.obtenerNavItemsPorRol(rol).some((item) => item.label === 'Mi Consulta'), rol === 'admin')
+  }
+  assert.equal(navegacion.obtenerItemDefaultPorRol('medico'), 'Citas')
+})
 
 test('preferencias no permiten abrir páginas ajenas al rol', () => {
   assert.equal(preferencias.normalizarPreferencias({ paginaInicio: 'Mi Consulta' }, 'recepcionista').paginaInicio, 'Predeterminada')
-  assert.equal(preferencias.normalizarPreferencias({ paginaInicio: 'Mi Consulta' }, 'medico').paginaInicio, 'Mi Consulta')
+  assert.equal(preferencias.normalizarPreferencias({ paginaInicio: 'Mi Consulta' }, 'medico').paginaInicio, 'Predeterminada')
+  assert.equal(preferencias.normalizarPreferencias({ paginaInicio: 'Mi Consulta' }, 'admin').paginaInicio, 'Mi Consulta')
   assert.equal(preferencias.normalizarPreferencias({ textoGrande: 'true' }, 'admin').textoGrande, false)
 })
 test('valida teléfonos, nombres y fechas de nacimiento reales', () => {

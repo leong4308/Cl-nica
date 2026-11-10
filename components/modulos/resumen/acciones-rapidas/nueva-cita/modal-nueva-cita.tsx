@@ -1,204 +1,31 @@
 'use client'
-
 import { useEffect, useState } from 'react'
-import {
-  cargarClinicaActiva,
-  cargarDisponibilidad,
-  cargarMedicosAgenda,
-  cargarPacientesParaCita,
-  crearCita,
-  type DiaDisponible,
-  type MedicoAgenda,
-} from '@/lib/supabase/datos'
-import { actualizarAgendaEnCache, leerCacheCita, ocuparSlotEnCache } from '@/lib/supabase/cache-cita'
+import { CalendarDays, Clock3, Loader2, Stethoscope } from 'lucide-react'
+import { cargarMedicosAgenda, cargarPacientesParaCita, crearCita, type MedicoAgenda } from '@/lib/supabase/datos'
+import { fechaClinica, horaClinica, leerAgendaMedico, type ResumenAgenda } from '@/lib/agenda/modelo'
 import { ModalMarco } from '../../../compartidos/modal-marco'
-import { BotonCancelarCita } from './cancelar-cita/boton-cancelar-cita'
-import { BotonGuardarCita } from './guardar-cita/boton-guardar-cita'
+import { AvisoClinico, BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO_CLINICO, ETIQUETA_CLINICA, PanelClinico } from '../../../compartidos/editor-clinico'
 import { BuscadorPacienteCita } from './buscador-paciente-cita'
-import { SelectorCita } from './selector-cita'
-
-type PropsModalNuevaCita = {
-  onClose: () => void
-  onSave: (value: string) => void
-}
-
-export function ModalNuevaCita({ onClose, onSave }: PropsModalNuevaCita) {
-  const cacheInicial = leerCacheCita()
-  const medicoInicial = cacheInicial?.medicos[0]?.id ?? null
-  const agendaInicial =
-    medicoInicial !== null ? cacheInicial?.agendas[medicoInicial] : undefined
-
-  const [medicos, setMedicos] = useState<MedicoAgenda[]>(cacheInicial?.medicos ?? [])
-  const [pacientesCita, setPacientesCita] = useState<{ id: number; nombre: string }[]>(cacheInicial?.pacientes ?? [])
-  const [clinicaId, setClinicaId] = useState<number | null>(cacheInicial?.clinicaId ?? null)
-  const [medicoId, setMedicoId] = useState<number | null>(medicoInicial)
-  const [pacienteId, setPacienteId] = useState<number | null>(null)
-  const [disponibilidad, setDisponibilidad] = useState<DiaDisponible[]>(agendaInicial?.filas ?? [])
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(agendaInicial?.filas[0]?.fecha ?? '')
-  const [horarioSeleccionado, setHorarioSeleccionado] = useState('')
-  const [citaError, setCitaError] = useState('')
-  const [cargandoCita, setCargandoCita] = useState(!cacheInicial)
-  const [cargandoAgenda, setCargandoAgenda] = useState(false)
-  const [citaLista, setCitaLista] = useState(cacheInicial !== null)
-  const [guardandoCita, setGuardandoCita] = useState(false)
-
-  useEffect(() => {
-    if (cacheInicial) return
-    let vigente = true
-    setCargandoCita(true)
-    Promise.all([cargarMedicosAgenda(), cargarPacientesParaCita(), cargarClinicaActiva()])
-      .then(([medicosResult, pacientesResult, clinica]) => {
-        if (!vigente) return
-        setMedicos(medicosResult.filas)
-        setPacientesCita(pacientesResult.filas)
-        setClinicaId(clinica)
-        setMedicoId((anterior) => anterior ?? medicosResult.filas[0]?.id ?? null)
-        setCitaError(medicosResult.error ?? '')
-        setCargandoCita(false)
-        if (medicosResult.filas.length === 0) setCitaLista(true)
-      })
-    return () => { vigente = false }
-  }, [cacheInicial])
-
-  const cambiarMedico = (nuevoId: number) => {
-    setMedicoId(nuevoId)
-    setHorarioSeleccionado('')
-
-    const guardada = leerCacheCita()?.agendas[nuevoId]
-    if (guardada) {
-      setDisponibilidad(guardada.filas)
-      setFechaSeleccionada(guardada.filas[0]?.fecha ?? '')
-      setCitaError(guardada.error ?? '')
-      setCargandoAgenda(false)
-      setCitaLista(true)
-      return
-    }
-
-    const medico = medicos.find((m) => m.id === nuevoId)
-    setCargandoAgenda(true)
-    cargarDisponibilidad(nuevoId, medico?.duracionConsulta ?? 20).then((resultado) => {
-      setDisponibilidad(resultado.filas)
-      setFechaSeleccionada(resultado.filas[0]?.fecha ?? '')
-      setCitaError(resultado.error ?? '')
-      setCargandoAgenda(false)
-      setCitaLista(true)
-    })
+export function ModalNuevaCita({ onClose, onSave, medicoIdInicial }: { onClose: () => void; onSave: (value: string) => void; medicoIdInicial?: number }) {
+  const [medicos, setMedicos] = useState<MedicoAgenda[]>([]), [pacientes, setPacientes] = useState<{ id: number; nombre: string }[]>([])
+  const [medicoId, setMedicoId] = useState(medicoIdInicial ?? 0), [pacienteId, setPacienteId] = useState(0)
+  const [fecha, setFecha] = useState(fechaClinica()), [hora, setHora] = useState(''), [motivo, setMotivo] = useState('')
+  const [agenda, setAgenda] = useState<ResumenAgenda | null>(null), [cargando, setCargando] = useState(true), [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null), [errorAgenda, setErrorAgenda] = useState<string | null>(null), [revision, setRevision] = useState(0), [cargandoAgenda, setCargandoAgenda] = useState(true)
+  useEffect(() => { let vigente = true; Promise.all([cargarMedicosAgenda(), cargarPacientesParaCita()]).then(([m, p]) => { if (!vigente) return; setMedicos(m.filas); setPacientes(p.filas); setMedicoId((id) => m.filas.some((v) => v.id === id) ? id : m.filas[0]?.id ?? 0); setError(m.error || p.error); setCargando(false) }).catch(() => { if (vigente) { setError('No se pudieron cargar médicos y pacientes.'); setCargando(false) } }); return () => { vigente = false } }, [])
+  useEffect(() => { let vigente = true; setHora(''); setAgenda(null); setErrorAgenda(null); if (!medicoId) { setCargandoAgenda(false); return }; setCargandoAgenda(true); leerAgendaMedico(medicoId, fecha).then((a) => { if (vigente) setAgenda(a) }).catch((err) => { if (vigente) setErrorAgenda(err.message) }).finally(() => { if (vigente) setCargandoAgenda(false) }); return () => { vigente = false } }, [medicoId, fecha, revision])
+  const medico = medicos.find((m) => m.id === medicoId), slots = agenda?.dias[0]?.slots ?? []
+  const seleccionado = slots.find((s) => new Date(s.inicio).toLocaleTimeString('en-GB', { timeZone: 'America/Mexico_City', hour12: false, hour: '2-digit', minute: '2-digit' }) === hora)
+  async function guardar(e?: React.FormEvent) {
+    e?.preventDefault(); if (guardando || cargandoAgenda || !agenda || !pacienteId || !medico || !hora || !motivo.trim()) return
+    setGuardando(true); setError(null)
+    const r = await crearCita({ pacienteId, medicoId, clinicaId: medico.clinicaId ?? 0, duracionConsulta: medico.duracionConsulta, fecha, hora, motivo })
+    setGuardando(false)
+    if (r.error) { setError(r.error); setRevision((v) => v + 1); return }
+    window.dispatchEvent(new Event('datos-actualizados')); onSave(`Cita #${r.id} agendada con ${medico.nombre}`); onClose()
   }
-
-  useEffect(() => {
-    if (medicoId === null) return
-    if (leerCacheCita()?.agendas[medicoId]) return
-    let vigente = true
-    setCargandoAgenda(true)
-    const medico = medicos.find((m) => m.id === medicoId)
-    cargarDisponibilidad(medicoId, medico?.duracionConsulta ?? 20).then((resultado) => {
-      if (!vigente) return
-      setDisponibilidad(resultado.filas)
-      setFechaSeleccionada(resultado.filas[0]?.fecha ?? '')
-      setCitaError(resultado.error ?? '')
-      setCargandoAgenda(false)
-      setCitaLista(true)
-    })
-    return () => { vigente = false }
-  }, [medicoId, medicos])
-
-  const medicoSeleccionado = medicos.find((m) => m.id === medicoId) ?? null
-  const puedeGuardarCita =
-    !cargandoCita && !cargandoAgenda && !guardandoCita &&
-    pacienteId !== null && medicoId !== null && clinicaId !== null &&
-    fechaSeleccionada !== '' && horarioSeleccionado !== ''
-
-  async function confirmarCita() {
-    if (!puedeGuardarCita || medicoId === null || clinicaId === null || pacienteId === null || !medicoSeleccionado) return
-    setGuardandoCita(true)
-    setCitaError('')
-    const resultado = await crearCita({
-      pacienteId,
-      medicoId,
-      clinicaId,
-      fecha: fechaSeleccionada,
-      hora: horarioSeleccionado,
-      motivo: 'Consulta general',
-      duracionConsulta: medicoSeleccionado.duracionConsulta,
-    })
-    setGuardandoCita(false)
-    if (resultado.error) {
-      setCitaError(resultado.error)
-      return
-    }
-
-    ocuparSlotEnCache(medicoId, fechaSeleccionada, horarioSeleccionado)
-    setDisponibilidad((prev) =>
-      prev
-        .map((dia) =>
-          dia.fecha === fechaSeleccionada
-            ? { ...dia, slots: dia.slots.filter((s) => s !== horarioSeleccionado) }
-            : dia,
-        )
-        .filter((dia) => dia.slots.length > 0),
-    )
-
-    window.dispatchEvent(new CustomEvent('datos-actualizados'))
-
-    onSave(`Cita #${resultado.id} · ${medicoSeleccionado.nombre} · ${fechaSeleccionada} · ${horarioSeleccionado}`)
-
-    void cargarDisponibilidad(medicoId, medicoSeleccionado.duracionConsulta).then((frescos) => {
-      actualizarAgendaEnCache(medicoId, frescos.filas, frescos.error)
-    })
-  }
-
-  if (!citaLista) return null
-
-  return (
-    <ModalMarco
-      title="Nueva cita"
-      onClose={onClose}
-      footer={
-        <div className="mt-6 flex justify-end gap-2">
-          <BotonCancelarCita deshabilitado={guardandoCita} onCancelar={onClose} />
-          <BotonGuardarCita deshabilitado={!puedeGuardarCita} guardando={guardandoCita} onGuardar={confirmarCita} />
-        </div>
-      }
-      aviso={
-        !guardandoCita && !puedeGuardarCita ? (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-            {pacienteId === null
-              ? 'Falta elegir al paciente.'
-              : medicoId === null
-                ? 'Falta elegir al médico.'
-                : 'Falta elegir la fecha y la hora.'}
-          </p>
-        ) : null
-      }
-    >
-      {!cargandoCita && (
-        <BuscadorPacienteCita
-          pacientes={pacientesCita}
-          seleccionadoId={pacienteId}
-          onSeleccionar={(id) => setPacienteId(id === 0 ? null : id)}
-          onPacienteCreado={(nuevo) => setPacientesCita((prev) => [...prev, nuevo])}
-        />
-      )}
-
-      {!cargandoCita && (
-        <SelectorCita
-          cargando={cargandoCita}
-          cargandoAgenda={cargandoAgenda}
-          medicos={medicos}
-          medicoId={medicoId}
-          onMedico={cambiarMedico}
-          dias={disponibilidad}
-          diaActual={disponibilidad.find((d) => d.fecha === fechaSeleccionada) ?? null}
-          fecha={fechaSeleccionada}
-          onFecha={(f) => {
-            setFechaSeleccionada(f)
-            setHorarioSeleccionado('')
-          }}
-          horario={horarioSeleccionado}
-          onHorario={setHorarioSeleccionado}
-          error={citaError}
-        />
-      )}
-    </ModalMarco>
-  )
+  return <ModalMarco title="Nueva cita" ancho="max-w-4xl" contenidoFijo onClose={() => { if (!guardando) onClose() }} footer={<div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">La disponibilidad se verifica de nuevo al guardar.</p><div className="flex gap-3"><button type="button" className={BOTON_SECUNDARIO} disabled={guardando} onClick={onClose}>Cancelar</button><button type="button" onClick={() => void guardar()} className={BOTON_PRIMARIO} disabled={guardando || cargando || cargandoAgenda || !agenda || !pacienteId || !hora || !motivo.trim()}>{guardando && <Loader2 size={16} className="animate-spin" />}{guardando ? 'Agendando...' : 'Agendar cita'}</button></div></div>}>
+    <p className="mb-5 text-sm text-slate-500">Un médico puede atender múltiples citas. Selecciona al paciente, al médico y un intervalo sin cruces.</p><AvisoClinico mensaje={error} />
+    {cargando ? <p role="status" className="py-12 text-center text-slate-500">Cargando pacientes y médicos...</p> : <div><fieldset disabled={guardando} className="grid min-w-0 gap-5 md:grid-cols-2"><div className="min-w-0 space-y-5"><PanelClinico icon={Stethoscope} titulo="Paciente y médico"><div className="space-y-4"><BuscadorPacienteCita pacientes={pacientes} seleccionadoId={pacienteId || null} onSeleccionar={setPacienteId} onPacienteCreado={(p) => setPacientes((prev) => [...prev, p])} /><label className={ETIQUETA_CLINICA}>Médico y especialidad<select aria-label="Médico y especialidad" className={CAMPO_CLINICO} value={medicoId} onChange={(e) => { setHora(''); setMedicoId(Number(e.target.value)) }}>{!medicos.length && <option value="0">No hay médicos activos</option>}{medicos.map((m) => <option key={m.id} value={m.id}>{m.nombre} · {m.especialidad}</option>)}</select></label><p className="text-xs text-slate-500">Duración configurada: {medico?.duracionConsulta ?? '—'} minutos. Horario de Ciudad de México.</p></div></PanelClinico><label className={ETIQUETA_CLINICA}>Motivo de la cita<textarea required maxLength={2000} rows={3} className={CAMPO_CLINICO} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Describe el motivo de la consulta..." /></label></div><PanelClinico icon={CalendarDays} titulo="Fecha y horario" ayuda="Se consultan las citas del médico seleccionado."><label className={ETIQUETA_CLINICA}>Fecha de la cita<input required type="date" min={fechaClinica()} className={CAMPO_CLINICO} value={fecha} onChange={(e) => { setHora(''); setFecha(e.target.value || fechaClinica()) }} /></label><AvisoClinico mensaje={errorAgenda} />{errorAgenda && <button type="button" className={BOTON_SECUNDARIO} onClick={() => setRevision((v) => v + 1)}>Reintentar consulta de agenda</button>}{cargandoAgenda ? <p role="status" className="mt-5 text-sm text-slate-500">Verificando agenda...</p> : agenda?.configurado ? <><p className="mt-5 text-xs font-semibold text-slate-600">Intervalos disponibles ({slots.length})</p><div className="mt-3 grid max-h-72 grid-cols-2 gap-2 overflow-y-auto">{slots.map((s) => { const h = new Date(s.inicio).toLocaleTimeString('en-GB', { timeZone: 'America/Mexico_City', hour12: false, hour: '2-digit', minute: '2-digit' }); return <button type="button" key={s.inicio} aria-pressed={hora === h} onClick={() => setHora(h)} className={'rounded-xl border px-2 py-3 text-xs font-medium ' + (hora === h ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 hover:bg-blue-50')}>{s.hora} – {s.finHora}</button> })}</div>{!slots.length && <p className="mt-4 text-sm text-slate-500">No hay intervalos disponibles en esta fecha. Elige otro día.</p>}</> : agenda && <div className="mt-5 space-y-4"><p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">El médico aún no tiene horario publicado. Puedes proponer una hora; se verificará que no coincida con otra cita. Administración puede configurar su jornada desde Médicos.</p><label className={ETIQUETA_CLINICA}>Hora de la cita<input required type="time" className={CAMPO_CLINICO} value={hora} onChange={(e) => setHora(e.target.value)} /></label></div>}{agenda?.descansos?.filter((d) => d.fecha === fecha).map((d, i) => <p key={i} className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Descanso del médico: {d.inicio} – {d.fin}</p>)}{hora && <p className="mt-4 flex items-center gap-2 rounded-xl bg-blue-50 p-3 text-xs text-blue-900"><Clock3 size={16} />{fecha} · {seleccionado ? `${seleccionado.hora} – ${seleccionado.finHora}` : `${hora} · ${medico?.duracionConsulta} min`}</p>}</PanelClinico></fieldset></div>}
+  </ModalMarco>
 }

@@ -189,25 +189,6 @@ export function AgendaDia({
         </div>
       </div>
 
-      {/* Widget Ocupación del Consultorio */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
-            <Activity size={15} className="text-blue-600" />
-            Ocupación del Consultorio
-          </span>
-          <span className="font-mono text-xs font-bold text-blue-600">87% Hoy</span>
-        </div>
-
-        <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600" style={{ width: '87%' }} />
-        </div>
-
-        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-          <span>Tiempo prom. consulta: <strong className="font-semibold text-slate-700">22 min</strong></span>
-          <span>Próxima cita libre: <strong className="font-semibold text-emerald-600">Mañana 10:15 AM</strong></span>
-        </div>
-      </div>
     </div>
   )
 }

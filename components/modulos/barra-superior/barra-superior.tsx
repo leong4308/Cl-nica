@@ -72,21 +72,21 @@ export function BarraSuperior({
 
   return (
     <>
-    <header className="flex h-[82px] items-center justify-between border-b border-slate-200 bg-white px-5 sm:px-9">
+    <header className="flex h-[82px] items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 sm:px-9">
       {/* Lado izquierdo: Menú móvil y saludo */}
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         <BotonAbrirMenu onAbrir={onAbrirMenu} />
-        <div>
-          <p className="text-[11px] text-slate-400">{fechaEncabezado(ahora)}</p>
-          <h1 className="text-[21px] font-bold tracking-tight">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] text-slate-400 sm:text-[11px]">{fechaEncabezado(ahora)}</p>
+          <h1 className="truncate text-base font-bold tracking-tight sm:text-[21px]">
             {saludoEncabezado(ahora)}, {usuario.nombre.split(' ')[0]}
           </h1>
         </div>
       </div>
 
       {/* Centro / Derecha: Rol y Acciones */}
-      <div className="flex items-center gap-3.5">
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs">
+      <div className="flex shrink-0 items-center gap-3.5">
+        <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 sm:flex px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs">
           <span className="flex size-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="hidden sm:inline text-slate-400 font-medium">Rol:</span>
           <span className="text-slate-900 font-bold">{ETIQUETA_ROL[usuario.rol]}</span>

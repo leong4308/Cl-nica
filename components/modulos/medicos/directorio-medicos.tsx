@@ -90,7 +90,7 @@ export function DirectorioMedicos({
 
                 <div className="flex items-center gap-2">
                   <Clock size={14} className="text-slate-400 shrink-0" />
-                  <span className="truncate">{medico.consultorio} • 20 min/consulta</span>
+                  <span className="truncate">{medico.duracionConsulta ? `${medico.duracionConsulta} min por consulta` : 'Duración no configurada'}</span>
                 </div>
               </div>
             </div>

@@ -1,15 +1,12 @@
 export type SignosVitales = {
-  presionArterial: string
-  presionComparativa?: string
-  presionAlerta?: boolean
-  frecuenciaCardiaca: number
-  frecuenciaRitmo?: string
-  spo2: number
-  temperatura: number
-  temperaturaEstado?: string
-  peso: number
-  imc: number
-  imcClasificacion?: string
+  presionArterial?: string
+  frecuenciaCardiaca?: number | string
+  spo2?: number | string
+  temperatura?: number | string
+  peso?: number | string
+  imc?: number | string
+  fechaHora?: string
+  tomadoPor?: string
 }
 
 export type ConsultaPrevia = {
@@ -50,17 +47,24 @@ export type MedicamentoPrescrito = {
   tipo: 'Nuevo' | 'Continuación'
   posologia: string
   presentacion: string
+  textoOriginal?: string
 }
 
 export type CitaAgendaMedico = {
   id: number
   hora: string
+  inicio: string
+  fin: string
+  genero?: string
+  ultimaVisita?: string
+  expedienteId?: number
+  historialError?: string
   estado: 'confirmada' | 'en_espera' | 'atendida' | 'pendiente' | 'cancelada'
   tipoTurno: 'Recurrente' | 'Primera Consulta' | 'Revisión' | 'Control'
   pacienteId: number
   pacienteNombre: string
   expedienteFolio: string
-  edad: number
+  edad: number | null
   grupoSanguineo: string
   motivo: string
   alertas?: string[]
@@ -84,5 +88,7 @@ export type MedicoPerfil = {
   cedula: string
   clinica: string
   consultorio: string
+  duracionConsulta?: number
+  clinicaId?: number
   avatarUrl?: string
 }

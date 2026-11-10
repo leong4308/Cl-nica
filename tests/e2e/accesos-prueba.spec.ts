@@ -43,7 +43,8 @@ for (const cuenta of cuentas) {
     expect(ingresos).toHaveLength(1)
     expect(ingresos[0]).toMatchObject({ email: cuenta.correo, password: 'Clinica123*' })
     if (cuenta.rol === 'enfermero' || cuenta.rol === 'recepcionista') await expect(page.getByRole('heading', { name: `Hola, ${cuenta.nombre}` })).toBeVisible()
-    if (cuenta.rol === 'medico') await expect(page.getByRole('button', { name: 'Mi Consulta', exact: true })).toBeVisible()
+    if (cuenta.rol === 'admin') await expect(page.getByRole('button', { name: 'Mi Consulta', exact: true })).toBeVisible()
+    else await expect(page.getByRole('button', { name: 'Mi Consulta', exact: true })).toHaveCount(0)
     if (cuenta.rol !== 'admin') await expect(page.getByRole('button', { name: 'Usuarios', exact: true })).toHaveCount(0)
   })
 }

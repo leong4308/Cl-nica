@@ -1,3 +1,4 @@
+import { leerAgendaMedico } from '@/lib/agenda/modelo'
 import { consultarHospital, guardarHospital, ubicacionHospital, type IngresoHospital } from '@/lib/internacion/modelo'
 import { createClient } from './client'
 import type { Row } from '@/components/modulos/compartidos/types'
@@ -801,6 +802,7 @@ export type MedicoAgenda = {
   nombre: string
   especialidad: string
   duracionConsulta: number
+  clinicaId?: number
 }
 
 export type DiaDisponible = {
@@ -909,11 +911,12 @@ export async function cargarMedicosAgenda(): Promise<{ filas: MedicoAgenda[]; er
     id: number
     especialidad: string
     duracion_consulta: number
-    usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null
+    clinica_id: number
+    usuarios: { nombre_completo: string; esta_activo?: boolean } | { nombre_completo: string; esta_activo?: boolean }[] | null
   }>(
     createClient()
       .from('perfiles_medicos')
-      .select('id, especialidad, duracion_consulta, usuarios(nombre_completo)')
+      .select('id, especialidad, duracion_consulta, clinica_id, usuarios(nombre_completo,esta_activo)')
       .eq('esta_activo', true)
       .order('id', { ascending: true })
       .limit(100)
@@ -921,10 +924,11 @@ export async function cargarMedicosAgenda(): Promise<{ filas: MedicoAgenda[]; er
 
   return {
     error,
-    filas: filas.map((fila) => {
+    filas: filas.filter((fila) => (Array.isArray(fila.usuarios) ? fila.usuarios[0] : fila.usuarios)?.esta_activo !== false).map((fila) => {
       const usuario = Array.isArray(fila.usuarios) ? fila.usuarios[0] : fila.usuarios
       return {
         id: fila.id,
+        clinicaId: fila.clinica_id,
         nombre: usuario?.nombre_completo ?? 'Médico sin nombre',
         especialidad: fila.especialidad,
         duracionConsulta: fila.duracion_consulta || 20,
@@ -933,116 +937,11 @@ export async function cargarMedicosAgenda(): Promise<{ filas: MedicoAgenda[]; er
   }
 }
 
-export async function cargarDisponibilidad(
-  medicoId: number,
-  duracionConsulta: number,
-  diasVista = 7,
-): Promise<{ filas: DiaDisponible[]; error: string | null }> {
-  const supabase = createClient()
-
-  let agendaFilas: { dia_semana: number; hora_inicio: string; hora_fin: string; duracion_slot: number }[] = []
-
-  const agenda = await consultar<{
-    dia_semana: number
-    hora_inicio: string
-    hora_fin: string
-    duracion_slot: number
-  }>(
-    supabase
-      .from('agenda_medicos')
-      .select('dia_semana, hora_inicio, hora_fin, duracion_slot')
-      .eq('medico_id', medicoId)
-      .eq('esta_activo', true)
-      .order('hora_inicio', { ascending: true })
-  )
-
-  // Si la tabla no existe en el schema cache de Supabase o falló la consulta, usamos el horario estándar de consulta
-  if (agenda.error || agenda.filas.length === 0) {
-    const bloquesEstandar = [
-      { hora_inicio: '09:00:00', hora_fin: '14:00:00' },
-      { hora_inicio: '16:00:00', hora_fin: '20:00:00' },
-    ]
-    for (let d = 1; d <= 6; d += 1) {
-      for (const b of bloquesEstandar) {
-        agendaFilas.push({
-          dia_semana: d,
-          hora_inicio: b.hora_inicio,
-          hora_fin: b.hora_fin,
-          duracion_slot: duracionConsulta || 20,
-        })
-      }
-    }
-  } else {
-    agendaFilas = agenda.filas
-  }
-
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const ventana: string[] = []
-  for (let i = 0; i < diasVista; i += 1) {
-    const dia = new Date(hoy)
-    dia.setDate(hoy.getDate() + i)
-    ventana.push(aIso(dia))
-  }
-
-  const dInicio = fechaLocal(ventana[0])
-  dInicio.setHours(0, 0, 0, 0)
-  const dFin = fechaLocal(ventana[ventana.length - 1])
-  dFin.setHours(23, 59, 59, 999)
-  const desde = dInicio.toISOString()
-  const hasta = dFin.toISOString()
-  const ocupadas = await consultar<{ inicio: string; fin: string }>(
-    supabase
-      .from('citas')
-      .select('inicio, fin')
-      .eq('medico_id', medicoId)
-      .in('estado', ['pendiente', 'confirmada'])
-      .gte('inicio', desde)
-      .lte('inicio', hasta)
-  )
-
-  const rangoOcupado = ocupadas.filas.map((cita) => ({
-    inicio: new Date(cita.inicio).getTime(),
-    fin: new Date(cita.fin).getTime(),
-  }))
-
-  const filas: DiaDisponible[] = []
-  for (const fecha of ventana) {
-    const diaSemana = fechaLocal(fecha).getDay()
-    const bloques = agendaFilas.filter((b) => b.dia_semana === diaSemana)
-    if (bloques.length === 0) continue
-
-    const slots: string[] = []
-    for (const bloque of bloques) {
-      const paso = bloque.duracion_slot || duracionConsulta || 20
-      const inicioMin = aMinutos(bloque.hora_inicio.slice(0, 5))
-      const finMin = aMinutos(bloque.hora_fin.slice(0, 5))
-      for (let minuto = inicioMin; minuto + paso <= finMin; minuto += paso) {
-        const hora = `${String(Math.floor(minuto / 60)).padStart(2, '0')}:${String(minuto % 60).padStart(2, '0')}`
-        const { inicio, fin } = rangoIso(fecha, hora, duracionConsulta || 20)
-        const t0 = new Date(inicio).getTime()
-        const t1 = new Date(fin).getTime()
-        const choca = rangoOcupado.some((ocupado) => t0 < ocupado.fin && t1 > ocupado.inicio)
-        if (!choca) slots.push(formato12h(hora))
-      }
-    }
-
-    const filtrados = fecha === aIso(hoy)
-      ? slots.filter((slot) => {
-        const minutosSlot = aMinutos(slot)
-        if (Number.isNaN(minutosSlot)) return false
-        const horas = Math.floor(minutosSlot / 60)
-        const minutos = minutosSlot % 60
-        return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), horas, minutos) > new Date()
-      })
-      : slots
-
-    if (filtrados.length === 0) continue
-
-    filas.push({ fecha, etiqueta: formatearEtiquetaDia(fecha), slots: filtrados })
-  }
-
-  return { filas, error: null }
+export async function cargarDisponibilidad(medicoId: number, _duracionConsulta: number, _diasVista = 7): Promise<{ filas: DiaDisponible[]; error: string | null }> {
+  try {
+    const agenda = await leerAgendaMedico(medicoId)
+    return { filas: agenda.dias.filter((dia) => dia.slots.length).map((dia) => ({ fecha: dia.fecha, etiqueta: formatearEtiquetaDia(dia.fecha), slots: dia.slots.map((slot) => formato12h(new Date(slot.inicio).toLocaleTimeString('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false }))) })), error: agenda.configurado ? null : 'Este médico aún no tiene un horario publicado.' }
+  } catch (error) { return { filas: [], error: error instanceof Error ? error.message : 'No se pudo consultar la disponibilidad.' } }
 }
 
 export async function cargarMedicos(): Promise<{ filas: Row[]; error: string | null }> {
@@ -1080,44 +979,15 @@ export type DatosNuevaCita = {
 }
 
 export async function crearCita(datos: DatosNuevaCita): Promise<{ id: number | null; error: string | null }> {
-  let rango: { inicio: string; fin: string }
   try {
-    rango = rangoIso(datos.fecha, datos.hora, datos.duracionConsulta)
-  } catch {
-    return { id: null, error: 'El horario seleccionado no es válido. Vuelve a elegirlo.' }
-  }
-  const { inicio, fin } = rango
-  if (new Date(inicio).getTime() <= Date.now()) {
-    return { id: null, error: 'No se puede agendar una cita en un horario que ya transcurrió.' }
-  }
-  const supabase = createClient()
-
-  const { data, error } = await supabase
-    .from('citas')
-    .insert({
-      paciente_id: datos.pacienteId,
-      medico_id: datos.medicoId,
-      clinica_id: datos.clinicaId,
-      inicio,
-      fin,
-      estado: 'pendiente',
-      motivo: datos.motivo.trim() || 'Consulta general',
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    const mensaje = error.message.toLowerCase()
-    if (mensaje.includes('citas_no_traslape') || mensaje.includes('exclusion')) {
-      return { id: null, error: 'Ese horario acaba de ocuparse. Elige otro disponible.' }
-    }
-    if (mensaje.includes('foreign key')) {
-      return { id: null, error: 'No se pudo validar el paciente o la clínica. Revisa los datos.' }
-    }
-    return { id: null, error: error.message }
-  }
-
-  return { id: data?.id ?? null, error: null }
+    const minutos = aMinutos(datos.hora)
+    if (!Number.isFinite(minutos)) return { id: null, error: 'Selecciona una hora válida.' }
+    const hora = `${String(Math.floor(minutos / 60)).padStart(2, '0')}:${String(minutos % 60).padStart(2, '0')}`
+    const respuesta = await fetch('/api/citas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pacienteId: datos.pacienteId, medicoId: datos.medicoId, fecha: datos.fecha, hora, motivo: datos.motivo }) })
+    const resultado = await respuesta.json()
+    if (!respuesta.ok) return { id: null, error: resultado.error || 'No se pudo agendar la cita.' }
+    return { id: resultado.id, error: null }
+  } catch { return { id: null, error: 'No se pudo conectar con el servicio de citas. Vuelve a intentarlo.' } }
 }
 
 export async function cargarPacientesParaCita(): Promise<{
@@ -1126,11 +996,11 @@ export async function cargarPacientesParaCita(): Promise<{
 }> {
   const { filas, error } = await consultar<{
     id: number
-    usuarios: { nombre_completo: string } | { nombre_completo: string }[] | null
+    usuarios: { nombre_completo: string; esta_activo?: boolean } | { nombre_completo: string; esta_activo?: boolean }[] | null
   }>(
     createClient()
       .from('perfiles_pacientes')
-      .select('id, usuarios(nombre_completo)')
+      .select('id, usuarios(nombre_completo,esta_activo)')
       .eq('esta_activo', true)
       .order('id', { ascending: true })
       .limit(200)
@@ -1139,7 +1009,7 @@ export async function cargarPacientesParaCita(): Promise<{
 
   return {
     error: null,
-    filas: filas.map((fila) => {
+    filas: filas.filter((fila) => (Array.isArray(fila.usuarios) ? fila.usuarios[0] : fila.usuarios)?.esta_activo !== false).map((fila) => {
       const usuario = Array.isArray(fila.usuarios) ? fila.usuarios[0] : fila.usuarios
       return { id: fila.id, nombre: usuario?.nombre_completo ?? 'Paciente sin nombre' }
     }),

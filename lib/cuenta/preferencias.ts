@@ -8,7 +8,7 @@ export function opcionesInicio(rol: RolUsuario): string[] {
   if (['admin', 'medico', 'recepcionista'].includes(rol)) comunes.push('Expedientes')
   if (['admin', 'medico', 'enfermero'].includes(rol)) comunes.push('Órdenes médicas', 'Laboratorio')
   if (['admin', 'medico', 'enfermero'].includes(rol)) comunes.push('Internación')
-  if (rol === 'medico') comunes.push('Mi Consulta')
+  if (rol === 'admin') comunes.push('Mi Consulta')
   return rol === 'paciente' ? ['Predeterminada'] : comunes
 }
 export function normalizarPreferencias(valor: unknown, rol: RolUsuario): PreferenciasUsuario {

@@ -59,7 +59,7 @@ export function AntecedentesMedicamentos({
         )}
       </div>
 
-      {/* Columna 2: Medicamentos Activos Recurrentes */}
+      {/* Columna 2: Medicamentos registrados */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
         <div className="mb-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export function AntecedentesMedicamentos({
               <Pill size={14} />
             </span>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Medicamentos Activos Recurrentes
+              Medicamentos registrados
             </h3>
           </div>
           <span className="text-[11px] font-semibold text-slate-400">
@@ -77,7 +77,7 @@ export function AntecedentesMedicamentos({
 
         {medicamentosActivos.length === 0 ? (
           <p className="py-6 text-center text-xs text-slate-400">
-            El paciente no tiene medicamentos recurrentes activos.
+            Sin medicamentos registrados en la ficha del paciente.
           </p>
         ) : (
           <div className="space-y-2.5">

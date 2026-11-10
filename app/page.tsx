@@ -6,7 +6,7 @@ import { aplicarPreferencias, PREFERENCIAS_INICIALES } from '@/lib/cuenta/prefer
 import { abrirSeccionCuenta } from '@/lib/cuenta/menu'
 import { Dashboard } from '@/components/modulos/resumen/dashboard'
 import { ModulePage } from '@/components/modulos/citas/module-page'
-import { MedicosPage } from '@/components/modulos/medicos'
+import { ConsultaAdministrativa, MedicosPage } from '@/components/modulos/medicos'
 import { BarraLateral } from '@/components/modulos/barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
 import { BotonCerrarAviso, BotonCerrarMenu } from './botones-pagina'
@@ -198,13 +198,15 @@ const openModal = (title: string) => {
    * Renderizar contenido según el rol y pestaña activa:
    * - Admin: ve Dashboard global + todos los módulos
    * - Recepcionista: ve Dashboard + Citas, Pacientes, Médicos (directorio), Expedientes
-   * - Médico: ve "Mi Consulta" (su estación) como pantalla principal + solo sus citas/pacientes/expedientes
+   * - Médico: entra a Citas y conserva sus módulos clínicos
    * - Enfermero: ve Dashboard + Citas, Pacientes, Internación, Órdenes
    */
   const renderContenido = () => {
-    // "Mi Consulta" para médicos — va directo a su estación de consulta, fijado a su perfil
+    // La pantalla de consulta es exclusiva de administración, incluso si llega una selección antigua.
     if (active === 'Mi Consulta') {
-      return <MedicosPage {...actions} usuario={perfil} />
+      return perfil.rol === 'admin'
+        ? <ConsultaAdministrativa {...actions} usuario={perfil} />
+        : <ModulePage active="Citas" {...actions} />
     }
 
     // "Médicos" — solo para admin/recepcionista (directorio de todos los médicos)
@@ -214,6 +216,7 @@ const openModal = (title: string) => {
 
     // "Resumen" — dashboard global (solo admin, recepcionista, enfermero)
     if (active === 'Resumen') {
+      if (perfil.rol === 'medico') return <ModulePage active="Citas" {...actions} />
       return <Dashboard {...actions} />
     }
 

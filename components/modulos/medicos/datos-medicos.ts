@@ -1,5 +1,8 @@
+import { leerConsulta, escribirConsulta } from '@/lib/agenda/consulta'
+import { fechaClinica, instanteClinica, sumarDias, horaClinica } from '@/lib/agenda/modelo'
+import { leerFichaClinica } from '@/lib/pacientes/ficha-clinica'
 import { createClient } from '@/lib/supabase/client'
-import type { CitaAgendaMedico, MedicoPerfil, MedicamentoPrescrito, DiagnosticoCie10, SignosVitales, ConsultaPrevia } from './types'
+import type { CitaAgendaMedico, MedicoPerfil, MedicamentoPrescrito, DiagnosticoCie10, SignosVitales } from './types'
 import { cargarHistorialPaciente } from '@/lib/supabase/datos'
 
 export const CATALOGO_CIE10 = [
@@ -18,14 +21,14 @@ export const CATALOGO_CIE10 = [
 ]
 
 export const VADEMECUM_POPULAR = [
-  { nombre: 'Amlodipino 5 mg', presentacion: 'Caja x 30 comprimidos', posologiaDefault: '1 tableta cada mañana con el desayuno por 30 días.' },
-  { nombre: 'Losartán Potásico 50 mg', presentacion: 'Caja x 60 comprimidos', posologiaDefault: '1 tableta cada 12 horas por 60 días con control tensional.' },
-  { nombre: 'Atorvastatina 20 mg', presentacion: 'Caja x 30 comprimidos', posologiaDefault: '1 tableta diaria por la noche por 90 días.' },
-  { nombre: 'Metformina 850 mg', presentacion: 'Caja x 60 tabletas', posologiaDefault: '1 tableta dos veces al día con los alimentos.' },
-  { nombre: 'Aspirina Protect 100 mg', presentacion: 'Caja x 28 tabletas', posologiaDefault: '1 tableta diaria después de la comida principal.' },
-  { nombre: 'Bisoprolol 2.5 mg', presentacion: 'Caja x 30 comprimidos', posologiaDefault: '1 tableta cada 24 horas por la mañana.' },
-  { nombre: 'Paracetamol 500 mg', presentacion: 'Caja x 20 tabletas', posologiaDefault: '1 tableta cada 8 horas en caso de dolor o fiebre.' },
-  { nombre: 'Omeprazol 20 mg', presentacion: 'Caja x 14 cápsulas', posologiaDefault: '1 cápsula en ayunas 30 minutos antes del desayuno.' },
+  { nombre: 'Amlodipino 5 mg' },
+  { nombre: 'Losartán Potásico 50 mg' },
+  { nombre: 'Atorvastatina 20 mg' },
+  { nombre: 'Metformina 850 mg' },
+  { nombre: 'Aspirina Protect 100 mg' },
+  { nombre: 'Bisoprolol 2.5 mg' },
+  { nombre: 'Paracetamol 500 mg' },
+  { nombre: 'Omeprazol 20 mg' },
 ]
 
 export async function obtenerMedicosBD(): Promise<MedicoPerfil[]> {
@@ -33,15 +36,16 @@ export async function obtenerMedicosBD(): Promise<MedicoPerfil[]> {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('perfiles_medicos')
-      .select('id, especialidad, cedula_profesional, clinica_id, clinicas(nombre), usuarios(nombre_completo)')
+      .select('id, especialidad, cedula_profesional, clinica_id, duracion_consulta, clinicas(nombre), usuarios(nombre_completo,esta_activo)')
       .eq('esta_activo', true)
       .order('id', { ascending: true })
 
     if (error || !data || data.length === 0) {
+      if (error) throw Error('No se pudo consultar el directorio médico.')
       return []
     }
 
-    return data.map((item) => {
+    return data.filter((item) => (Array.isArray(item.usuarios) ? item.usuarios[0] : item.usuarios)?.esta_activo !== false).map((item) => {
       const usuario = Array.isArray(item.usuarios) ? item.usuarios[0] : item.usuarios
       const clinica = Array.isArray(item.clinicas) ? item.clinicas[0] : item.clinicas
       const nombreLimpio = usuario?.nombre_completo || 'Médico'
@@ -50,148 +54,35 @@ export async function obtenerMedicosBD(): Promise<MedicoPerfil[]> {
         id: item.id,
         nombre: `${prefijo}${nombreLimpio}`,
         especialidad: item.especialidad || 'Medicina General',
-        cedula: item.cedula_profesional || `CED-${item.id}`,
-        clinica: clinica?.nombre || 'Clínica Nova - Sede Central',
-        consultorio: `Torre B, Consultorio ${200 + item.id}`,
+        cedula: item.cedula_profesional || 'No registrada',
+        clinica: clinica?.nombre || 'Clínica no registrada',
+        consultorio: '',
+        duracionConsulta: item.duracion_consulta,
+        clinicaId: item.clinica_id,
       }
     })
   } catch (err) {
-    console.error('Error al cargar médicos de BD:', err)
-    return []
+    throw Error('No se pudo consultar el directorio médico.')
   }
 }
 
-export async function obtenerCitasAgendaMedico(medicoId: number, fechaStr?: string): Promise<CitaAgendaMedico[]> {
-  try {
-    const supabase = createClient()
-    const fechaFiltro = fechaStr || new Date().toISOString().split('T')[0]
-    const inicioDia = `${fechaFiltro}T00:00:00`
-    const finDia = `${fechaFiltro}T23:59:59`
-
-    // Consulta REAL de citas para ese médico y rango
-    const { data, error } = await supabase
-      .from('citas')
-      .select(`
-        id,
-        inicio,
-        fin,
-        estado,
-        motivo,
-        paciente_id,
-        perfiles_pacientes(
-          id,
-          fecha_nacimiento,
-          genero,
-          notas_medicas,
-          usuarios(nombre_completo)
-        )
-      `)
-      .eq('medico_id', medicoId)
-      .gte('inicio', inicioDia)
-      .lte('inicio', finDia)
-      .order('inicio', { ascending: true })
-
-    if (error) {
-      console.error('Error al consultar citas de médico en BD:', error.message)
-      return []
-    }
-
-    if (!data || data.length === 0) {
-      return []
-    }
-
-    // Mapeo 100% fiel a los datos reales de la base de datos
-    const citasMapeadas: CitaAgendaMedico[] = await Promise.all(
-      data.map(async (cita, idx) => {
-        const d = new Date(cita.inicio)
-        const hora = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-        const perfilPac = Array.isArray(cita.perfiles_pacientes) ? cita.perfiles_pacientes[0] : cita.perfiles_pacientes
-        const usuarioPac = perfilPac?.usuarios ? (Array.isArray(perfilPac.usuarios) ? perfilPac.usuarios[0] : perfilPac.usuarios) : null
-        const nombrePac = usuarioPac?.nombre_completo || 'Paciente Registrado'
-
-        const hoyAnio = new Date().getFullYear()
-        const pacNacAnio = perfilPac?.fecha_nacimiento ? new Date(perfilPac.fecha_nacimiento).getFullYear() : (hoyAnio - 35)
-        const edad = Math.max(1, hoyAnio - pacNacAnio)
-
-        const estadoMap: Record<string, CitaAgendaMedico['estado']> = {
-          pendiente: 'pendiente',
-          confirmada: 'confirmada',
-          atendida: 'atendida',
-          cancelada_paciente: 'cancelada',
-          cancelada_medico: 'cancelada',
-          no_asistio: 'cancelada',
-        }
-
-        // Cargar historial previo real desde expedientes en Supabase
-        const { filas: historialReal } = await cargarHistorialPaciente(cita.paciente_id)
-        const consultasPrevias: ConsultaPrevia[] = historialReal.map((h, i) => ({
-          id: `hist-${cita.paciente_id}-${i}`,
-          fecha: h.fecha,
-          especialidad: 'Consulta General',
-          medico: h.medico,
-          resumen: `${h.motivo}: ${h.diagnostico}. Receta: ${h.receta}`,
-        }))
-
-        // Si ya hay expediente guardado para ESTA cita específica, cargarlo
-        const { data: expedienteActual } = await supabase
-          .from('expedientes')
-          .select('diagnostico, receta, notas_doctor')
-          .eq('cita_id', cita.id)
-          .maybeSingle()
-
-        const alertas: string[] = []
-        if (perfilPac?.notas_medicas) {
-          alertas.push(perfilPac.notas_medicas)
-        }
-
-        return {
-          id: cita.id,
-          hora,
-          estado: estadoMap[cita.estado] || 'confirmada',
-          tipoTurno: idx === 0 ? 'Primera Consulta' : 'Recurrente',
-          pacienteId: cita.paciente_id,
-          pacienteNombre: nombrePac,
-          expedienteFolio: `EXP-${pacNacAnio}-${String(cita.paciente_id).padStart(4, '0')}`,
-          edad,
-          grupoSanguineo: 'O+',
-          motivo: cita.motivo || 'Consulta médica programada',
-          alertas,
-          signosVitales: {
-            presionArterial: '120/80',
-            presionComparativa: 'Estable',
-            presionAlerta: false,
-            frecuenciaCardiaca: 72,
-            frecuenciaRitmo: 'Ritmo sinusal regular',
-            spo2: 98,
-            temperatura: 36.5,
-            temperaturaEstado: 'Eutérmico',
-            peso: 70.0,
-            imc: 24.2,
-            imcClasificacion: 'Normopeso',
-          },
-          consultasPrevias,
-          medicamentosActivos: [],
-          archivosEstudios: [],
-          soap: {
-            subjetivo: expedienteActual?.notas_doctor ? '' : 'Paciente acude a consulta programada.',
-            objetivo: expedienteActual?.notas_doctor ? '' : 'Paciente orientado, signos vitales dentro de parámetros normales.',
-            diagnosticos: expedienteActual?.diagnostico
-              ? [{ codigo: 'CIE-10', descripcion: expedienteActual.diagnostico, tipo: 'Principal' }]
-              : [{ codigo: 'Z00.0', descripcion: 'Examen médico general', tipo: 'Principal' }],
-            plan: expedienteActual?.receta ? expedienteActual.receta : 'Plan de tratamiento y recomendaciones.',
-          },
-          prescripciones: expedienteActual?.receta
-            ? [{ id: 'p-act', nombre: expedienteActual.receta, tipo: 'Nuevo', posologia: 'Según indicaciones', presentacion: 'Presentación clínica' }]
-            : [],
-        }
-      })
-    )
-
-    return citasMapeadas
-  } catch (err) {
-    console.error('Error al obtener citas:', err)
-    return []
-  }
+export async function obtenerCitasAgendaMedico(medicoId: number, fechaStr = fechaClinica()): Promise<CitaAgendaMedico[]> {
+  const db = createClient()
+  const { data, error } = await db.from('citas').select('id,inicio,fin,estado,motivo,paciente_id,perfiles_pacientes(id,fecha_nacimiento,genero,notas_medicas,usuarios(nombre_completo))').eq('medico_id', medicoId).gte('inicio', instanteClinica(fechaStr, '00:00')).lt('inicio', instanteClinica(sumarDias(fechaStr, 1), '00:00')).order('inicio')
+  if (error) throw Error('No se pudo cargar la agenda del médico. Vuelve a intentarlo.')
+  const historiales = new Map<number, ReturnType<typeof cargarHistorialPaciente>>()
+  return Promise.all((data ?? []).map(async (cita): Promise<CitaAgendaMedico> => {
+    const uno = (v: any) => Array.isArray(v) ? v[0] : v
+    const paciente = uno(cita.perfiles_pacientes), ficha = leerFichaClinica(paciente?.notas_medicas), vitales = ficha.signosVitales
+    if (!historiales.has(cita.paciente_id)) historiales.set(cita.paciente_id, cargarHistorialPaciente(cita.paciente_id))
+    const [historial, expediente] = await Promise.all([historiales.get(cita.paciente_id)!, db.from('expedientes').select('id,diagnostico,receta,notas_doctor').eq('cita_id', cita.id).maybeSingle()])
+    if (expediente.error) throw Error('No se pudo cargar el expediente de una cita.')
+    const anteriores = historial.filas.filter((h) => h.id !== expediente.data?.id && h.fechaIso && Date.parse(h.fechaIso) < Date.parse(cita.inicio))
+    const edadFecha = fechaClinica(), nacimiento = paciente?.fecha_nacimiento
+    const edad = nacimiento ? Number(edadFecha.slice(0, 4)) - Number(nacimiento.slice(0, 4)) - (edadFecha.slice(5) < nacimiento.slice(5) ? 1 : 0) : null
+    const mapa: Record<string, CitaAgendaMedico['estado']> = { pendiente: 'pendiente', confirmada: 'confirmada', atendida: 'atendida', cancelada_paciente: 'cancelada', cancelada_medico: 'cancelada', no_asistio: 'cancelada' }
+    return { id: cita.id, inicio: cita.inicio, fin: cita.fin, hora: horaClinica(cita.inicio), estado: mapa[cita.estado] ?? 'pendiente', tipoTurno: anteriores.length ? 'Recurrente' : 'Primera Consulta', pacienteId: cita.paciente_id, pacienteNombre: uno(paciente?.usuarios)?.nombre_completo ?? 'Paciente', expedienteFolio: expediente.data?.id ? `EXP-${String(expediente.data.id).padStart(5, '0')}` : 'Sin expediente de esta cita', expedienteId: expediente.data?.id, edad: edad !== null && edad >= 0 ? edad : null, genero: paciente?.genero, grupoSanguineo: ficha.tipoSangre || 'No registrado', ultimaVisita: anteriores[0]?.fechaIso, motivo: cita.motivo || 'Sin motivo registrado', alertas: [ficha.alergias ? `Alergias: ${ficha.alergias}` : '', ficha.condicionesCronicas ?? ''].filter(Boolean), signosVitales: vitales ? { presionArterial: vitales.presionArterial, frecuenciaCardiaca: vitales.frecuenciaCardiaca, spo2: vitales.saturacionOxigeno, temperatura: vitales.temperatura, peso: vitales.peso, fechaHora: vitales.fechaHora, tomadoPor: vitales.tomadoPor } : undefined, consultasPrevias: anteriores.map((h) => ({ id: String(h.id), fecha: h.fecha, especialidad: '', medico: h.medico, resumen: `${h.motivo}: ${h.diagnostico}. ${h.notas}` })), historialError: historial.error ?? undefined, medicamentosActivos: ficha.medicamentoActual ? [{ id: 'ficha', nombre: ficha.medicamentoActual, dosis: '', frecuencia: '', via: '', activo: true }] : [], ...leerConsulta(expediente.data) }
+  }))
 }
 
 export async function finalizarConsultaYFirmar({
@@ -200,73 +91,50 @@ export async function finalizarConsultaYFirmar({
   diagnosticos,
   prescripciones,
   signosVitales,
+  concluir = true,
 }: {
   citaId: number
   soap: { subjetivo: string; objetivo: string; plan: string }
   diagnosticos: DiagnosticoCie10[]
   prescripciones: MedicamentoPrescrito[]
   signosVitales?: SignosVitales
+  concluir?: boolean
 }): Promise<{ ok: boolean; mensaje: string }> {
   try {
     const supabase = createClient()
 
-    // 1. Formatear diagnósticos
-    const diagTexto = diagnosticos
-      .map((d) => `[${d.codigo}] ${d.descripcion} (${d.tipo})`)
-      .join('\n') || 'Diagnóstico no especificado'
-
-    // 2. Formatear prescripciones
-    const recetaTexto = prescripciones
-      .map((p, i) => `${i + 1}. ${p.nombre} [${p.tipo}] - ${p.posologia} (${p.presentacion})`)
-      .join('\n') || 'Sin prescripción farmacológica.'
-
-    // 3. Formatear SOAP
-    const notasSoap = `--- FORMATO S.O.A.P. ---
-S (Subjetivo):
-${soap.subjetivo || 'Sin datos anamnésicos.'}
-
-O (Objetivo):
-${soap.objetivo || 'Sin hallazgos físicos descritos.'}
-Signos Vitales: TA: ${signosVitales?.presionArterial ?? 'N/D'} | FC: ${signosVitales?.frecuenciaCardiaca ?? 'N/D'} lpm | SpO2: ${signosVitales?.spo2 ?? 'N/D'}% | Temp: ${signosVitales?.temperatura ?? 'N/D'}°C | Peso: ${signosVitales?.peso ?? 'N/D'}kg (IMC: ${signosVitales?.imc ?? 'N/D'})
-
-A (Análisis):
-${diagTexto}
-
-P (Plan Médico):
-${soap.plan || 'Sin plan especificado.'}
-`
+    const contenido = escribirConsulta(soap, diagnosticos, prescripciones, signosVitales)
 
     // 4. Guardar en tabla expedientes de Supabase
     const { error: expError } = await supabase.from('expedientes').upsert(
       {
         cita_id: citaId,
-        diagnostico: diagTexto,
-        receta: recetaTexto,
-        notas_doctor: notasSoap,
+        ...contenido,
       },
       { onConflict: 'cita_id' }
     )
 
     if (expError) {
-      console.warn('Aviso expedientes:', expError.message)
+      return { ok: false, mensaje: 'No se pudo guardar el expediente. La cita conserva su estado.' }
     }
 
     // 5. Actualizar estado de la cita a 'atendida' en Supabase
-    const { error: citaError } = await supabase
+    if (!concluir) { window.dispatchEvent(new Event('datos-actualizados')); return { ok: true, mensaje: 'Borrador guardado en el expediente. La cita sigue pendiente de finalizar.' } }
+    const { data: citaActualizada, error: citaError } = await supabase
       .from('citas')
       .update({
         estado: 'atendida',
         actualizado_en: new Date().toISOString(),
       })
-      .eq('id', citaId)
+      .eq('id', citaId).select('id').maybeSingle()
 
-    if (citaError) {
-      return { ok: false, mensaje: `No se pudo actualizar cita: ${citaError.message}` }
+    if (citaError || !citaActualizada) {
+      return { ok: false, mensaje: 'El expediente se guardó, pero no se pudo finalizar la cita. Revisa su estado antes de volver a intentarlo.' }
     }
 
     // Disparar evento global para que recepcionista, médico y admin se actualicen inmediatamente
     window.dispatchEvent(new CustomEvent('datos-actualizados'))
-    return { ok: true, mensaje: 'Consulta concluida y receta médica firmada exitosamente en la base de datos.' }
+    return { ok: true, mensaje: 'Consulta guardada y finalizada correctamente.' }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error desconocido al guardar'
     return { ok: false, mensaje: msg }

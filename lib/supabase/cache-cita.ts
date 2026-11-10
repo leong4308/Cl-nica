@@ -41,18 +41,12 @@ export function precargarCita(): Promise<void> {
       cargarClinicaActiva(),
     ])
 
-    const agendas = await Promise.all(
-      medicosResult.filas.map(
-        async (medico) =>
-          [medico.id, await cargarDisponibilidad(medico.id, medico.duracionConsulta)] as const,
-      ),
-    )
 
     cache = {
       medicos: medicosResult.filas,
       pacientes: pacientesResult.filas,
       clinicaId,
-      agendas: Object.fromEntries(agendas),
+      agendas: {},
     }
   })().catch(() => undefined)
 

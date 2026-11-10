@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { BarraLateralRecepcionista } from './barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
 import { DashboardRecepcionista } from './resumen'
+import { MedicosPage } from '@/components/modulos/medicos'
 import { ModulePage } from '@/components/modulos/citas/module-page'
 import { ModalRegistrarPaciente } from '@/components/modulos/resumen/acciones-rapidas/registrar-paciente'
 import { ModalNuevaCita } from '@/components/modulos/resumen/acciones-rapidas/nueva-cita'
@@ -134,6 +135,8 @@ export function InterfazRecepcionista({
               onAccionCita={(cita, accion) => setCitaAbierta({ cita, accion })}
               {...actions}
             />
+          ) : active === 'Médicos' ? (
+            <MedicosPage usuario={usuario} {...actions} />
           ) : (
             <ModulePage active={active} {...actions} />
           )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileEdit, ShieldCheck, Plus, X, Search, Sparkles } from 'lucide-react'
+import { FileEdit, Plus, X, Search } from 'lucide-react'
 import type { DiagnosticoCie10 } from './types'
 import { CATALOGO_CIE10 } from './datos-medicos'
 
@@ -54,7 +54,7 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
   }
 
   const handleEliminarDiagnostico = (codigo: string) => {
-    const filtrados = soap.diagnosticos.filter((d) => d.codigo !== codigo)
+    const filtrados = soap.diagnosticos.filter((d) => d.codigo !== codigo).map((d) => ({ ...d }))
     // Asegurar que el primero restante sea Principal
     if (filtrados.length > 0 && filtrados[0].tipo !== 'Principal') {
       filtrados[0].tipo = 'Principal'
@@ -81,10 +81,7 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
           </h3>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
-          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-          Guardado automático activo cada 30 segundos
-        </div>
+        <p className="text-xs text-slate-500">Usa Guardar borrador para conservar tus cambios.</p>
       </div>
 
       {/* Grid 2x2 Formato SOAP */}
@@ -93,12 +90,13 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
         {/* S - Subjetivo */}
         <div className="flex flex-col rounded-xl border border-slate-200/90 bg-slate-50/40 p-4 transition focus-within:border-blue-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-blue-500/20">
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+            <label htmlFor="consulta-subjetivo" className="text-xs font-bold text-blue-700 uppercase tracking-wide">
               S • Subjetivo (Motivo y Anamnesis)
             </label>
             <span className="text-[10px] text-slate-400 font-medium">Relato del paciente</span>
           </div>
           <textarea
+            id="consulta-subjetivo"
             rows={4}
             value={soap.subjetivo}
             onChange={(e) => handleSubjetivoChange(e.target.value)}
@@ -110,12 +108,13 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
         {/* O - Objetivo */}
         <div className="flex flex-col rounded-xl border border-slate-200/90 bg-slate-50/40 p-4 transition focus-within:border-blue-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-blue-500/20">
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+            <label htmlFor="consulta-objetivo" className="text-xs font-bold text-blue-700 uppercase tracking-wide">
               O • Objetivo (Examen Físico y Hallazgos)
             </label>
             <span className="text-[10px] text-slate-400 font-medium">Exploración clínica</span>
           </div>
           <textarea
+            id="consulta-objetivo"
             rows={4}
             value={soap.objetivo}
             onChange={(e) => handleObjetivoChange(e.target.value)}
@@ -183,7 +182,7 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-2xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-mono font-bold text-blue-700">[{d.codigo}]</span>
+                  {d.codigo && <span className="font-mono font-bold text-blue-700">[{d.codigo}]</span>}
                   <span className="truncate text-slate-800 font-medium">{d.descripcion}</span>
                   <span
                     className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
@@ -212,12 +211,13 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
         {/* P - Plan Médico & Conducta */}
         <div className="flex flex-col rounded-xl border border-slate-200/90 bg-slate-50/40 p-4 transition focus-within:border-blue-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-blue-500/20">
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+            <label htmlFor="consulta-plan" className="text-xs font-bold text-blue-700 uppercase tracking-wide">
               P • Plan Médico & Conducta
             </label>
             <span className="text-[10px] text-slate-400 font-medium">Tratamiento e indicaciones</span>
           </div>
           <textarea
+            id="consulta-plan"
             rows={4}
             value={soap.plan}
             onChange={(e) => handlePlanChange(e.target.value)}

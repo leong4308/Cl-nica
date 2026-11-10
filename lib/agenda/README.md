@@ -1,0 +1,19 @@
+# Agenda médica y descansos
+
+`/api/citas` crea citas con la sesión y el rol real del solicitante. Recepción y administración pueden agendar con cualquier médico activo; el médico solo con su propio perfil. Se permiten múltiples citas para un mismo médico y paciente en intervalos distintos. La clínica y la duración provienen del perfil médico, no de campos enviados por el navegador. Se verifican cruces del médico, del paciente y descansos antes de insertar.
+
+`/api/agenda/[id]` calcula en `America/Mexico_City` los intervalos completos disponibles, el siguiente turno y los minutos reservados. La duración mostrada es la duración configurada, no un promedio de atención real. La aplicación no registra actualmente las horas efectivas de inicio y fin de la atención.
+
+Administración configura la jornada y los descansos desde **Médicos → seleccionar médico → Configurar horario**. Puede repetir bloques los siete días y asignar descansos rotativos por fecha. No se guarda un descanso que coincida con una cita activa; primero se debe reagendar. Los descansos se excluyen de los turnos y del total de minutos de atención.
+
+La base conectada no tiene `agenda_medicos`. Por eso la configuración se conserva como JSON en el bucket privado `agenda-medica`, editable únicamente por el servidor después de autorizar a administración. No se incluye en los JWT de las cuentas. Si no hay un archivo, se admite la configuración anterior de `app_metadata.clinica_agenda` y, si tampoco existe y la tabla sí está disponible en otro entorno, se leen sus bloques. Si no hay ninguna fuente configurada, se informa **Horario no publicado**. No se inventan jornadas; recepción puede proponer una hora y se verifican citas y descansos. Los horarios de apertura/cierre deben ser definidos por administración.
+
+Las nuevas reservas y la asignación de descansos se serializan en el proceso de Next.js. Esto no reemplaza una transacción ni una restricción de PostgreSQL entre múltiples instancias. Antes de desplegar varias instancias, aplicar la exclusión de intervalos de `supabase/migraciones/agenda_citas.sql` y trasladar la reserva y la validación de descansos a una transacción en la base. No aplicar toda esa migración sin revisar sus horarios de ejemplo.
+
+`Mi Consulta` está disponible únicamente para administración; los médicos entran a Citas. La agenda de Médicos conserva el agendado y la configuración de descansos, separados de la pantalla de registro de consulta. `Mi Consulta` usa los datos guardados de paciente, ficha clínica y expedientes. Los signos sin medición se muestran como **No registrado** y el formulario clínico comienza vacío si no existe expediente. Las notas y el diagnóstico se guardan antes de finalizar; un error de guardado impide marcar la cita como atendida. Los borradores se persisten en el expediente y conservan el estado de la cita.
+
+Verificación: `npm run test:unit`, `npm run typecheck`, `npm run build` y `npx playwright test tests/e2e/agenda-medica.spec.ts`. Las pruebas con datos reales deben crear y eliminar sus propios pacientes, médicos y citas temporales.
+
+La versión de consulta mostrada por Gabriel aún no está publicada en `origin/Gabriel` (commit revisado: `a707bf9`). Su integración queda pendiente de disponer del commit correspondiente. La entrada del módulo se separó en `consulta-administrativa.tsx` para incorporarla cuando se publique, conservando citas y descansos.
+
+La consulta usa guardado manual de borradores. Al reabrirlos se recuperan los campos SOAP, los diagnósticos y los medicamentos sin envolver nuevamente el texto guardado. Los expedientes antiguos de texto libre se conservan. La receta exige indicaciones introducidas por el profesional y permite editarlas; no asigna dosis ni duración por defecto. Una falla al consultar disponibilidad no borra la lista de citas y bloquea la edición del horario hasta poder cargarlo.
