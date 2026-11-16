@@ -52,6 +52,7 @@ type PacienteCitaRelacion = {
 type CitaFila = {
   id: number; inicio: string; fin?: string; estado: string; motivo: string | null; motivo_cancelacion: string | null
   paciente_id: number
+  recepcion_llegadas?: { llegada: string; inicio_cita: string; en_consulta: string | null } | { llegada: string; inicio_cita: string; en_consulta: string | null }[] | null
   perfiles_pacientes: PacienteCitaRelacion | PacienteCitaRelacion[] | null
   perfiles_medicos: MedicoRelacion | MedicoRelacion[] | null
 }
@@ -111,6 +112,8 @@ export type CitaPanel = {
   motivoCancelacion: string | null
   solicitaReagenda: boolean
   reagendadaPorRecepcion?: boolean
+  llegada?: string | null
+  enConsulta?: string | null
   estado: string
   inicio: number
 }
@@ -127,7 +130,7 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
   const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + DIAS_VENTANA_PANEL)
   const { filas, error } = await consultar<CitaFila>(
     supabase.from('citas')
-      .select('id, inicio, estado, motivo, motivo_cancelacion, paciente_id, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))')
+      .select('id, inicio, estado, motivo, motivo_cancelacion, paciente_id, recepcion_llegadas(llegada,inicio_cita,en_consulta), perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(id, duracion_consulta, usuarios(nombre_completo))')
       .order('inicio', { ascending: true })
       .gte('inicio', inicioDiaLocal(hoy))
       .lt('inicio', inicioDiaLocal(fin))
@@ -141,7 +144,11 @@ export async function cargarCitasPanel(): Promise<{ filas: CitaPanel[]; error: s
       const usuarioMedico = medico?.usuarios
       const nombreMedico = Array.isArray(usuarioMedico) ? usuarioMedico[0]?.nombre_completo : usuarioMedico?.nombre_completo
       const pacRel = Array.isArray(cita.perfiles_pacientes) ? cita.perfiles_pacientes[0] : cita.perfiles_pacientes
+      const llegada = Array.isArray(cita.recepcion_llegadas) ? cita.recepcion_llegadas[0] : cita.recepcion_llegadas
+      const vigente = llegada && Date.parse(llegada.inicio_cita) === Date.parse(cita.inicio)
       return {
+        llegada: vigente ? llegada.llegada : null,
+        enConsulta: vigente ? llegada.en_consulta : null,
         id: cita.id,
         pacienteId: cita.paciente_id,
         medicoId: medico?.id ?? 0,
@@ -394,11 +401,15 @@ export type PerfilPacienteDetalle = {
 
 export async function cargarPerfilPaciente(pacienteId: number): Promise<{ perfil: PerfilPacienteDetalle | null; error: string | null }> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('perfiles_pacientes')
     .select('id, esta_activo, fecha_nacimiento, genero, notas_medicas, usuarios(nombre_completo, correo, telefono)')
     .eq('id', pacienteId)
     .maybeSingle()
+  if (!data && !error) {
+    const administrativo = await supabase.rpc('clinica_directorio_recepcion', { p_id: pacienteId })
+    if (!administrativo.error) data = administrativo.data?.[0] ?? null
+  }
   if (error) return { perfil: null, error: error.message }
   if (!data) return { perfil: null, error: null }
   const u = Array.isArray(data.usuarios) ? data.usuarios[0] : data.usuarios
@@ -463,6 +474,10 @@ export async function cargarHistorialPaciente(pacienteId: number): Promise<{ fil
 }
 
 export type DatosExpediente = {
+  version?: string
+  clave?: string
+  concluir?: boolean
+  contenido?: Record<string, unknown>
   id?: number
   citaId: number
   diagnostico: string
@@ -505,13 +520,13 @@ export async function eliminarExpediente(expedienteId: number): Promise<{ error:
 }
 
 export async function cargarExpedientePorId(expedienteId: number): Promise<{
-  expediente: { id: number; citaId: number; diagnostico: string; receta: string; notas: string; fecha: string; paciente: string; medico: string; motivo: string } | null
+  expediente: { id: number; citaId: number; diagnostico: string; receta: string; notas: string; fecha: string; paciente: string; medico: string; motivo: string; notaEstado?: string } | null
   error: string | null
 }> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('expedientes')
-    .select('id, cita_id, diagnostico, receta, notas_doctor, creado_en, citas(id, motivo, inicio, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)))')
+    .select('id, cita_id, diagnostico, receta, notas_doctor, creado_en, estado_nota, citas(id, motivo, inicio, perfiles_pacientes(usuarios(nombre_completo)), perfiles_medicos(usuarios(nombre_completo)))')
     .eq('id', expedienteId)
     .maybeSingle()
 
@@ -528,6 +543,7 @@ export async function cargarExpedientePorId(expedienteId: number): Promise<{
     expediente: {
       id: data.id,
       citaId: data.cita_id,
+      notaEstado: data.estado_nota,
       diagnostico: data.diagnostico ?? '',
       receta: data.receta ?? '',
       notas: data.notas_doctor ?? '',
@@ -727,7 +743,7 @@ export type EstadisticasResumen = Record<string, { value: string; meta: string }
 
 export type MedicoTurno = { nombre: string; especialidad: string; estado: string }
 
-export type ResumenCamas = { ocupadas: number; total: number; libres: number }
+export type ResumenCamas = { ocupadas: number; total: number; libres: number; habilitadas?: number; fueraServicio?: number }
 
 export async function cargarResumenEstadisticas(): Promise<{
   filas: EstadisticasResumen
@@ -765,6 +781,7 @@ export async function cargarMedicosTurno(): Promise<{ filas: MedicoTurno[]; erro
   }>(
     createClient().from('perfiles_medicos')
       .select('especialidad, usuarios!inner(nombre_completo)')
+      .eq('usuarios.esta_activo', true)
       .eq('esta_activo', true)
   )
   return {
@@ -774,7 +791,7 @@ export async function cargarMedicosTurno(): Promise<{ filas: MedicoTurno[]; erro
       return {
         nombre: usuario?.nombre_completo ?? 'Médico',
         especialidad: doctor.especialidad,
-        estado: 'Disponible',
+        estado: 'Activo',
       }
     }),
   }
@@ -782,20 +799,10 @@ export async function cargarMedicosTurno(): Promise<{ filas: MedicoTurno[]; erro
 
 export async function cargarResumenCamas(): Promise<{ filas: ResumenCamas; error: string | null }> {
   const supabase = createClient()
-  const [total, ocupadas] = await Promise.all([
-    supabase.from('camas').select('id', { count: 'exact', head: true }),
-    supabase.from('camas').select('id', { count: 'exact', head: true }).eq('esta_ocupada', true),
-  ])
-  const totalCamas = total.count ?? 0
-  const ocupadasCamas = ocupadas.count ?? 0
-  return {
-    error: total.error?.message ?? ocupadas.error?.message ?? null,
-    filas: {
-      ocupadas: ocupadasCamas,
-      total: totalCamas,
-      libres: Math.max(totalCamas - ocupadasCamas, 0),
-    },
-  }
+  const { data, error } = await supabase.from('camas').select('id,esta_ocupada,habilitada,habitaciones!inner(activa,clinicas!inner(esta_activo))')
+  const camas = (data ?? []).map(c => { const h = Array.isArray(c.habitaciones) ? c.habitaciones[0] : c.habitaciones; const cl = Array.isArray(h?.clinicas) ? h.clinicas[0] : h?.clinicas; return { ocupada: c.esta_ocupada, habilitada: c.habilitada !== false && h?.activa !== false && cl?.esta_activo !== false } })
+  const habilitadas = camas.filter(c => c.habilitada).length
+  return { error: error?.message ?? null, filas: { total: camas.length, ocupadas: camas.filter(c => c.ocupada).length, libres: camas.filter(c => c.habilitada && !c.ocupada).length, habilitadas, fueraServicio: camas.length - habilitadas } }
 }
 
 export type MedicoAgenda = {
@@ -995,18 +1002,13 @@ export async function cargarPacientesParaCita(): Promise<{
   filas: { id: number; nombre: string }[]
   error: string | null
 }> {
-  const { filas, error } = await consultar<{
-    id: number
-    usuarios: { nombre_completo: string; esta_activo?: boolean } | { nombre_completo: string; esta_activo?: boolean }[] | null
-  }>(
-    createClient()
-      .from('perfiles_pacientes')
-      .select('id, usuarios(nombre_completo,esta_activo)')
-      .eq('esta_activo', true)
-      .order('id', { ascending: true })
-      .limit(200)
-  )
+  const db = createClient()
+  let { filas, error } = await consultar<{ id: number; usuarios: { nombre_completo: string; esta_activo?: boolean } | { nombre_completo: string; esta_activo?: boolean }[] | null }>(db.from('perfiles_pacientes').select('id, usuarios(nombre_completo,esta_activo)').eq('esta_activo', true).order('id').limit(200))
   if (error) return { filas: [], error }
+  if (!filas.length) {
+    const administrativo = await db.rpc('clinica_directorio_recepcion')
+    if (!administrativo.error && Array.isArray(administrativo.data)) filas = administrativo.data.filter((p: { esta_activo: boolean }) => p.esta_activo)
+  }
 
   return {
     error: null,
@@ -1066,7 +1068,11 @@ export async function obtenerCita(
   if (error) return { cita: null, error: error.message }
   if (!data) return { cita: null, error: null }
 
-  const pacienteRel = data.perfiles_pacientes as any
+  let pacienteRel = data.perfiles_pacientes as any
+  if (!pacienteRel) {
+    const administrativo = await supabase.rpc('clinica_directorio_recepcion', { p_id: data.paciente_id })
+    if (!administrativo.error) pacienteRel = administrativo.data?.[0]
+  }
   const pacienteUsr = Array.isArray(pacienteRel) ? pacienteRel[0]?.usuarios : pacienteRel?.usuarios
   const medicoRel = data.perfiles_medicos as any
   const medicoUsr = Array.isArray(medicoRel) ? medicoRel[0]?.usuarios : medicoRel?.usuarios
@@ -1104,7 +1110,11 @@ export async function obtenerCitaPanel(
   if (error) return { cita: null, error: error.message }
   if (!data) return { cita: null, error: null }
 
-  const pacienteRel = data.perfiles_pacientes as any
+  let pacienteRel = data.perfiles_pacientes as any
+  if (!pacienteRel) {
+    const administrativo = await supabase.rpc('clinica_directorio_recepcion', { p_id: data.paciente_id })
+    if (!administrativo.error) pacienteRel = administrativo.data?.[0]
+  }
   const pacienteUsr = Array.isArray(pacienteRel) ? pacienteRel[0]?.usuarios : pacienteRel?.usuarios
   const medicoRel = data.perfiles_medicos
   const medico: MedicoRelacion | null = Array.isArray(medicoRel) ? (medicoRel[0] ?? null) : (medicoRel as MedicoRelacion | null)

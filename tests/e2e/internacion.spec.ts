@@ -1,7 +1,7 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 import type { DatosHospital, IngresoHospital } from '../../lib/internacion/modelo'
-async function preparar(page: Page) {
+async function preparar(page: Page, rol = 'admin') {
   const user = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'prueba@example.test', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
   const encode = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url')
   const token = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now()/1000)+3600 })}.firma-prueba`
@@ -15,7 +15,7 @@ async function preparar(page: Page) {
   await page.route('**/auth/v1/**', (r) => r.fulfill({ json: new URL(r.request().url()).pathname.endsWith('/user') ? user : { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-prueba', user } }))
   await page.route('**/rest/v1/**', (r) => {
     const tabla = new URL(r.request().url()).pathname.split('/').pop()
-    const data = tabla === 'usuarios' ? [{ id: 3, auth_user_id: user.id, nombre_completo: 'Admin de prueba', correo: user.email, rol: 'admin', esta_activo: true }] : []
+    const data = tabla === 'usuarios' ? [{ id: 3, auth_user_id: user.id, nombre_completo: 'Admin de prueba', correo: user.email, rol, esta_activo: true }] : []
     return r.fulfill({ json: data, headers: { 'content-range': `0-0/${data.length}` } })
   })
   await page.route('**/api/internacion*', (r) => {
@@ -30,7 +30,7 @@ async function preparar(page: Page) {
       else { ingreso.motivo = body.motivo; ingreso.diagnostico = body.diagnostico; ingreso.camaId = body.camaId }
       await r.fulfill({ json: { id } }); return
     }
-    await r.fulfill({ json: { ingreso, movimientos: [{ id: 1, tipo: 'Ingreso', descripcion: 'Observación de prueba', fecha: base.ingreso, autor: 'Profesional de prueba' }] } })
+    await r.fulfill({ json: { ingreso, puedeAlta: rol === 'medico', movimientos: [{ id: 1, tipo: 'Ingreso', descripcion: 'Observación de prueba', fecha: base.ingreso, autor: 'Profesional de prueba' }] } })
   })
   await page.goto('/')
   await page.locator('input[type=email]').fill(user.email)
@@ -42,6 +42,72 @@ async function preparar(page: Page) {
   await expect(page.getByRole('row').filter({ hasText: 'María de prueba' })).toBeVisible()
   return { datos, escrituras, modal: page.getByRole('dialog') }
 }
+
+async function catalogoSimulado(page: Page) {
+  const catalogo = { clinicas: [{ id: 1, nombre: 'Clínica de prueba', activa: true }], habitaciones: [{ id: 100, clinicaId: 1, numero: '100', tipo: 'Doble', capacidad: 3, habilitadas: 2, activa: true, motivo: null, version: 'a'.repeat(32) }], camas: [{ id: 10, habitacionId: 100, numero: 'A', ocupada: true, habilitada: true, motivo: null as string | null, version: 'b'.repeat(32) }, { id: 11, habitacionId: 100, numero: 'B', ocupada: false, habilitada: true, motivo: null as string | null, version: 'c'.repeat(32) }] }
+  const escrituras: any[] = []; let fallar = false
+  await page.route('**/api/admin/camas', r => {
+    if (r.request().method() === 'POST') {
+      const b = r.request().postDataJSON(); escrituras.push(b)
+      if (fallar) { fallar = false; return r.fulfill({ status: 409, json: { error: 'La cama cambió. Actualiza el catálogo.' } }) }
+      if (b.accion === 'crear_cama') catalogo.camas.push({ id: 13, habitacionId: b.datos.habitacionId, numero: b.datos.numero, ocupada: false, habilitada: true, motivo: null, version: 'd'.repeat(32) })
+      if (b.accion === 'estado_cama') { const c = catalogo.camas.find(c => c.id === b.datos.id)!; c.habilitada = b.datos.habilitada; c.motivo = b.datos.motivo }
+      return r.fulfill({ json: { id: 13, mensaje: 'Catálogo actualizado.' } })
+    }
+    return r.fulfill({ json: catalogo })
+  })
+  return { catalogo, escrituras, fallar: () => { fallar = true } }
+}
+
+test('administración agrega camas dentro de una habitación y protege las ocupadas', async ({ page }) => {
+  const c = await catalogoSimulado(page), { modal } = await preparar(page)
+  await page.getByRole('button', { name: 'Administrar habitaciones y camas', exact: true }).click()
+  await expect(modal.getByRole('heading', { name: 'Administrar habitaciones y camas' })).toBeVisible()
+  await expect(modal.locator('article').filter({ hasText: 'Cama A' }).getByRole('button', { name: 'Editar cama' })).toBeDisabled()
+  await modal.getByRole('button', { name: 'Agregar cama', exact: true }).click()
+  await modal.getByLabel('Identificador de cama').fill('C')
+  await modal.getByRole('button', { name: 'Guardar recurso' }).click()
+  await expect(modal.getByRole('heading', { name: 'Cama C', exact: true })).toBeVisible()
+  expect(c.escrituras[0]).toMatchObject({ accion: 'crear_cama', datos: { habitacionId: 100, numero: 'C' } })
+  await page.screenshot({ path: '.herramientas/admin-camas.png', fullPage: true })
+})
+
+test('un conflicto conserva el formulario y las bajas temporales exigen motivo', async ({ page }) => {
+  const c = await catalogoSimulado(page), { modal } = await preparar(page)
+  await page.getByRole('button', { name: 'Administrar habitaciones y camas', exact: true }).click()
+  await modal.locator('article').filter({ hasText: 'Cama B' }).getByRole('button', { name: 'Deshabilitar cama' }).click()
+  await modal.getByRole('button', { name: 'Guardar recurso' }).click(); expect(c.escrituras).toHaveLength(0)
+  await modal.getByLabel('Motivo de baja temporal').fill('Limpieza y mantenimiento')
+  c.fallar(); await modal.getByRole('button', { name: 'Guardar recurso' }).click()
+  await expect(modal.getByRole('alert')).toContainText('La cama cambió')
+  await expect(modal.getByLabel('Motivo de baja temporal')).toHaveValue('Limpieza y mantenimiento')
+  await modal.getByRole('button', { name: 'Guardar recurso' }).click()
+  await expect(modal.locator('article').filter({ hasText: 'Cama B' })).toContainText('Fuera de servicio')
+  expect(c.escrituras[0].clave).toBe(c.escrituras[1].clave)
+})
+
+test('administración no autoriza el alta clínica y el médico no administra el catálogo', async ({ page }) => {
+  const { modal } = await preparar(page)
+  await page.getByRole('button', { name: 'Ver hospitalización de María de prueba' }).click()
+  await expect(modal.getByRole('button', { name: 'Editar ingreso' })).toBeVisible()
+  await expect(modal.getByRole('button', { name: 'Dar de alta', exact: true })).toHaveCount(0)
+})
+
+test('el catálogo administrativo no aparece en la interfaz del médico', async ({ page }) => {
+  await preparar(page, 'medico')
+  await expect(page.getByRole('button', { name: 'Administrar habitaciones y camas', exact: true })).toHaveCount(0)
+})
+
+test('crear habitaciones es cómodo en una pantalla pequeña', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await catalogoSimulado(page); const { modal } = await preparar(page)
+  await page.getByRole('button', { name: 'Administrar habitaciones y camas', exact: true }).click()
+  await modal.getByRole('button', { name: 'Crear habitación', exact: true }).click()
+  await modal.getByLabel('Número de habitación').fill('105')
+  await expect(modal.getByLabel('Capacidad de camas habilitadas')).toBeVisible()
+  expect(await modal.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await page.screenshot({ path: '.herramientas/admin-camas-movil.png', fullPage: true })
+})
 test('Ver abre el ingreso correcto en modo lectura y muestra movimientos', async ({ page }) => {
   const { modal, escrituras } = await preparar(page)
   await page.getByRole('button', { name: 'Ver hospitalización de María de prueba' }).click()
@@ -75,7 +141,7 @@ test('cambiar de Ver a Editar no envía el formulario automáticamente', async (
   expect(escrituras).toHaveLength(0)
 })
 test('alta exige nota y confirmación y guarda una sola vez', async ({ page }) => {
-  const { modal, escrituras } = await preparar(page)
+  const { modal, escrituras } = await preparar(page, 'medico')
   await page.getByRole('button', { name: 'Ver hospitalización de María de prueba' }).click()
   await modal.getByRole('button', { name: 'Dar de alta', exact: true }).click()
   const guardar = modal.getByRole('button', { name: 'Confirmar alta y liberar cama' })
@@ -146,12 +212,14 @@ test('conflicto al guardar conserva el borrador y comunica el error', async ({ p
   await expect(modal.getByLabel(/Motivo del internamiento/)).toHaveValue('Borrador conservado')
   expect(escrituras).toHaveLength(0)
 })
-test('exporta censo filtrado a PDF y CSV', async ({ page }) => {
+test('exporta censo filtrado a PDF y Excel', async ({ page }) => {
   await preparar(page)
   await page.getByRole('searchbox', { name: 'Buscar hospitalización' }).fill('MARIA')
   const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Censo PDF', exact: true }).click()])
   await expect(popup.locator('tbody tr')).toHaveCount(1)
   await expect(popup.locator('tbody')).toContainText('María de prueba')
-  const [descarga] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Descargar CSV', exact: true }).click()])
-  expect(descarga.suggestedFilename()).toBe('internacion_camas.csv')
+  await popup.screenshot({ path: test.info().outputPath('reporte.png'), fullPage: true })
+  await popup.pdf({ path: test.info().outputPath('censo.pdf'), format: 'A4', landscape: true, printBackground: true })
+  const [descarga] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Descargar Excel', exact: true }).click()])
+  expect(descarga.suggestedFilename()).toBe('internacion_camas.xlsx')
 })

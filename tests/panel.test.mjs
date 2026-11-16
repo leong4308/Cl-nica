@@ -128,6 +128,11 @@ test('estadoDe: los estados finales salen del panel', () => {
   }
 })
 
+test('estadoDe: una llegada registrada conserva al paciente en espera aunque hayan pasado diez minutos', () => {
+  assert.equal(estadoDe({ ...cita(-60), llegada: AHORA.toISOString() }, AHORA.getTime()), 'Confirmada')
+  assert.equal(estadoDe({ ...cita(-60), enConsulta: AHORA.toISOString() }, AHORA.getTime()), 'Confirmada')
+})
+
 test('estadoDe: el estado de la BD no altera la clasificación temporal', () => {
   assert.equal(estadoEn(30, 'Confirmada'), 'Confirmada', 'futura y confirmada es Actual')
   assert.equal(estadoEn(-5, 'Confirmada'), 'Pendiente', 'ya empezó: toca check-in')

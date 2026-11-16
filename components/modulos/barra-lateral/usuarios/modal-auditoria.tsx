@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { ModalMarco } from '../../compartidos/modal-marco'
 import { AvisoClinico, BOTON_SECUNDARIO, CAMPO_CLINICO } from '../../compartidos/editor-clinico'
-const TABLAS: Record<string,string> = { usuarios:'Usuarios',perfiles_pacientes:'Pacientes',citas:'Citas',expedientes:'Expedientes',internaciones:'Internaciones',episodios_medicos:'Movimientos clínicos',ordenes_medicas:'Órdenes médicas',solicitudes_analisis:'Laboratorio',paciente_medicos:'Médicos tratantes',configuracion_agenda:'Horarios',ordenes:'Documentos de órdenes',laboratorio:'Documentos de laboratorio' }
+const TABLAS: Record<string,string> = { consultorios:'Consultorios',consultorio_turnos:'Asignaciones de consultorio',lista_espera:'Lista de espera',espera_ofertas:'Ofertas de horario',controles_seguimiento:'Controles de seguimiento',envios:'Reintentos de avisos', habitaciones:'Habitaciones',camas:'Camas',usuarios:'Usuarios',perfiles_pacientes:'Pacientes',citas:'Citas',expedientes:'Expedientes',internaciones:'Internaciones',episodios_medicos:'Movimientos clínicos',ordenes_medicas:'Órdenes médicas',solicitudes_analisis:'Laboratorio',paciente_medicos:'Médicos tratantes',configuracion_agenda:'Horarios',ordenes:'Documentos de órdenes',laboratorio:'Documentos de laboratorio' }
 type Evento = { id:number; fecha:string; autor:string; tabla:string; registro_id:string; accion:string; anterior:Record<string,unknown>|null; nuevo:Record<string,unknown>|null }
 const texto = (v: unknown) => v === null || v === undefined ? 'Sin valor' : typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)
 export function ModalAuditoria({ onClose }: { onClose:()=>void }) {

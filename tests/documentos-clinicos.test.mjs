@@ -65,7 +65,15 @@ test('sin sesión, paciente, perfil inactivo o registro inaccesible no permiten 
 })
 test('enfermería adjunta a órdenes pero no a expedientes', async () => {
   assert.equal((await escenario({ rol: 'enfermero', tipo: 'expedientes' }).subir()).status, 403)
-  assert.equal((await escenario({ rol: 'enfermero', tipo: 'ordenes' }).subir()).status, 200)
+  assert.equal((await escenario({ rol: 'enfermero', tipo: 'ordenes' }).subir()).status, 403)
+})
+test('recepción no consulta ni descarga PDF clínicos', async () => {
+  for (const tipo of ['expedientes', 'ordenes']) {
+    const e = escenario({ rol: 'recepcionista', tipo })
+    assert.equal((await e.api.GET(new Request('http://localhost/api/documentos-clinicos'), e.contexto)).status, 403)
+    assert.deepEqual(e.llamadas.firmas, [])
+    assert.deepEqual(e.llamadas.listas, [])
+  }
 })
 test('servidor rechaza PDF mayor de 2 MB y contenido falso sin subirlos', async () => {
   const e = escenario()

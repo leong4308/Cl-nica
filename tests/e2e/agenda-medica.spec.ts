@@ -1,5 +1,5 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 import { resumirAgenda } from '../../lib/agenda/modelo'
 async function preparar(page: Page, rol = 'admin', configurado = true) {
   await page.clock.setFixedTime(new Date('2026-11-09T14:00:00Z'))
@@ -16,6 +16,7 @@ async function preparar(page: Page, rol = 'admin', configurado = true) {
   await page.route('**/auth/v1/**',r=>r.fulfill({json:new URL(r.request().url()).pathname.endsWith('/user')?user:{access_token:token,token_type:'bearer',expires_in:7200,refresh_token:'refresh-prueba',user}}))
   await page.route('**/rest/v1/**',async r=>{
     const url=new URL(r.request().url()),tabla=url.pathname.split('/').pop();let data:any[]=[]
+    if(tabla==='clinica_consulta_leer')return r.fulfill({json:{version:'a'.repeat(32),nota:null}})
     if(tabla==='usuarios')data=[{id:11,auth_user_id:user.id,nombre_completo:'Profesional 1',correo:user.email,rol,esta_activo:true}]
     if(tabla==='perfiles_medicos')data=url.searchParams.has('usuario_id')?[medicos[0]]:medicos
     if(tabla==='perfiles_pacientes')data=pacientes
@@ -31,6 +32,18 @@ async function preparar(page: Page, rol = 'admin', configurado = true) {
     await r.fulfill({json:data,headers:{'content-range':`0-0/${data.length}`}})
   })
   await page.route('**/api/agenda/*',async r=>{const url=new URL(r.request().url()),id=Number(url.pathname.split('/').pop());if(r.request().method()==='PATCH'){const body=r.request().postDataJSON();horarios.push({id,...body});bloques=body.bloques;descansos=body.descansos;return r.fulfill({json:{ok:true}})}return r.fulfill({json:resumirAgenda(bloques,citas.filter(c=>c.medico_id===id),url.searchParams.get('fecha')||'2026-11-09',id===1?20:30,new Date('2026-11-09T14:00:00Z'),7,descansos)})})
+  await page.route('**/api/medico**',r=>{
+    const params=new URL(r.request().url()).searchParams
+    if(r.request().method()==='POST'){
+      const b=r.request().postDataJSON(),d=b.datos.contenido,c=citas.find(x=>x.id===b.datos.citaId)!,anterior=expedientes.find(e=>e.cita_id===c.id),contenido={cita_id:c.id,diagnostico:d.diagnostico,receta:d.recetaLibre,notas_doctor:d.subjetivo,contenido:d,estado_nota:b.datos.cerrar?'cerrada':'borrador'}
+      if(anterior)Object.assign(anterior,contenido);else expedientes.push({id:expedientes.length+1,...contenido})
+      if(b.datos.cerrar){c.estado='atendida';cambiosCita.push({estado:'atendida'})}
+      return r.fulfill({json:{ok:true,mensaje:b.datos.cerrar?'Consulta guardada y finalizada correctamente.':'Borrador guardado en el expediente.'}})
+    }
+    const c=citas.find(x=>x.id===Number(params.get('cita')))
+    if(c)return r.fulfill({json:{cita:{id:c.id,pacienteId:c.paciente_id,paciente:c.perfiles_pacientes.usuarios.nombre_completo,medico:'Profesional 1',cedula:'CED-REAL-1',inicio:c.inicio,estado:c.estado,motivo:c.motivo,alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:expedientes.find(e=>e.cita_id===c.id)??null,correcciones:[],ordenes:[],catalogo:[]}})
+    return r.fulfill({json:{dia:params.get('dia'),ahora:'2026-11-09T14:00:00Z',citas:citas.map(c=>({id:c.id,pacienteId:c.paciente_id,paciente:c.perfiles_pacientes.usuarios.nombre_completo,inicio:c.inicio,fin:c.fin,estado:c.estado,motivo:c.motivo,llegada:null,enConsulta:null})),abiertas:[],resultados:[],incidencias:[]}})
+  })
   await page.route('**/api/citas',r=>{agendadas.push(r.request().postDataJSON());return r.fulfill({json:{id:200+agendadas.length}})})
   await page.goto('/');await page.locator('input[type=email]').fill(user.email);await page.locator('input[type=password]').fill('Prueba123*');await page.getByRole('button',{name:'Ingresar',exact:true}).click();await expect(page.getByRole('button',{name:'Menú de usuario'})).toBeVisible()
   return {agendadas,horarios,expedientes,cambiosCita}
@@ -61,7 +74,7 @@ test('Mi Consulta muestra agenda e intervalos reales y no inventa datos del paci
 test('recepción agenda al mismo paciente con cualquiera de los tres médicos',async({page})=>{
   const {agendadas}=await preparar(page,'recepcionista')
   for(const id of [1,2,3]){
-    await page.getByRole('button',{name:'Agendar cita médica',exact:true}).click();const modal=page.getByRole('dialog')
+    await page.getByRole('button',{name:'Agendar cita',exact:true}).click();const modal=page.getByRole('dialog')
     await modal.getByLabel('Paciente',{exact:true}).fill('Paciente de prueba');await modal.getByRole('button',{name:'Paciente de prueba',exact:true}).click()
     await modal.getByLabel('Médico y especialidad',{exact:true}).selectOption(String(id));await modal.getByLabel('Fecha de la cita').fill('2026-11-10')
     const hora=id===1?'08:00':id===2?'10:00':'12:00'
@@ -70,9 +83,31 @@ test('recepción agenda al mismo paciente con cualquiera de los tres médicos',a
   }
   expect(agendadas).toHaveLength(3);expect(agendadas.map(c=>c.medicoId)).toEqual([1,2,3]);expect(agendadas.every(c=>c.pacienteId===7)).toBe(true)
 })
+
+test('recepción recibe disponibilidad del paciente y puede responder sin modificar su reserva',async({page})=>{
+ const solicitudes=[{id:4,cita_id:101,paciente:'Paciente de prueba',medico:'Profesional 1',telefono:'9611234567',inicio:'2026-11-09T16:00:00Z',estado:'pendiente',disponibilidad:'Puedo el martes y miércoles, de 16:00 a 19:00.',respuesta:null as string|null,canal:'telegram'}]
+ const enviadas:object[]=[]
+ await page.route('**/api/citas/respuestas',async r=>{
+   if(r.request().method()==='PATCH'){const b=r.request().postDataJSON();enviadas.push(b);solicitudes[0].estado='cerrada';solicitudes[0].respuesta=b.respuesta;return r.fulfill({json:{ok:true}})}
+   return r.fulfill({json:{solicitudes}})
+ })
+ await preparar(page,'recepcionista')
+ const panel=page.getByRole('region',{name:'Solicitudes para reagendar',exact:true})
+ await expect(panel.getByText('Puedo el martes y miércoles, de 16:00 a 19:00.',{exact:true})).toBeVisible()
+ await expect(panel.getByText('Telegram · pendiente',{exact:true})).toBeVisible()
+ await panel.getByRole('button',{name:'Responder sin cambiar cita',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Responder a Paciente de prueba',exact:true})
+ await modal.getByLabel('Mensaje para el paciente').fill('Te contactaremos para acordar una hora dentro de tu disponibilidad.')
+ await modal.getByRole('button',{name:'Enviar respuesta y cerrar solicitud',exact:true}).click()
+ await expect(modal).toHaveCount(0)
+ await expect(panel.getByText('No hay solicitudes pendientes de revisar.',{exact:true})).toBeVisible()
+ expect(enviadas).toEqual([{id:4,respuesta:'Te contactaremos para acordar una hora dentro de tu disponibilidad.'}])
+ await panel.getByRole('button',{name:'Ver historial de solicitudes',exact:true}).click()
+ await expect(panel.getByText('Te contactaremos para acordar una hora dentro de tu disponibilidad.',{exact:true})).toBeVisible()
+})
 test('sin horario publicado no anuncia horas libres y recepción puede proponer un intervalo',async({page})=>{
   const {agendadas}=await preparar(page,'recepcionista',false)
-  await page.getByRole('button',{name:'Agendar cita médica',exact:true}).click();const modal=page.getByRole('dialog')
+  await page.getByRole('button',{name:'Agendar cita',exact:true}).click();const modal=page.getByRole('dialog')
   await expect(modal.getByText(/aún no tiene horario publicado/)).toBeVisible()
   await modal.getByLabel('Paciente',{exact:true}).fill('Paciente de prueba');await modal.getByRole('button',{name:'Paciente de prueba',exact:true}).click()
   await modal.getByLabel('Fecha de la cita').fill('2026-11-10');await modal.getByLabel('Hora de la cita').fill('10:20');await modal.getByLabel('Motivo de la cita').fill('Revisión')
@@ -86,7 +121,7 @@ test('administración asigna un descanso por fecha al médico seleccionado',asyn
 })
 test('el error al guardar mantiene el formulario de cita para corregirlo',async({page})=>{
   await preparar(page,'recepcionista',false);await page.route('**/api/citas',r=>r.fulfill({status:409,json:{error:'El médico tiene un descanso asignado en ese intervalo.'}}))
-  await page.getByRole('button',{name:'Agendar cita médica',exact:true}).click();const modal=page.getByRole('dialog');await modal.getByLabel('Paciente',{exact:true}).fill('Paciente de prueba');await modal.getByRole('button',{name:'Paciente de prueba',exact:true}).click();await modal.getByLabel('Fecha de la cita').fill('2026-11-10');await modal.getByLabel('Hora de la cita').fill('10:00');await modal.getByLabel('Motivo de la cita').fill('Control conservado');await modal.getByRole('button',{name:'Agendar cita',exact:true}).click();await expect(modal.getByRole('alert')).toContainText('descanso asignado');await expect(modal.getByLabel('Motivo de la cita')).toHaveValue('Control conservado')
+  await page.getByRole('button',{name:'Agendar cita',exact:true}).click();const modal=page.getByRole('dialog');await modal.getByLabel('Paciente',{exact:true}).fill('Paciente de prueba');await modal.getByRole('button',{name:'Paciente de prueba',exact:true}).click();await modal.getByLabel('Fecha de la cita').fill('2026-11-10');await modal.getByLabel('Hora de la cita').fill('10:00');await modal.getByLabel('Motivo de la cita').fill('Control conservado');await modal.getByRole('button',{name:'Agendar cita',exact:true}).click();await expect(modal.getByRole('alert')).toContainText('descanso asignado');await expect(modal.getByLabel('Motivo de la cita')).toHaveValue('Control conservado')
 })
 test('vista médica se adapta a un teléfono',async({page})=>{
   await page.setViewportSize({width:390,height:844});await preparar(page);await page.getByRole('button',{name:'Abrir menú',exact:true}).click();await page.getByRole('button',{name:'Mi Consulta',exact:true}).click();await expect(page.getByRole('heading',{name:'Disponibilidad del médico'})).toBeVisible();const ancho=await page.evaluate(()=>({doc:document.documentElement.scrollWidth,pantalla:innerWidth}));expect(ancho.doc).toBeLessThanOrEqual(ancho.pantalla+1)
@@ -121,7 +156,7 @@ test('recepción conserva las agendas y los descansos sin la pantalla de consult
   await preparar(page,'recepcionista')
   await expect(page.getByRole('button',{name:'Mi Consulta',exact:true})).toHaveCount(0)
   await page.getByRole('button',{name:'Médicos',exact:true}).click()
-  await expect(page.getByRole('heading',{name:'Disponibilidad del médico'})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Médicos',exact:true})).toBeVisible()
   await expect(page.getByRole('tab',{name:'Registrar consulta'})).toHaveCount(0)
   await expect(page.getByRole('button',{name:'Configurar horario',exact:true})).toHaveCount(0)
   await expect(page.getByRole('button',{name:'Agendar cita',exact:true})).toBeVisible()
@@ -186,4 +221,21 @@ test('guardar y reabrir un borrador conserva campos y receta sin finalizar ni du
   await expect(page.getByRole('button',{name:'Actualizar',exact:true})).toBeEnabled()
   expect(expedientes).toEqual([guardado])
   expect(cambiosCita).toEqual([])
+})
+
+
+test('el médico inicia la atención del paciente que recepción dejó en espera',async({page})=>{
+  await preparar(page,'medico')
+  const estado={id:101,estado:'confirmada',puedeIniciar:true,version:'a'.repeat(32),llegada:'2026-11-09T13:50:00Z',enConsulta:null as string|null}
+  const acciones:object[]=[]
+  await page.route('**/api/recepcion**',async r=>{
+    if(r.request().method()==='POST'){acciones.push(r.request().postDataJSON());estado.enConsulta='2026-11-09T14:00:00Z';return r.fulfill({json:{ok:true,mensaje:'Consulta iniciada.'}})}
+    return r.fulfill({json:estado})
+  })
+  await page.getByRole('button',{name:'Abrir consulta',exact:true}).first().click()
+  const modal=page.getByRole('dialog')
+  await expect(modal.getByText(/Paciente en espera/)).toBeVisible()
+  await modal.getByRole('button',{name:'Iniciar atención',exact:true}).click()
+  await expect(modal.getByText(/Consulta iniciada a las/)).toBeVisible()
+  expect(acciones[0]).toMatchObject({citaId:101,accion:'iniciar',version:'a'.repeat(32)})
 })

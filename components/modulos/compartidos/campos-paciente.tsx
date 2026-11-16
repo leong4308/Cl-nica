@@ -2,6 +2,7 @@
 
 export type DatosPacienteFormulario = {
   nombre: string
+  correo: string
   telefono: string
   fechaNacimiento: string
   genero: string
@@ -10,6 +11,7 @@ export type DatosPacienteFormulario = {
 
 export const DATOS_PACIENTE_INICIALES: DatosPacienteFormulario = {
   nombre: '',
+  correo: '',
   telefono: '',
   fechaNacimiento: '',
   genero: 'M',
@@ -19,6 +21,7 @@ export const DATOS_PACIENTE_INICIALES: DatosPacienteFormulario = {
 export function payloadPaciente(datos: DatosPacienteFormulario) {
   return {
     nombre: datos.nombre.trim(),
+    correo: datos.correo.trim().toLowerCase() || undefined,
     telefono: datos.telefono.trim() || undefined,
     fechaNacimiento: datos.fechaNacimiento || undefined,
     genero: datos.genero || undefined,
@@ -27,6 +30,7 @@ export function payloadPaciente(datos: DatosPacienteFormulario) {
 }
 
 type PropsCamposPaciente = {
+  soloAdministrativo?: boolean
   datos: DatosPacienteFormulario
   onChange: <K extends keyof DatosPacienteFormulario>(campo: K, valor: DatosPacienteFormulario[K]) => void
   prefijoId?: string
@@ -44,6 +48,7 @@ export function CamposPaciente({
   prefijoId = 'paciente',
   autoFocusNombre = false,
   disabled = false,
+  soloAdministrativo = false,
 }: PropsCamposPaciente) {
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -64,6 +69,11 @@ export function CamposPaciente({
         />
       </div>
 
+      <div>
+        <label htmlFor={`${prefijoId}-correo`} className={ETIQUETA}>Correo electrónico</label>
+        <input id={`${prefijoId}-correo`} type="email" autoComplete="email" maxLength={150} disabled={disabled} placeholder="correo@ejemplo.com" value={datos.correo} onChange={e => onChange('correo', e.target.value)} className={CAMPO} />
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">Opcional. Permite invitar al paciente a su portal y enviarle avisos de citas.</p>
+      </div>
       <div>
         <label htmlFor={`${prefijoId}-tel`} className={ETIQUETA}>
           Teléfono
@@ -111,7 +121,7 @@ export function CamposPaciente({
         </div>
       </div>
 
-      <div>
+      {!soloAdministrativo && <div>
         <label htmlFor={`${prefijoId}-notas`} className={ETIQUETA}>
           Notas médicas o antecedentes
         </label>
@@ -124,7 +134,7 @@ export function CamposPaciente({
           onChange={(e) => onChange('notasMedicas', e.target.value)}
           className={CAMPO + ' resize-y leading-relaxed'}
         />
-      </div>
+      </div>}
     </div>
   )
 }

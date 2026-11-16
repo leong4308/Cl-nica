@@ -5,10 +5,15 @@ export const PREFERENCIAS_INICIALES: PreferenciasUsuario = { textoGrande: false,
 export function opcionesInicio(rol: RolUsuario): string[] {
   const comunes = ['Predeterminada', 'Citas', 'Pacientes']
   if (rol !== 'paciente' && rol !== 'medico') comunes.push('Resumen')
-  if (['admin', 'medico', 'recepcionista'].includes(rol)) comunes.push('Expedientes')
+  if (['admin', 'medico'].includes(rol)) comunes.push('Expedientes')
   if (['admin', 'medico', 'enfermero'].includes(rol)) comunes.push('Órdenes médicas', 'Laboratorio')
   if (['admin', 'medico', 'enfermero'].includes(rol)) comunes.push('Internación')
-  if (rol === 'admin') comunes.push('Mi Consulta')
+  if (['admin','medico'].includes(rol)) comunes.push('Enfermería')
+  if (rol === 'recepcionista') comunes.push('Sala de espera', 'Solicitudes', 'Médicos')
+  if (rol === 'enfermero') comunes.push('Notas y signos','Medicamentos','Entrega de turno')
+  if (rol === 'admin') comunes.push('Mi Consulta', 'Reportes')
+  if (['admin', 'recepcionista'].includes(rol)) comunes.push('Comunicaciones', 'Lista de espera', 'Consultorios')
+  if (rol === 'medico') comunes.push('Controles')
   return rol === 'paciente' ? ['Predeterminada'] : comunes
 }
 export function normalizarPreferencias(valor: unknown, rol: RolUsuario): PreferenciasUsuario {

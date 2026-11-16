@@ -1,5 +1,5 @@
 export type EstadoInternacion = 'activa' | 'alta' | 'traslado'
-export type CamaHospital = { id: number; habitacionId: number; clinicaId: number; numero: string; habitacion: string; tipo: string; ocupada: boolean; paciente: string | null; internacionId: number | null; inconsistente: boolean }
+export type CamaHospital = { habilitada?: boolean; motivoBaja?: string | null; id: number; habitacionId: number; clinicaId: number; numero: string; habitacion: string; tipo: string; ocupada: boolean; paciente: string | null; internacionId: number | null; inconsistente: boolean }
 export type MedicoHospital = { id: number; nombre: string; especialidad: string; clinicaId: number }
 export type PacienteHospital = { id: number; nombre: string; ingresoActivo: boolean }
 export type IngresoHospital = { id: number; pacienteId: number; paciente: string; medicoId: number; medico: string; clinicaId: number; habitacionId: number; habitacion: string; tipoHabitacion: string; camaId: number; cama: string; ingreso: string; alta: string | null; estado: EstadoInternacion; motivo: string; diagnostico: string; version: string }

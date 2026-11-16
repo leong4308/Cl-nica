@@ -64,14 +64,14 @@ function cuenta(opciones = {}) {
 }
 test('mi perfil actualiza solo nombre y teléfono de la cuenta autenticada', async () => {
   const e = cuenta()
-  const api = cargar('../app/api/cuenta/route.ts', { '@/lib/cuenta/servidor': e.servidor, '@/lib/cuenta/preferencias': preferencias, '@/lib/cuenta/validacion': validacion })
+  const api = cargar('../app/api/cuenta/route.ts', { '@/lib/cuenta/servidor': e.servidor, '@/lib/cuenta/preferencias': preferencias, '@/lib/cuenta/validacion': validacion, '@/lib/supabase/error-operacion': cargar('../lib/supabase/error-operacion.ts') })
   const respuesta = await api.PATCH(new Request('http://localhost/api/cuenta', { method: 'PATCH', body: JSON.stringify({ accion: 'perfil', nombre: 'Ana', telefono: '5555555555', id: 999, rol: 'admin', correo: 'otro@example.test' }) }))
   assert.equal(respuesta.status, 200)
   assert.deepEqual(e.escrituras, [{ nombre_completo: 'Ana', telefono: '5555555555' }])
 })
 test('preferencias guarda únicamente opciones normalizadas', async () => {
   const e = cuenta()
-  const api = cargar('../app/api/cuenta/route.ts', { '@/lib/cuenta/servidor': e.servidor, '@/lib/cuenta/preferencias': preferencias, '@/lib/cuenta/validacion': validacion })
+  const api = cargar('../app/api/cuenta/route.ts', { '@/lib/cuenta/servidor': e.servidor, '@/lib/cuenta/preferencias': preferencias, '@/lib/cuenta/validacion': validacion, '@/lib/supabase/error-operacion': cargar('../lib/supabase/error-operacion.ts') })
   const res = await api.PATCH(new Request('http://localhost', { method: 'PATCH', body: JSON.stringify({ accion: 'preferencias', preferencias: { altoContraste: true, rol: 'admin', paginaInicio: 'Usuarios' } }) }))
   assert.equal(res.status, 200)
   assert.deepEqual(e.escrituras[0], { data: { clinica_preferencias: { textoGrande: false, reducirAnimaciones: false, altoContraste: true, paginaInicio: 'Predeterminada' } } })
@@ -106,9 +106,9 @@ function paciente({ rol = 'medico', sinSesion = false, fallaPerfil = false } = {
   const original = { id: 7, usuario_id: 70, fecha_nacimiento: '1990-01-01', genero: 'F', nombre_contacto_emergencia: null, telefono_emergencia: null, usuarios: { nombre_completo: 'Paciente', correo: 'paciente@example.test', telefono: '5555555555' } }
   const db = { rpc: async (operacion, datos) => { escrituras.push({ operacion, datos }); return fallaPerfil ? { data: null, error: { code: '40001', message: 'El paciente cambió' } } : { data: { ok: true }, error: null } }, auth: { getUser: async () => ({ data: { user: sinSesion ? null : { id: 'actual' } } }) }, from(tabla) { const q = { select() { return q }, eq() { return q }, async maybeSingle() { return { data: tabla === 'usuarios' ? { rol, esta_activo: true } : original, error: null } } }; return q } }
   const admin = { from(tabla) { let cambios; const q = { update(payload) { cambios = payload; escrituras.push({ tabla, payload }); return q }, eq() { return q }, is() { return q }, select() { return q }, async maybeSingle() { return { data: fallaPerfil && tabla === 'perfiles_pacientes' ? null : { id: 7 }, error: null } }, then(resolver) { return Promise.resolve({ error: null }).then(resolver) } }; return q } }
-  const api = cargar('../app/api/pacientes/[id]/route.ts', { '@/lib/supabase/server': { createClient: async () => db }, '@supabase/supabase-js': { createClient: () => admin }, '@/lib/cuenta/validacion': validacion })
+  const api = cargar('../app/api/pacientes/[id]/route.ts', { '@/lib/supabase/server': { createClient: async () => db }, '@supabase/supabase-js': { createClient: () => admin }, '@/lib/cuenta/validacion': validacion, '@/lib/notificaciones/correo.mjs': { configuracionCorreo: () => null } })
   const contexto = { params: Promise.resolve({ id: '7' }) }
-  const guardar = () => api.PATCH(new Request('http://localhost', { method: 'PATCH', body: JSON.stringify({ nombre: 'Nombre modificado', telefono: '5511111111', fechaNacimiento: '1991-02-03', genero: 'F', contactoEmergencia: 'Contacto', telefonoEmergencia: '5599999999', correo: 'no-se-cambia@example.test', rol: 'admin', notasMedicas: 'no-se-cambia' }) }), contexto)
+  const guardar = () => api.PATCH(new Request('http://localhost', { method: 'PATCH', body: JSON.stringify({ nombre: 'Nombre modificado', telefono: '5511111111', fechaNacimiento: '1991-02-03', genero: 'F', contactoEmergencia: 'Contacto', telefonoEmergencia: '5599999999', rol: 'admin', notasMedicas: 'no-se-cambia' }) }), contexto)
   return { api, contexto, guardar, escrituras }
 }
 process.env.NEXT_PUBLIC_SUPABASE_URL ||= 'https://example.test'
@@ -128,4 +128,26 @@ test('un conflicto de la transacción del paciente se comunica sin simular éxit
   const e = paciente({ fallaPerfil: true })
   assert.equal((await e.guardar()).status, 409)
   assert.equal(e.escrituras.length, 1)
+})
+
+
+test('paciente valida y guarda su ficha con versión sin aceptar identificadores, correo ni campos clínicos',async()=>{
+ const llamadas=[],e=cuenta();e.servidor.cuentaAutenticada=async()=>({db:{rpc:async(fn,p)=>{llamadas.push({fn,p});return {data:{ok:true,paciente:{nombre:'Paciente',telefono:'9611234567',fechaNacimiento:'1990-01-01',genero:'F',contactoEmergencia:'Contacto',telefonoEmergencia:'9617654321',version:'b'.repeat(32)}}}}},user:{id:'propio'},usuario:{rol:'paciente'}})
+ const api=cargar('../app/api/cuenta/route.ts',{'@/lib/cuenta/servidor':e.servidor,'@/lib/cuenta/preferencias':preferencias,'@/lib/cuenta/validacion':validacion})
+ const body={accion:'perfil',nombre:'Paciente',telefono:'9611234567',fechaNacimiento:'1990-01-01',genero:'F',contactoEmergencia:'Contacto',telefonoEmergencia:'9617654321',version:'a'.repeat(32)}
+ const enviar=datos=>api.PATCH(new Request('http://localhost/api/cuenta',{method:'PATCH',body:JSON.stringify(datos)}))
+ assert.equal((await enviar({...body,fechaNacimiento:'2999-01-01'})).status,400)
+ assert.equal((await enviar({...body,genero:'X'})).status,400)
+ assert.equal((await enviar({...body,telefonoEmergencia:'texto'})).status,400)
+ assert.equal(llamadas.length,0)
+ const r=await enviar({...body,pacienteId:999,correo:'intruso@test.local',rol:'admin',notasMedicas:'Falso'})
+ assert.equal(r.status,200);assert.deepEqual(llamadas[0],{fn:'clinica_guardar_mis_datos',p:{p_datos:{nombre:body.nombre,telefono:body.telefono,fechaNacimiento:body.fechaNacimiento,genero:body.genero,contactoEmergencia:body.contactoEmergencia,telefonoEmergencia:body.telefonoEmergencia},p_version:body.version}})
+ assert.equal((await r.json()).paciente.version,'b'.repeat(32))
+})
+
+test('un conflicto de versión del perfil devuelve 409 y no intenta una escritura directa',async()=>{
+ const e=cuenta();e.servidor.cuentaAutenticada=async()=>({db:{rpc:async()=>({error:{code:'PT409',message:'Tus datos cambiaron'}})},user:{id:'propio'},usuario:{rol:'paciente'}})
+ const api=cargar('../app/api/cuenta/route.ts',{'@/lib/cuenta/servidor':e.servidor,'@/lib/cuenta/preferencias':preferencias,'@/lib/cuenta/validacion':validacion})
+ const r=await api.PATCH(new Request('http://localhost/api/cuenta',{method:'PATCH',body:JSON.stringify({accion:'perfil',nombre:'Paciente',telefono:'',fechaNacimiento:'',genero:'',contactoEmergencia:'',telefonoEmergencia:'',version:'a'.repeat(32)})}))
+ assert.equal(r.status,409);assert.equal((await r.json()).error,'Tus datos cambiaron');assert.equal(e.escrituras.length,0)
 })

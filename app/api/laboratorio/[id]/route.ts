@@ -21,7 +21,7 @@ async function autorizar(idTexto: string) {
   const db = await createClient()
   const { data: { user }, error: authError } = await db.auth.getUser()
   if (authError || !user) return { respuesta: fallo('Inicia sesión para continuar.', 401) } as const
-  const { data: perfil, error: errorPerfil } = await db.from('usuarios').select('id, rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
+  const { data: perfil, error: errorPerfil } = await db.from('usuarios').select('id, rol, esta_activo, puede_validar_laboratorio').eq('auth_user_id', user.id).maybeSingle()
   if (errorPerfil || !perfil?.esta_activo || !['admin', 'medico', 'enfermero'].includes(perfil.rol)) return { respuesta: fallo('No tienes permiso para acceder a los resultados de laboratorio.', 403) } as const
   const denegado = await autorizarRegistro(db, 'laboratorio', id, perfil)
   if (denegado) return { respuesta: denegado } as const
@@ -30,7 +30,7 @@ async function autorizar(idTexto: string) {
     .select('id, archivo_resultado, estado_analisis, fecha_resultado').eq('id', id).maybeSingle()
   if (error) return { respuesta: fallo('No se pudo consultar la solicitud.', 500) } as const
   if (!solicitud) return { respuesta: fallo('Solicitud no encontrada o sin acceso.', 404) } as const
-  return { db, user, solicitud, id } as const
+  return { db, user, solicitud, id, rol: perfil.rol, puedeValidar: perfil.rol === 'admin' || perfil.puede_validar_laboratorio === true } as const
 }
 
 // Acceso al PDF de la solicitud; nunca se acepta una ruta enviada por el navegador.
@@ -62,6 +62,7 @@ export async function POST(request: Request, { params }: Contexto) {
     if (origin && origin !== new URL(request.url).origin) return fallo('Origen de solicitud inválido.', 403)
     const acceso = await autorizar((await params).id)
     if ('respuesta' in acceso) return acceso.respuesta
+    if (!acceso.puedeValidar) return fallo('Enfermería registra toma y entrega de muestras desde Mi turno. La validación de resultados corresponde al personal autorizado.', 403)
     const { db, solicitud, id } = acceso
     if (Number(request.headers.get('content-length')) > MAX_PDF_BYTES + 1024 * 1024) return fallo('La solicitud supera el tamaño permitido.', 413)
     const form = await request.formData()

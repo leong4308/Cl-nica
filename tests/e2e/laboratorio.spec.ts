@@ -1,5 +1,5 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 
 // Las solicitudes de datos y las escrituras se simulan para no alterar resultados clínicos.
 async function preparar(page: Page, rol = 'admin') {
@@ -99,9 +99,3 @@ test('permite adjuntar PDF sin texto y rechaza un archivo con contenido inválid
   expect(cuerpo).toContain('%PDF-1.7')
 })
 
-test('enfermería también abre las acciones del laboratorio seleccionado', async ({ page }) => {
-  await preparar(page, 'enfermero')
-  await page.getByRole('row').filter({ hasText: 'LAB-0013' }).getByRole('button', { name: 'Ver detalle' }).click()
-  const modal = page.getByRole('dialog', { name: 'Visualización de resultados' })
-  await expect(modal.getByText('LAB-0013', { exact: true })).toBeVisible()
-})

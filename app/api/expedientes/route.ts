@@ -1,91 +1,19 @@
-import { origenValido } from '@/lib/cuenta/servidor'
-import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-
-async function autorizar(soloAdmin = false) {
-  const db = await createClient()
-  const { data: { user } } = await db.auth.getUser()
-  if (!user) return { respuesta: NextResponse.json({ error: 'Inicia sesión para continuar.' }, { status: 401 }) } as const
-  const { data: perfil } = await db.from('usuarios').select('id, rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
-  if (!perfil?.esta_activo || !(soloAdmin ? ['admin'] : ['admin', 'medico']).includes(perfil.rol)) return { respuesta: NextResponse.json({ error: 'No tienes permiso para modificar expedientes.' }, { status: 403 }) } as const
-  return { db, perfil } as const
-}
-
+import { cuentaAutenticada, origenValido } from '@/lib/cuenta/servidor'
+import { errorOperacion } from '@/lib/supabase/error-operacion'
 export async function POST(request: Request) {
-  if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })
-  try {
-    const acceso = await autorizar()
-    if ('respuesta' in acceso) return acceso.respuesta
-    const admin = acceso.db
-    const body = await request.json()
-    const citaId = Number(body.citaId)
-
-    const expedienteId = Number(body.id)
-    if ((!Number.isSafeInteger(expedienteId) || expedienteId <= 0) && (!Number.isSafeInteger(citaId) || citaId <= 0)) {
-      return NextResponse.json({ error: 'ID de cita inválido' }, { status: 400 })
-    }
-
-    const denegado = await autorizarRegistro(admin, expedienteId > 0 ? 'expedientes' : 'citas', expedienteId > 0 ? expedienteId : citaId, acceso.perfil)
-    if (denegado) return denegado
-    const fila: Record<string, unknown> = {
-      diagnostico: typeof body.diagnostico === 'string' ? body.diagnostico.trim() || null : null,
-      receta: typeof body.receta === 'string' ? body.receta.trim() || null : null,
-      notas_doctor: typeof body.notas === 'string' ? body.notas.trim() || null : null,
-    }
-
-    if (expedienteId && !Number.isNaN(expedienteId)) {
-      const { data, error } = await admin
-        .from('expedientes')
-        .update(fila)
-        .eq('id', expedienteId)
-        .select()
-
-      if (error || !data?.length) {
-        return NextResponse.json({ error: error?.message || 'No se pudo actualizar el expediente.' }, { status: 400 })
-      }
-      return NextResponse.json({ ok: true, data })
-    }
-
-    const filaConCita = { ...fila, cita_id: citaId }
-    const { data, error } = await admin
-      .from('expedientes')
-      .upsert(filaConCita, { onConflict: 'cita_id' })
-      .select()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ ok: true, data })
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error al guardar el expediente' },
-      { status: 500 }
-    )
-  }
+ if (!origenValido(request)) return NextResponse.json({error:'Origen inválido.'},{status:403})
+ const a=await cuentaAutenticada();if(a.respuesta)return a.respuesta
+ if(!['admin','medico'].includes(a.usuario.rol))return NextResponse.json({error:'No puedes modificar expedientes.'},{status:403})
+ const b=await request.json().catch(()=>null)
+ if(!b||JSON.stringify(b).length>50000)return NextResponse.json({error:'Revisa el expediente.'},{status:400})
+ let citaId=Number(b.citaId)
+ if(Number.isSafeInteger(Number(b.id))&&Number(b.id)>0){const n=await a.db.from('expedientes').select('cita_id').eq('id',Number(b.id)).maybeSingle();if(n.error)return errorOperacion(n.error);citaId=n.data?.cita_id}
+ if(!Number.isSafeInteger(citaId)||citaId<1)return NextResponse.json({error:'Cita inválida.'},{status:400})
+ const ctx=await a.db.rpc('clinica_consulta_leer',{p_cita:citaId});if(ctx.error)return errorOperacion(ctx.error)
+ if(ctx.data.nota&&!b.version)return NextResponse.json({error:'Abre la consulta actual para modificar el borrador o añadir una aclaración a su nota cerrada.'},{status:409})
+ const contenido=b.contenido??{subjetivo:typeof b.notas==='string'?b.notas:'',objetivo:'',diagnostico:typeof b.diagnostico==='string'?b.diagnostico:'',plan:'',recetaLibre:typeof b.receta==='string'?b.receta:'',medicamentos:[]}
+ const r=await a.db.rpc('clinica_medico_operar',{p_accion:'guardar',p_datos:{citaId,version:b.version??ctx.data.version,contenido,cerrar:b.concluir===true},p_clave:b.clave??crypto.randomUUID()})
+ return r.error?errorOperacion(r.error):NextResponse.json({ok:true,data:[{id:r.data.id}],mensaje:r.data.mensaje})
 }
-
-export async function DELETE(request: Request) {
-  if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })
-  try {
-    const acceso = await autorizar(true)
-    if ('respuesta' in acceso) return acceso.respuesta
-    const admin = acceso.db
-    const { searchParams } = new URL(request.url)
-    const id = Number(searchParams.get('id'))
-    if (!id || Number.isNaN(id)) {
-      return NextResponse.json({ error: 'ID de expediente inválido' }, { status: 400 })
-    }
-
-    const { error } = await admin.from('expedientes').delete().eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error al eliminar el expediente' },
-      { status: 500 }
-    )
-  }
-}
+export async function DELETE(){return NextResponse.json({error:'Los expedientes se conservan. Añade una aclaración desde la consulta.'},{status:403})}

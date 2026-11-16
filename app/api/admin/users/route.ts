@@ -1,3 +1,4 @@
+import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { origenValido } from '@/lib/cuenta/servidor'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -32,10 +33,13 @@ export async function GET() {
   if (solicitante?.rol !== 'admin' || !solicitante?.esta_activo) {
     return NextResponse.json({ error: 'Solo un administrador puede ver y gestionar usuarios.' }, { status: 403 })
   }
+  const estado = await sessionClient.rpc('clinica_estado_sesion', { p_accion: 'estado' })
+  if (estado.error) return errorOperacion(estado.error)
+  if (estado.data?.bloqueada) return NextResponse.json({ error: 'Sesión bloqueada. Verifica tu contraseña.', bloqueada: true }, { status: 423 })
 
   const { data: usuarios, error } = await admin
     .from('usuarios')
-    .select('id, auth_user_id, correo, nombre_completo, telefono, rol, esta_activo, creado_en, perfiles_medicos(id, especialidad, cedula_profesional, duracion_consulta, esta_activo), perfiles_enfermeros(id, especialidad, esta_activo)')
+    .select('id, auth_user_id, correo, nombre_completo, telefono, rol, esta_activo, puede_validar_laboratorio, creado_en, perfiles_medicos(id, especialidad, cedula_profesional, duracion_consulta, esta_activo), perfiles_enfermeros(id, especialidad, esta_activo)')
     .order('id', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -60,13 +64,17 @@ export async function PATCH(request: Request) {
   if (solicitante?.rol !== 'admin' || !solicitante?.esta_activo) {
     return NextResponse.json({ error: 'Solo un administrador puede modificar usuarios.' }, { status: 403 })
   }
+  const estado = await sessionClient.rpc('clinica_estado_sesion', { p_accion: 'estado' })
+  if (estado.error) return errorOperacion(estado.error)
+  if (estado.data?.bloqueada) return NextResponse.json({ error: 'Sesión bloqueada. Verifica tu contraseña.', bloqueada: true }, { status: 423 })
 
-  const { id, esta_activo, nombre, rol, telefono } = await request.json() as {
+  const { id, esta_activo, nombre, rol, telefono, puede_validar_laboratorio } = await request.json() as {
     id: number
     esta_activo?: boolean
     nombre?: string
     rol?: string
     telefono?: string
+    puede_validar_laboratorio?: boolean
   }
 
   if (!id) return NextResponse.json({ error: 'ID de usuario requerido.' }, { status: 400 })
@@ -77,6 +85,10 @@ export async function PATCH(request: Request) {
   if (rol && !['admin','medico','recepcionista','enfermero','paciente'].includes(rol.trim())) return NextResponse.json({ error: 'Rol inválido.' }, { status: 400 })
   if (rol) updates.rol = rol.trim()
   if (telefono !== undefined) updates.telefono = telefono.trim()
+  if (puede_validar_laboratorio !== undefined) {
+    if (typeof puede_validar_laboratorio !== 'boolean') return NextResponse.json({error:'Permiso de laboratorio inválido.'},{status:400})
+    updates.puede_validar_laboratorio = puede_validar_laboratorio
+  }
 
   const { error } = await admin.from('usuarios').update(updates).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -101,6 +113,9 @@ export async function POST(request: Request) {
   if (solicitante?.rol !== 'admin' || !solicitante?.esta_activo) {
     return NextResponse.json({ error: 'Solo un administrador puede crear cuentas de personal.' }, { status: 403 })
   }
+  const estado = await sessionClient.rpc('clinica_estado_sesion', { p_accion: 'estado' })
+  if (estado.error) return errorOperacion(estado.error)
+  if (estado.data?.bloqueada) return NextResponse.json({ error: 'Sesión bloqueada. Verifica tu contraseña.', bloqueada: true }, { status: 423 })
 
   const body = await request.json() as CuerpoUsuario
   const email = body.email?.trim().toLowerCase()

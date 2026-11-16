@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { Calendar, Clock, Stethoscope, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
 import { cargarMedicosAgenda, obtenerCita, actualizarCita, type CitaDetalle } from '@/lib/supabase/datos'
+import { fechaClinica, ZONA_CLINICA } from '@/lib/agenda/modelo'
 
 export function ModalEditarCita({
   citaId,
@@ -45,11 +46,9 @@ export function ModalEditarCita({
         return
       }
       setCitaActual(cita)
-      setFecha(cita.inicio.split('T')[0])
+      setFecha(fechaClinica(new Date(cita.inicio)))
       try {
-        const timePart = cita.inicio.split('T')[1]
-        const [h, m] = timePart.split(':').map(Number)
-        setHora(String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'))
+        setHora(new Date(cita.inicio).toLocaleTimeString('es-MX', { timeZone: ZONA_CLINICA, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }))
       } catch {
         setHora('09:00')
       }
@@ -69,6 +68,11 @@ export function ModalEditarCita({
       if (!resultado.error) setMedicos(resultado.filas)
     })
   }, [])
+
+  useEffect(() => {
+    const medico = medicos.find(m => m.id === medicoId)
+    if (medico) setDuracionConsulta(medico.duracionConsulta)
+  }, [medicos, medicoId])
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()

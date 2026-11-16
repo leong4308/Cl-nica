@@ -35,7 +35,7 @@ export function AccionesFilaModulo({
 
   // Reglas coherentes de permisos:
   // - Eliminar: ÚNICAMENTE Administradores
-  const puedeEliminar = esAdmin
+  const puedeEliminar = esAdmin && modulo !== 'Expedientes'
 
   // - Editar:
   //   * Citas: Admin, Recepcionista, Médico
@@ -92,6 +92,10 @@ export function AccionesFilaModulo({
     <RowActions
       onView={() => {
         if (modulo === 'Citas') {
+          if (esMedico) {
+            onAbrirModal(`Detalle: ${id}`)
+            return
+          }
           if (pacienteId && !Number.isNaN(pacienteId)) {
             const existente = leerPerfilPacienteEnCache(pacienteId)
             registrarPerfilPacienteEnCache({

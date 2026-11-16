@@ -2,6 +2,9 @@ import { Bed, Calendar, ClipboardList, FlaskConical, LayoutDashboard, UsersRound
 
 export const navItemsEnfermero = [
   ['Resumen', LayoutDashboard],
+  ['Notas y signos', ClipboardList],
+  ['Medicamentos', ClipboardList],
+  ['Entrega de turno', ClipboardList],
   ['Pacientes', UsersRound],
   ['Citas', Calendar],
   ['Internación', Bed],

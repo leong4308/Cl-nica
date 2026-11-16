@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url), antes = url.searchParams.get('antes'), tabla = url.searchParams.get('tabla')
   let q = acceso.db.from('auditoria_clinica').select('id,fecha,autor,autor_nombre,tabla,registro_id,accion,anterior,nuevo').order('id', { ascending: false }).limit(50)
   if (antes && /^\d+$/.test(antes)) q = q.lt('id', Number(antes))
-  if (tabla && ['usuarios','perfiles_pacientes','citas','expedientes','internaciones','episodios_medicos','ordenes_medicas','solicitudes_analisis','paciente_medicos','configuracion_agenda','ordenes','laboratorio'].includes(tabla)) q = q.eq('tabla', tabla)
+  if (tabla && ['habitaciones','camas','consultorios','consultorio_turnos','lista_espera','espera_ofertas','controles_seguimiento','envios','usuarios','perfiles_pacientes','citas','expedientes','internaciones','episodios_medicos','ordenes_medicas','solicitudes_analisis','paciente_medicos','configuracion_agenda','ordenes','laboratorio'].includes(tabla)) q = q.eq('tabla', tabla)
   const r = await q
   if (r.error) return errorOperacion(r.error)
   const autores = [...new Set((r.data ?? []).map(r => r.autor).filter(Boolean))]

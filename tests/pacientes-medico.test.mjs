@@ -45,8 +45,8 @@ test('una cita cancelada o una inasistencia sin atención previa no asigna al pa
   const filas = await listado.listarPacientes(escenario(), {id:10,rol:'medico'})
   assert.ok(!filas.some(p=>[9,11].includes(p.id)))
 })
-test('administración, recepción y enfermería conservan el directorio completo', async () => {
-  for (const rol of ['admin','recepcionista','enfermero']) assert.equal((await listado.listarPacientes(escenario(),{id:10,rol})).length,5)
+test('administración y enfermería conservan el directorio permitido por sus políticas', async () => {
+  for (const rol of ['admin','enfermero']) assert.equal((await listado.listarPacientes(escenario(),{id:10,rol})).length,5)
 })
 test('médico sin perfil o con fallo no recibe como alternativa la lista completa', async () => {
   assert.deepEqual(await listado.listarPacientes(escenario({sinPerfil:true}),{id:10,rol:'medico'}),[])

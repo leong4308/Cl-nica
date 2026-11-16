@@ -1,6 +1,9 @@
 'use client'
 
+import { PanelMedico } from '@/components/roles/medico/panel-medico'
 import { useEffect, useState } from 'react'
+import { SolicitudesCambio } from './solicitudes-cambio'
+import { PanelEnfermeria } from '@/components/roles/enfermero/panel-enfermeria'
 import { InternacionPage } from '../internacion/internacion-page'
 import { AlertCircle, Search, X } from 'lucide-react'
 import { modules } from './configuracion'
@@ -19,8 +22,16 @@ import { precargarPerfilPaciente, registrarPerfilPacienteEnCache } from '@/lib/s
 type DatosModulo = { modulo: string; filas: Row[]; error: string | null }
 
 export function ModulePage(props: ClinicActions & { active: string }) {
+  if (props.rol === 'medico' && props.active === 'Citas') return <PanelMedico {...props} />
+  if (props.rol === 'medico' && props.active === 'Laboratorio') return <LaboratorioDelMedico {...props} />
+  if (props.active === 'Enfermería' && ['admin','medico'].includes(props.rol ?? '')) return <PanelEnfermeria rol={props.rol!} />
   if (props.active === 'Internación') return <InternacionPage {...props} />
-  return <ModulePageGenerico {...props} />
+  return <>{props.active === 'Citas' && ['admin','recepcionista'].includes(props.rol ?? '') && <SolicitudesCambio />}<ModulePageGenerico {...props} /></>
+}
+
+function LaboratorioDelMedico(props: ClinicActions & { active: string }) {
+ const [capturar,setCapturar]=useState(false)
+ return capturar?<><button type="button" className="mb-5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm" onClick={()=>setCapturar(false)}>Volver a revisión clínica</button><ModulePageGenerico {...props}/></>:<PanelMedico {...props} resultadosSolo onCapturar={()=>setCapturar(true)}/>
 }
 
 function ModulePageGenerico({ active, notify, openModal, onAccion, rol, usuarioNombre }: ClinicActions & { active: string }) {

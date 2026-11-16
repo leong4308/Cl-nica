@@ -22,7 +22,8 @@ export function CamasInternacion({ onVerCamas }: { onVerCamas: () => void }) {
     return () => { vigente = false; window.removeEventListener('datos-actualizados', cargarCamas) }
   }, [])
 
-  const porcentaje = camasResumen.total ? Math.round((camasResumen.ocupadas / camasResumen.total) * 100) : 0
+  const habilitadas = camasResumen.habilitadas ?? camasResumen.total
+  const porcentaje = habilitadas ? Math.min(100, Math.round((camasResumen.ocupadas / habilitadas) * 100)) : 0
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -31,13 +32,14 @@ export function CamasInternacion({ onVerCamas }: { onVerCamas: () => void }) {
         <Bed className="size-4 text-blue-600" />
       </div>
       <div className="mt-4 flex items-end justify-between">
-        <div><p className="text-2xl font-bold">{camasResumen.ocupadas} <span className="text-sm font-normal text-slate-400">/ {camasResumen.total}</span></p><p className="text-xs text-slate-500">{porcentaje}% de ocupación</p></div>
+        <div><p className="text-2xl font-bold">{camasResumen.ocupadas} <span className="text-sm font-normal text-slate-400">/ {habilitadas}</span></p><p className="text-xs text-slate-500">{porcentaje}% de camas habilitadas en uso</p></div>
         <div className="text-right text-xs">
           <p className="font-semibold text-emerald-600">{camasResumen.libres} libres</p>
           <p className="text-slate-400">{camasResumen.total > 0 ? `${camasResumen.ocupadas} en uso` : 'Sin camas registradas'}</p>
         </div>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${porcentaje}%` }} /></div>
+      {!!camasResumen.fueraServicio && <p className="mt-3 text-xs text-amber-700">{camasResumen.fueraServicio} fuera de servicio</p>}
       <BotonVerCamas onVerCamas={onVerCamas} />
     </section>
   )

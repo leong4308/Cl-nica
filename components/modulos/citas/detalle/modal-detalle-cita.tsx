@@ -1,4 +1,5 @@
 'use client'
+import { EstadoLlegada } from '@/components/modulos/citas/estado-llegada'
 
 import { useEffect, useState } from 'react'
 import {
@@ -392,6 +393,7 @@ export function ModalDetalleCita({
 
         {/* Contenido scrolleable */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <EstadoLlegada key={citaId} citaId={citaId} />
           {error && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
               {error}

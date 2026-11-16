@@ -1,5 +1,5 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 
 async function preparar(page: Page, modulo: string) {
   const usuario = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'prueba@example.test', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }

@@ -1,5 +1,5 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 
 async function preparar(page: Page, rol = 'admin') {
   await page.context().grantPermissions(['local-network-access'])
@@ -191,6 +191,36 @@ test('renueva JWT automáticamente al vencer y al salir no restaura la sesión',
   await expect(page.getByRole('button', { name: 'Ingresar', exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('button', { name: 'Ingresar', exact: true })).toBeVisible()
+})
+
+test('quince minutos sin interacción bloquean la pantalla y la contraseña recupera el borrador', async ({ page }) => {
+  await page.clock.install({ time: new Date() })
+  let bloqueada = false
+  let ultima = Date.now()
+  await page.route('**/api/sesion', async r => {
+    const ahora = await page.evaluate(() => Date.now())
+    const accion = r.request().method() === 'POST' ? r.request().postDataJSON().accion : 'estado'
+    if (accion === 'bloquear') bloqueada = true
+    if (accion === 'actividad' && !bloqueada) ultima = ahora
+    return r.fulfill({ json: { id: '11111111-1111-4111-8111-111111111112', usuarioId: '11111111-1111-4111-8111-111111111111', correo: 'prueba@example.test', nombre: 'Usuario de prueba', bloqueada, ultimaActividad: new Date(ultima).toISOString(), servidorAhora: new Date(ahora).toISOString() } })
+  })
+  await preparar(page)
+  await abrir(page, 'Mi perfil')
+  const perfil = page.getByRole('dialog', { name: 'Mi perfil', exact: true, includeHidden: true })
+  await perfil.getByLabel('Nombre completo').fill('Borrador por guardar')
+  await page.clock.fastForward(15 * 60 * 1000 + 1000)
+  const bloqueo = page.getByRole('dialog', { name: 'Sesión bloqueada', exact: true })
+  await expect(bloqueo).toBeVisible()
+  await expect(perfil).toBeHidden()
+  await page.route('**/auth/v1/token?grant_type=password', async r => {
+    expect(r.request().postDataJSON()).toMatchObject({ email: 'prueba@example.test', password: 'ClaveDePrueba123*' })
+    bloqueada = false; ultima = await page.evaluate(() => Date.now())
+    return r.fallback()
+  })
+  await bloqueo.getByLabel('Contraseña', { exact: true }).fill('ClaveDePrueba123*')
+  await bloqueo.getByRole('button', { name: 'Desbloquear y continuar' }).click()
+  await expect(bloqueo).toHaveCount(0)
+  await expect(perfil.getByLabel('Nombre completo')).toHaveValue('Borrador por guardar')
 })
 
 for (const rol of ['enfermero', 'recepcionista']) {

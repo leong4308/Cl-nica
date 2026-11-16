@@ -33,6 +33,11 @@ export async function pacientesDelMedico(db: SupabaseClient, usuarioId: number):
 }
 
 export async function listarPacientes(db: SupabaseClient, solicitante: Solicitante): Promise<PacienteListado[]> {
+  if (solicitante.rol === 'recepcionista') {
+    const r = await db.rpc('clinica_directorio_recepcion')
+    if (r.error) throw Error('No se pudo consultar el directorio administrativo. Verifica la actualización de recepción.')
+    return r.data ?? []
+  }
   let ids: number[] | null = null
   if (solicitante.rol === 'medico') ids = (await pacientesDelMedico(db, solicitante.id)).ids
   if (ids?.length === 0) return []

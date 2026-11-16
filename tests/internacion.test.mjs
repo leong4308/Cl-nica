@@ -12,6 +12,13 @@ const modelo = cargar('../lib/internacion/modelo.ts')
 const servidor = cargar('../lib/internacion/servidor.ts', { './modelo': modelo, '@/lib/cuenta/servidor': {} })
 const ops = cargar('../lib/internacion/operaciones.ts', { './servidor': servidor, './modelo': modelo })
 const actor = { id: 90, nombre_completo: 'Profesional verificado' }
+test('una estancia cerrada conserva la ubicación registrada; una activa muestra la actual', () => {
+  const fila = { id: 1, estado: 'alta', habitaciones: { numero: '205', tipo: 'Individual' }, camas: { numero: 'Z' }, ubicacion_registrada: { habitacion: '101', cama: 'A', tipo: 'General' } }
+  const historico = servidor.mapearIngreso(fila)
+  assert.equal(historico.habitacion, '101'); assert.equal(historico.cama, 'A'); assert.equal(historico.tipoHabitacion, 'General')
+  const activa = servidor.mapearIngreso({ ...fila, estado: 'activa' })
+  assert.equal(activa.habitacion, '205'); assert.equal(activa.cama, 'Z')
+})
 const version = '2026-11-01T12:00:00.000Z'
 function escenario(opciones = {}) {
   const tablas = {
@@ -132,13 +139,14 @@ test('control de acceso valida roles clínicos y propaga sesión ausente', async
   }
 })
 test('PDF escapa texto clínico antes de incluirlo en HTML y reconoce bloqueo de ventana', () => {
-  const exportar = cargar('../lib/exportar/exportar-internacion.ts')
+  const exportar = cargar('../lib/exportar/exportar-internacion.ts', { './reporte-clinico': cargar('../lib/exportar/reporte-clinico.ts') })
   const ventanaAnterior = globalThis.window
   let html = ''; const ventana = { opener: 'padre', document: { write: (v) => { html = v }, close() {} } }
   try {
     globalThis.window = { open: () => ventana }
     assert.equal(exportar.exportarInternacionPDF([{ ubicacion: 'Cama A', paciente: '<img src=x onerror=alert(1)>', medico: 'A & B', ingreso: '2026', estado: 'Alta' }]), true)
     assert.ok(!html.includes('<img src=x')); assert.match(html, /&lt;img/); assert.match(html, /A &amp; B/); assert.equal(ventana.opener, null)
+    exportar.exportarInternacionPDF([{ ubicacion: 'Cama B', paciente: 'Paciente', medico: 'Medico', ingreso: '2026', estado: 'Hospitalizado' }]); assert.match(html, /<b>1<\/b><span>Ingresos activos<\/span>/)
     globalThis.window.open = () => null; assert.equal(exportar.exportarInternacionPDF([]), false)
   } finally { globalThis.window = ventanaAnterior }
 })

@@ -75,6 +75,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         return
       }
 
+      // Inicializa la sesión de aplicación antes de consultar perfiles protegidos.
+      const estado = await fetch('/api/sesion', { cache: 'no-store' })
+      if (!estado.ok) throw Error('No se pudo verificar la sesión.')
       // Cargar perfil real desde la base de datos
       const perfil = await cargarPerfilSesion()
       setLoading(false)

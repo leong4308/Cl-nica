@@ -75,68 +75,28 @@ export async function obtenerCitasAgendaMedico(medicoId: number, fechaStr = fech
     const uno = (v: any) => Array.isArray(v) ? v[0] : v
     const paciente = uno(cita.perfiles_pacientes), ficha = leerFichaClinica(paciente?.notas_medicas), vitales = ficha.signosVitales
     if (!historiales.has(cita.paciente_id)) historiales.set(cita.paciente_id, cargarHistorialPaciente(cita.paciente_id))
-    const [historial, expediente] = await Promise.all([historiales.get(cita.paciente_id)!, db.from('expedientes').select('id,diagnostico,receta,notas_doctor').eq('cita_id', cita.id).maybeSingle()])
+    const [historial, expediente] = await Promise.all([historiales.get(cita.paciente_id)!, db.from('expedientes').select('id,diagnostico,receta,notas_doctor,contenido').eq('cita_id', cita.id).maybeSingle()])
     if (expediente.error) throw Error('No se pudo cargar el expediente de una cita.')
+    const contexto = await db.rpc('clinica_consulta_leer', { p_cita: cita.id })
     const anteriores = historial.filas.filter((h) => h.id !== expediente.data?.id && h.fechaIso && Date.parse(h.fechaIso) < Date.parse(cita.inicio))
     const edadFecha = fechaClinica(), nacimiento = paciente?.fecha_nacimiento
     const edad = nacimiento ? Number(edadFecha.slice(0, 4)) - Number(nacimiento.slice(0, 4)) - (edadFecha.slice(5) < nacimiento.slice(5) ? 1 : 0) : null
     const mapa: Record<string, CitaAgendaMedico['estado']> = { pendiente: 'pendiente', confirmada: 'confirmada', atendida: 'atendida', cancelada_paciente: 'cancelada', cancelada_medico: 'cancelada', no_asistio: 'cancelada' }
-    return { id: cita.id, inicio: cita.inicio, fin: cita.fin, hora: horaClinica(cita.inicio), estado: mapa[cita.estado] ?? 'pendiente', tipoTurno: anteriores.length ? 'Recurrente' : 'Primera Consulta', pacienteId: cita.paciente_id, pacienteNombre: uno(paciente?.usuarios)?.nombre_completo ?? 'Paciente', expedienteFolio: expediente.data?.id ? `EXP-${String(expediente.data.id).padStart(5, '0')}` : 'Sin expediente de esta cita', expedienteId: expediente.data?.id, edad: edad !== null && edad >= 0 ? edad : null, genero: paciente?.genero, grupoSanguineo: ficha.tipoSangre || 'No registrado', ultimaVisita: anteriores[0]?.fechaIso, motivo: cita.motivo || 'Sin motivo registrado', alertas: [ficha.alergias ? `Alergias: ${ficha.alergias}` : '', ficha.condicionesCronicas ?? ''].filter(Boolean), signosVitales: vitales ? { presionArterial: vitales.presionArterial, frecuenciaCardiaca: vitales.frecuenciaCardiaca, spo2: vitales.saturacionOxigeno, temperatura: vitales.temperatura, peso: vitales.peso, fechaHora: vitales.fechaHora, tomadoPor: vitales.tomadoPor } : undefined, consultasPrevias: anteriores.map((h) => ({ id: String(h.id), fecha: h.fecha, especialidad: '', medico: h.medico, resumen: `${h.motivo}: ${h.diagnostico}. ${h.notas}` })), historialError: historial.error ?? undefined, medicamentosActivos: ficha.medicamentoActual ? [{ id: 'ficha', nombre: ficha.medicamentoActual, dosis: '', frecuencia: '', via: '', activo: true }] : [], ...leerConsulta(expediente.data) }
+    return { id: cita.id, versionConsulta: contexto.data?.version, inicio: cita.inicio, fin: cita.fin, hora: horaClinica(cita.inicio), estado: mapa[cita.estado] ?? 'pendiente', tipoTurno: anteriores.length ? 'Recurrente' : 'Primera Consulta', pacienteId: cita.paciente_id, pacienteNombre: uno(paciente?.usuarios)?.nombre_completo ?? 'Paciente', expedienteFolio: expediente.data?.id ? `EXP-${String(expediente.data.id).padStart(5, '0')}` : 'Sin expediente de esta cita', expedienteId: expediente.data?.id, edad: edad !== null && edad >= 0 ? edad : null, genero: paciente?.genero, grupoSanguineo: ficha.tipoSangre || 'No registrado', ultimaVisita: anteriores[0]?.fechaIso, motivo: cita.motivo || 'Sin motivo registrado', alertas: [ficha.alergias ? `Alergias: ${ficha.alergias}` : '', ficha.condicionesCronicas ?? ''].filter(Boolean), signosVitales: vitales ? { presionArterial: vitales.presionArterial, frecuenciaCardiaca: vitales.frecuenciaCardiaca, spo2: vitales.saturacionOxigeno, temperatura: vitales.temperatura, peso: vitales.peso, fechaHora: vitales.fechaHora, tomadoPor: vitales.tomadoPor } : undefined, consultasPrevias: anteriores.map((h) => ({ id: String(h.id), fecha: h.fecha, especialidad: '', medico: h.medico, resumen: `${h.motivo}: ${h.diagnostico}. ${h.notas}` })), historialError: historial.error ?? undefined, medicamentosActivos: ficha.medicamentoActual ? [{ id: 'ficha', nombre: ficha.medicamentoActual, dosis: '', frecuencia: '', via: '', activo: true }] : [], ...leerConsulta(expediente.data) }
   }))
 }
 
-export async function finalizarConsultaYFirmar({
-  citaId,
-  soap,
-  diagnosticos,
-  prescripciones,
-  signosVitales,
-  concluir = true,
-}: {
-  citaId: number
-  soap: { subjetivo: string; objetivo: string; plan: string }
-  diagnosticos: DiagnosticoCie10[]
-  prescripciones: MedicamentoPrescrito[]
-  signosVitales?: SignosVitales
-  concluir?: boolean
-}): Promise<{ ok: boolean; mensaje: string }> {
-  try {
-    const supabase = createClient()
-
-    const contenido = escribirConsulta(soap, diagnosticos, prescripciones, signosVitales)
-
-    // 4. Guardar en tabla expedientes de Supabase
-    const { error: expError } = await supabase.from('expedientes').upsert(
-      {
-        cita_id: citaId,
-        ...contenido,
-      },
-      { onConflict: 'cita_id' }
-    )
-
-    if (expError) {
-      return { ok: false, mensaje: 'No se pudo guardar el expediente. La cita conserva su estado.' }
-    }
-
-    // 5. Actualizar estado de la cita a 'atendida' en Supabase
-    if (!concluir) { window.dispatchEvent(new Event('datos-actualizados')); return { ok: true, mensaje: 'Borrador guardado en el expediente. La cita sigue pendiente de finalizar.' } }
-    const { data: citaActualizada, error: citaError } = await supabase
-      .from('citas')
-      .update({
-        estado: 'atendida',
-        actualizado_en: new Date().toISOString(),
-      })
-      .eq('id', citaId).select('id').maybeSingle()
-
-    if (citaError || !citaActualizada) {
-      return { ok: false, mensaje: 'El expediente se guardó, pero no se pudo finalizar la cita. Revisa su estado antes de volver a intentarlo.' }
-    }
-
-    // Disparar evento global para que recepcionista, médico y admin se actualicen inmediatamente
-    window.dispatchEvent(new CustomEvent('datos-actualizados'))
-    return { ok: true, mensaje: 'Consulta guardada y finalizada correctamente.' }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Error desconocido al guardar'
-    return { ok: false, mensaje: msg }
-  }
+export async function finalizarConsultaYFirmar({ citaId, soap, diagnosticos, prescripciones, concluir = true, version }: {
+ citaId:number;soap:{subjetivo:string;objetivo:string;plan:string};diagnosticos:DiagnosticoCie10[];prescripciones:MedicamentoPrescrito[];signosVitales?:SignosVitales;concluir?:boolean;version?:string
+}):Promise<{ok:boolean;mensaje:string}>{
+ try{
+  if(!version)return {ok:false,mensaje:'Actualiza la agenda antes de guardar. Tu borrador se conserva.'}
+  const previa=await fetch(`/api/medico?cita=${citaId}`,{cache:'no-store'}),ctx=await previa.json()
+  if(!previa.ok)return {ok:false,mensaje:ctx.error||'No se pudo verificar la consulta.'}
+  if(ctx.version!==version)return {ok:false,mensaje:'La nota cambió. Revisa la versión del servidor antes de guardar.'}
+  const escrito=escribirConsulta(soap,diagnosticos,prescripciones)
+  const r=await fetch('/api/medico',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:'guardar',clave:crypto.randomUUID(),datos:{citaId,version,cerrar:concluir,contenido:{...(ctx.nota?.contenido??{}),subjetivo:soap.subjetivo,objetivo:soap.objetivo,diagnostico:escrito.diagnostico,plan:soap.plan,recetaLibre:escrito.receta,medicamentos:[]}}})})
+  const b=await r.json();if(!r.ok)return {ok:false,mensaje:b.error||'No se pudo guardar. El borrador se conserva.'}
+  window.dispatchEvent(new Event('datos-actualizados'));return {ok:true,mensaje:b.mensaje}
+ }catch{return {ok:false,mensaje:'No se pudo verificar el guardado. Revisa la consulta antes de volver a intentar.'}}
 }

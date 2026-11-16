@@ -86,6 +86,14 @@ test('no permite guardar como paciente', async () => {
   const inactivo = escenario({ inactivo: true })
   assert.equal((await inactivo.guardar()).status, 403)
 })
+
+test('enfermería consulta el PDF autorizado pero no modifica ni valida resultados', async () => {
+  const e = escenario({ rol: 'enfermero' })
+  assert.equal((await e.guardar()).status, 403)
+  assert.equal(e.llamadas.actualizaciones.length, 0)
+  assert.equal(e.llamadas.subidas.length, 0)
+  assert.equal((await e.api.GET(new Request('http://localhost'), e.contexto)).status, 307)
+})
 test('exige confirmar cambios en completados y detecta una versión antigua', async () => {
   const e = escenario()
   assert.equal((await e.guardar({ confirmarCompletado: 'false' })).status, 400)

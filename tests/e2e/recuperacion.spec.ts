@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixture'
 test('el login solicita un enlace real de recuperación y muestra una respuesta neutra',async({page})=>{
   let correo=''
   await page.route('**/auth/v1/**',r=>r.fulfill({json:{user:null}}))

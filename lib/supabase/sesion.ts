@@ -51,7 +51,10 @@ export async function cargarPerfilSesion(): Promise<PerfilSesion> {
   }
 }
 
+let salidaExplicita = false
+export const esSalidaExplicita = () => salidaExplicita
 export async function cerrarSesion() {
+  salidaExplicita = true
   const { error } = await createClient().auth.signOut({ scope: 'local' })
-  if (error) throw error
+  if (error) { salidaExplicita = false; throw error }
 }

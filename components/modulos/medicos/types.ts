@@ -51,6 +51,7 @@ export type MedicamentoPrescrito = {
 }
 
 export type CitaAgendaMedico = {
+  versionConsulta?: string
   id: number
   hora: string
   inicio: string

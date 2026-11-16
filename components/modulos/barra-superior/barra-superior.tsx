@@ -96,7 +96,7 @@ export function BarraSuperior({
         </div>
 
 
-        <BotonNotificaciones onAbrir={() => onAbrirModal('Notificaciones')} />
+        <BotonNotificaciones key={usuario.usuarioId} usuarioId={usuario.usuarioId} onVerCita={(id) => onAbrirModal(`Detalle: ${id}`)} />
         <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
         {/* Menú de Usuario */}

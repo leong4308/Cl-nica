@@ -26,7 +26,7 @@ export function MedicosEnTurno() {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold">Médicos en turno</h3>
+        <h3 className="text-sm font-bold">Médicos activos</h3>
         <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{doctoresEnTurno.length} activos</span>
       </div>
       <div className="mt-4 space-y-3">

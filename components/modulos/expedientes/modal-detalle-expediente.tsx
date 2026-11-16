@@ -1,4 +1,5 @@
 'use client'
+import { ModalConsultaMedica } from '@/components/roles/medico/modal-consulta-medica'
 
 import { useEffect, useState } from 'react'
 import { FileText, Loader2, Pill, Stethoscope, UserRound } from 'lucide-react'
@@ -8,7 +9,7 @@ import { DocumentosClinicos } from '../compartidos/documentos-clinicos'
 import { cargarExpedientePorId, guardarExpediente } from '@/lib/supabase/datos'
 import { subirDocumentoClinico } from '@/lib/documentos-clinicos'
 
-export type ExpedienteEditable = { id: number; paciente: string; motivo: string; diagnostico: string; medico: string; actualizado: string; citaId?: number; receta?: string; notas?: string }
+export type ExpedienteEditable = { id: number; notaEstado?: string; paciente: string; motivo: string; diagnostico: string; medico: string; actualizado: string; citaId?: number; receta?: string; notas?: string }
 export function ModalDetalleExpediente({ expediente, modo: modoInicial = 'ver', puedeEditar = true, onClose, onSave }: { expediente: ExpedienteEditable; modo?: 'ver' | 'editar'; puedeEditar?: boolean; onClose: () => void; onSave?: (mensaje: string) => void }) {
   const [modo, setModo] = useState(puedeEditar ? modoInicial : 'ver')
   const [datos, setDatos] = useState(expediente)
@@ -43,6 +44,7 @@ export function ModalDetalleExpediente({ expediente, modo: modoInicial = 'ver', 
       onSave?.(`Expediente clínico de ${datos.paciente} actualizado correctamente`); onClose()
     } finally { setGuardando(false) }
   }
+  if (datos.notaEstado && datos.citaId) return <ModalConsultaMedica key={datos.citaId} citaId={datos.citaId} tabInicial={modo === 'editar' && datos.notaEstado === 'cerrada' ? 'correcciones' : 'nota'} onClose={onClose} />
   const editando = modo === 'editar'
   return <ModalMarco title={editando ? 'Modificar expediente clínico' : 'Expediente clínico'} ancho="max-w-5xl" contenidoFijo onClose={() => { if (!ocupado) onClose() }} footer={<div className="flex flex-wrap justify-between gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={onClose} disabled={ocupado}>{editando ? 'Cancelar' : 'Cerrar'}</button>{editando ? <button key="guardar" type="submit" form="form-editar-expediente" className={BOTON_PRIMARIO} disabled={ocupado || cargando || !cargaCorrecta || !diagnostico.trim()}>{guardando && <Loader2 size={16} className="animate-spin" />}{guardando ? 'Guardando...' : 'Guardar cambios'}</button> : puedeEditar && <button key="editar" type="button" className={BOTON_PRIMARIO} onClick={(event) => { event.preventDefault(); setModo('editar') }} disabled={cargando || !cargaCorrecta}>Editar expediente</button>}</div>}>
     <p className="mb-5 text-sm text-slate-500">{editando ? 'Actualiza la información de esta consulta y sus documentos.' : 'Consulta el diagnóstico, el tratamiento y el seguimiento del paciente.'}</p><AvisoClinico mensaje={error} />

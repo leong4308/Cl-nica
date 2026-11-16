@@ -1,10 +1,14 @@
 import type { DiagnosticoCie10, MedicamentoPrescrito, SignosVitales } from '@/components/modulos/medicos/types'
 
-type Expediente = { diagnostico?: string | null; receta?: string | null; notas_doctor?: string | null }
+type Expediente = { contenido?: {subjetivo?:string;objetivo?:string;plan?:string;medicamentos?:{nombre:string;dosis:string;via:string;frecuencia:string;duracion:string}[]} | null;  diagnostico?: string | null; receta?: string | null; notas_doctor?: string | null }
 export type NotaConsulta = { subjetivo: string; objetivo: string; plan: string; diagnosticos: DiagnosticoCie10[] }
 
 // Conserva también los expedientes antiguos que solo contienen texto libre.
 export function leerConsulta(expediente?: Expediente | null): { soap: NotaConsulta; prescripciones: MedicamentoPrescrito[] } {
+  if (expediente?.contenido && Object.keys(expediente.contenido).length) {
+    const d=expediente.contenido,base=leerConsulta({...expediente,contenido:undefined})
+    return {soap:{...base.soap,subjetivo:d.subjetivo??'',objetivo:d.objetivo??'',plan:d.plan??''},prescripciones:d.medicamentos?.length?d.medicamentos.map((m,i)=>({id:`estructurado-${i}`,nombre:m.nombre,tipo:'Continuación' as const,posologia:[m.dosis,m.via,m.frecuencia,m.duracion].join(' · '),presentacion:''})):base.prescripciones}
+  }
   const notas = expediente?.notas_doctor ?? ''
   const esSoap = notas.startsWith('--- FORMATO S.O.A.P. ---')
   const seccion = (inicio: string, fin?: string) => {

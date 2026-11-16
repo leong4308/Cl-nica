@@ -17,7 +17,7 @@ export async function GET(_request: Request, contexto: Contexto) {
     if (ingreso.error || eventos.error) throw Error('No se pudo cargar el detalle de hospitalización.')
     if (!ingreso.data) return NextResponse.json({ error: 'Ingreso no encontrado o sin acceso.' }, { status: 404 })
     const movimientos = (eventos.data ?? []).map((fila: any) => { const medico = Array.isArray(fila.perfiles_medicos) ? fila.perfiles_medicos[0] : fila.perfiles_medicos; const usuario = Array.isArray(medico?.usuarios) ? medico.usuarios[0] : medico?.usuarios; return { id: fila.id, fecha: fila.fecha_hora, tipo: fila.tipo_episodio, descripcion: fila.descripcion ?? '', autor: fila.otros_signos?.auditoria?.nombre ?? usuario?.nombre_completo ?? 'Personal clínico' } })
-    return NextResponse.json({ ingreso: mapearIngreso(ingreso.data), movimientos }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ ingreso: mapearIngreso(ingreso.data), movimientos, puedeAlta: acceso.usuario.rol === 'medico' }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) { return respuestaErrorHospital(error) }
 }
 export async function PATCH(request: Request, contexto: Contexto) {

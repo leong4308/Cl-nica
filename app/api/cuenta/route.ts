@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cuentaAutenticada, origenValido } from '@/lib/cuenta/servidor'
 import { normalizarPreferencias } from '@/lib/cuenta/preferencias'
-import { validarNombreTelefono } from '@/lib/cuenta/validacion'
+import { validarNombreTelefono, validarMisDatos } from '@/lib/cuenta/validacion'
+import { errorOperacion } from '@/lib/supabase/error-operacion'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 export async function GET() {
@@ -20,10 +21,19 @@ export async function GET() {
       const { data: profesional } = await db.from(usuario.rol === 'medico' ? 'perfiles_medicos' : 'perfiles_enfermeros').select('clinica_id').eq('usuario_id', usuario.id).maybeSingle()
       clinicaId = profesional?.clinica_id
     }
-    let consultaClinica = db.from('clinicas').select('nombre, telefono, correo_contacto').eq('esta_activo', true)
-    if (clinicaId) consultaClinica = consultaClinica.eq('id', clinicaId)
-    const { data: soporte } = await consultaClinica.limit(1).maybeSingle()
-    return NextResponse.json({ cuenta: { nombre: usuario.nombre_completo, correo: user.email ?? usuario.correo, telefono: usuario.telefono ?? '', rol: usuario.rol, especialidad, creado: usuario.creado_en, preferencias: normalizarPreferencias(user.user_metadata?.clinica_preferencias, usuario.rol as RolUsuario), sesion: { jwtVerificado: Boolean(data?.claims), expira: data?.claims.exp ?? null }, soporte } }, { headers: { 'Cache-Control': 'private, no-store' } })
+    let soporte, paciente, nombrePropio: string | undefined, telefonoPropio: string | undefined
+    if (usuario.rol === 'paciente') {
+      const [portal, personales] = await Promise.all([db.rpc('clinica_portal_paciente'), db.rpc('clinica_mis_datos')])
+      if (personales.error) return errorOperacion(personales.error)
+      const { nombre, telefono, ...campos } = personales.data
+      nombrePropio = nombre; telefonoPropio = telefono; paciente = campos
+      soporte = portal.data?.soporte ?? null
+    } else {
+      let consultaClinica = db.from('clinicas').select('nombre, telefono, correo_contacto').eq('esta_activo', true)
+      if (clinicaId) consultaClinica = consultaClinica.eq('id', clinicaId)
+      soporte = (await consultaClinica.limit(1).maybeSingle()).data
+    }
+    return NextResponse.json({ cuenta: { nombre: nombrePropio ?? usuario.nombre_completo, correo: user.email ?? usuario.correo, telefono: telefonoPropio ?? usuario.telefono ?? '', rol: usuario.rol, especialidad, creado: usuario.creado_en, preferencias: normalizarPreferencias(user.user_metadata?.clinica_preferencias, usuario.rol as RolUsuario), sesion: { jwtVerificado: Boolean(data?.claims), expira: data?.claims.exp ?? null }, soporte, paciente } }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'No se pudo cargar tu cuenta.' }, { status: 500 }) }
 }
 
@@ -35,6 +45,15 @@ export async function PATCH(request: Request) {
     const { db, user, usuario } = acceso
     const body = await request.json()
     if (body.accion === 'perfil') {
+      if (usuario.rol === 'paciente') {
+        const errorCampos = validarMisDatos(body)
+        if (errorCampos) return NextResponse.json({ error: errorCampos }, { status: 400 })
+        const datos = Object.fromEntries(['nombre','telefono','fechaNacimiento','genero','contactoEmergencia','telefonoEmergencia'].map(k => [k, body[k] ?? '']))
+        const r = await db.rpc('clinica_guardar_mis_datos', { p_datos: datos, p_version: body.version })
+        if (r.error) return errorOperacion(r.error)
+        const { nombre, telefono, ...paciente } = r.data.paciente
+        return NextResponse.json({ ok: true, nombre, telefono, paciente }, { headers: { 'Cache-Control': 'private, no-store' } })
+      }
       const errorCampos = validarNombreTelefono(body.nombre, body.telefono)
       if (errorCampos) return NextResponse.json({ error: errorCampos }, { status: 400 })
       const { data, error } = await db.from('usuarios').update({ nombre_completo: body.nombre.trim(), telefono: body.telefono?.trim() || null }).eq('auth_user_id', user.id).select('id').maybeSingle()

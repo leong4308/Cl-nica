@@ -1,5 +1,10 @@
 'use client'
 
+import { PanelEnvios } from '@/components/modulos/gestion/panel-envios'
+import { PanelEspera } from '@/components/modulos/gestion/panel-espera'
+import { PanelConsultorios } from '@/components/modulos/gestion/panel-consultorios'
+import { PanelReportes } from '@/components/modulos/gestion/panel-reportes'
+import { PanelControles } from '@/components/modulos/gestion/panel-controles'
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { aplicarPreferencias, PREFERENCIAS_INICIALES } from '@/lib/cuenta/preferencias'
@@ -10,7 +15,7 @@ import { ConsultaAdministrativa, MedicosPage } from '@/components/modulos/medico
 import { BarraLateral } from '@/components/modulos/barra-lateral'
 import { BarraSuperior } from '@/components/modulos/barra-superior'
 import { BotonCerrarAviso, BotonCerrarMenu } from './botones-pagina'
-import { cargarPerfilSesion, cerrarSesion, type PerfilSesion } from '@/lib/supabase/sesion'
+import { cargarPerfilSesion, cerrarSesion, esSalidaExplicita, type PerfilSesion } from '@/lib/supabase/sesion'
 import { type RolUsuario } from '@/lib/supabase/tipos-rol'
 import { obtenerItemDefaultPorRol } from '@/components/modulos/barra-lateral/navegacion/items-menu'
 import { ModalUsuarios } from '@/components/modulos/barra-lateral/usuarios'
@@ -27,6 +32,9 @@ import {
   type CitaPanel,
   type EstadoCita,
 } from '@/lib/supabase/datos'
+import { registrarLlegadaCita } from '@/lib/recepcion/llegada'
+import { ModalGestionCamas } from '@/components/modulos/internacion/modal-gestion-camas'
+import { ModalConsultaMedica } from '@/components/roles/medico/modal-consulta-medica'
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalPerfilPaciente, ModalEditarPaciente } from '@/components/modulos/pacientes'
 import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
@@ -34,6 +42,7 @@ import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
 import { InterfazRecepcionista } from '@/components/roles/recepcionista'
 import { InterfazEnfermero } from '@/components/roles/enfermero'
+import { InterfazPaciente } from '@/components/roles/paciente/interfaz-paciente'
 import { ModalNuevoExpediente, ModalDetalleExpediente } from '@/components/modulos/expedientes'
 import { ModalNuevaAdmision, ModalDetalleInternacion } from '@/components/modulos/internacion'
 import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
@@ -45,6 +54,7 @@ export default function Page() {
   const [authenticated, setAuthenticated] = useState(false)
   const [comprobandoSesion, setComprobandoSesion] = useState(true)
   const autenticadoRef = useRef(false)
+  const [controlInicial, setControlInicial] = useState<{ pacienteId: number; citaId: number } | undefined>()
   const [active, setActive] = useState('Resumen')
   const [menuOpen, setMenuOpen] = useState(false)
   const [modal, setModal] = useState<string | null>(null)
@@ -59,6 +69,8 @@ export default function Page() {
     const restaurar = async () => {
       const actual = ++version
       try {
+        const acceso = await fetch('/api/sesion', { cache: 'no-store' })
+        if (!acceso.ok) throw Error('Verifica tu sesión.')
         const perfilActual = await cargarPerfilSesion()
         if (!vigente || actual !== version) return
         setPerfil(perfilActual)
@@ -77,6 +89,10 @@ export default function Page() {
     }
     const { data: { subscription } } = createClient().auth.onAuthStateChange((evento) => {
       if (evento === 'SIGNED_OUT') {
+        if (autenticadoRef.current && !esSalidaExplicita()) {
+          window.dispatchEvent(new Event('sesion-requiere-acceso'))
+          return
+        }
         ++version
         const estabaAutenticado = autenticadoRef.current
         autenticadoRef.current = false
@@ -106,13 +122,13 @@ export default function Page() {
   }, [perfil.rol, authenticated])
 
   useEffect(() => {
-    if (!authenticated) return
+    if (!authenticated || ['paciente','enfermero','recepcionista'].includes(perfil.rol)) return
     precargarModulos()
     precargarCita()
     const refrescar = () => { precargarModulos(); precargarCita() }
     window.addEventListener('datos-actualizados', refrescar)
     return () => window.removeEventListener('datos-actualizados', refrescar)
-  }, [authenticated])
+  }, [authenticated, perfil.rol])
 
   const notify = (message: string) => {
     setNotice(message)
@@ -120,6 +136,7 @@ export default function Page() {
   }
 
 const MODALES_CON_FORMULARIO = [
+  'Administrar camas',
   'Historial de cambios',
   'Usuarios',
   'Buscar paciente',
@@ -141,7 +158,7 @@ const openModal = (title: string) => {
     setModal(title)
   }
 }
-  const navigate = (label: string) => { setActive(label); setMenuOpen(false); setModal(null) }
+  const navigate = (label: string) => { setControlInicial(undefined); setActive(label); setMenuOpen(false); setModal(null) }
 
   const aplicarEstado = async (cita: CitaPanel, estado: EstadoCita, mensaje: string) => {
     const { error } = await actualizarEstadoCita(cita.id, estado)
@@ -162,7 +179,7 @@ const openModal = (title: string) => {
 
   const accionesCita = {
     onConfirmar: (cita: CitaPanel) => aplicarEstado(cita, 'confirmada', `Cita de ${cita.paciente} confirmada`),
-    onRegistrar: (cita: CitaPanel) => aplicarEstado(cita, 'atendida', `Asistencia registrada para ${cita.paciente}`),
+    onRegistrar: async (cita: CitaPanel) => { const error = await registrarLlegadaCita(cita.id); notify(error || `Llegada registrada para ${cita.paciente}`); return error },
     onNoAsistio: (cita: CitaPanel) => aplicarEstado(cita, 'no_asistio', `${cita.paciente} quedó como no asistió`),
     onCancelar: (cita: CitaPanel) => aplicarEstado(cita, 'cancelada_paciente', `Cita de ${cita.paciente} cancelada`),
     onEliminar: (cita: CitaPanel) => onEliminarCita(cita.id),
@@ -204,6 +221,11 @@ const openModal = (title: string) => {
    * - Enfermero: ve Dashboard + Citas, Pacientes, Internación, Órdenes
    */
   const renderContenido = () => {
+    if (active === 'Comunicaciones' && perfil.rol === 'admin') return <PanelEnvios />
+    if (active === 'Lista de espera' && perfil.rol === 'admin') return <PanelEspera rol="admin" onPaciente={id => openModal(`PacienteDetalle: ${id}`)} />
+    if (active === 'Consultorios' && perfil.rol === 'admin') return <PanelConsultorios rol="admin" />
+    if (active === 'Reportes' && perfil.rol === 'admin') return <PanelReportes />
+    if (active === 'Controles' && perfil.rol === 'medico') return <PanelControles key={JSON.stringify(controlInicial)} rol="medico" inicial={controlInicial} />
     // La pantalla de consulta es exclusiva de administración, incluso si llega una selección antigua.
     if (active === 'Mi Consulta') {
       return perfil.rol === 'admin'
@@ -250,6 +272,10 @@ const openModal = (title: string) => {
     )
   }
 
+  if (perfil.rol === 'paciente') {
+    return <InterfazPaciente key={perfil.usuarioId} usuario={perfil} onCerrarSesion={handleCerrarSesion} />
+  }
+
   if (perfil.rol === 'enfermero') {
     return (
       <InterfazEnfermero
@@ -293,19 +319,22 @@ const openModal = (title: string) => {
           <BotonCerrarAviso onCerrar={() => setNotice('')} />
         </div>
       )}
+      {modal === 'Administrar camas' && perfil.rol === 'admin' && <ModalGestionCamas onClose={() => setModal(null)} onSave={notify} />}
       {modal === 'Historial de cambios' && perfil.rol === 'admin' && <ModalAuditoria onClose={() => setModal(null)} />}
 
       {modal === 'Nueva cita' && (
         <ModalNuevaCita
+          medicoIdInicial={perfil.rol === 'medico' ? perfil.medicoId : undefined}
+          soloMedico={perfil.rol === 'medico'}
           onClose={() => setModal(null)}
           onSave={(value) => { notify(value ? 'Nueva cita guardado correctamente' : 'Nueva cita listo para completar'); setModal(null) }}
         />
       )}
       {modal !== null && modal.startsWith('Detalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
-        <ModalDetalleCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
+        <ModalConsultaMedica onControl={perfil.rol === 'medico' ? (pacienteId, citaId) => { setControlInicial({ pacienteId, citaId }); setActive('Controles'); setModal(null) } : undefined} key={modal} citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
       {modal !== null && modal.startsWith('HistorialDetalle: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
-        <ModalDetalleCita citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
+        <ModalConsultaMedica onControl={perfil.rol === 'medico' ? (pacienteId, citaId) => { setControlInicial({ pacienteId, citaId }); setActive('Controles'); setModal(null) } : undefined} key={modal} citaId={Number(modal.split(': ')[1])} tabInicial="historial" onClose={() => setModal(null)} />
       )}
       {modal !== null && /^PacienteEditar: [0-9]+$/.test(modal) && (
         <ModalEditarPaciente key={modal} pacienteId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />

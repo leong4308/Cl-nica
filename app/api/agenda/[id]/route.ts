@@ -8,7 +8,13 @@ export async function GET(request: Request, contexto: Contexto) {
     const id = idAgenda((await contexto.params).id), fecha = fechaAgenda(new URL(request.url).searchParams.get('fecha'))
     const medico = await medicoAgenda(acceso.admin, id, acceso.usuario)
     const [config, citas] = await Promise.all([configuracionMedico(acceso.admin, medico), citasAgenda(acceso.admin, id, fecha)])
-    return NextResponse.json(resumirAgenda(config.bloques, citas, fecha, medico.duracion_consulta, new Date(), 7, config.descansos), { headers: { 'Cache-Control': 'private, no-store' } })
+    const resumen = resumirAgenda(config.bloques, citas, fecha, medico.duracion_consulta, new Date(), 7, config.descansos)
+    const filtrados = await acceso.db.rpc('clinica_filtrar_consultorios', { p_medico: id, p_turnos: resumen.dias.flatMap(d => d.slots) })
+    if (filtrados.error) throw new ErrorAgenda('No se pudo comprobar la disponibilidad del consultorio. Actualiza e intenta de nuevo.', 503)
+    const permitidos = new Set((filtrados.data as { inicio: string }[]).map(t => Date.parse(t.inicio)))
+    resumen.dias = resumen.dias.map(d => ({ ...d, slots: d.slots.filter(t => permitidos.has(Date.parse(t.inicio))) }))
+    resumen.proximo = resumen.dias.flatMap(d => d.slots)[0] ?? null
+    return NextResponse.json(resumen, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (err) { return errorAgenda(err) }
 }
 export async function PATCH(request: Request, contexto: Contexto) {

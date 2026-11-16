@@ -67,7 +67,7 @@ export function BotonExportarModulo({
               return
             }
             onAvisar('Descargando censo en Excel...')
-            exportarInternacionExcel(internaciones)
+            void exportarInternacionExcel(internaciones).catch(()=>onAvisar('No se pudo generar el archivo Excel.'))
           }}
         >
           Censo Excel
@@ -107,8 +107,8 @@ export function BotonExportarModulo({
               onAvisar('No hay expedientes para exportar')
               return
             }
-            onAvisar('Descargando expedientes en Excel (CSV)...')
-            exportarExpedientesExcel(expedientes)
+            onAvisar('Preparando archivo Excel...')
+            void exportarExpedientesExcel(expedientes).catch(()=>onAvisar('No se pudo generar el archivo Excel.'))
           }}
         >
           Descargar Excel

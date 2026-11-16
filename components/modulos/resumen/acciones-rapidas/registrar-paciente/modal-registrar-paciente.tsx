@@ -12,11 +12,12 @@ import {
 } from '../../../compartidos/campos-paciente'
 
 type PropsModalRegistrarPaciente = {
+  soloAdministrativo?: boolean
   onClose: () => void
   onSave: (nombre: string) => void
 }
 
-export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarPaciente) {
+export function ModalRegistrarPaciente({ onClose, onSave, soloAdministrativo = false }: PropsModalRegistrarPaciente) {
   const [datos, setDatos] = useState<DatosPacienteFormulario>(DATOS_PACIENTE_INICIALES)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -92,12 +93,13 @@ export function ModalRegistrarPaciente({ onClose, onSave }: PropsModalRegistrarP
         ) : null
       }
     >
-      <p className="mb-5 text-sm text-slate-500">Crea el perfil con los datos de contacto y los antecedentes del paciente.</p>
+      <p className="mb-5 text-sm text-slate-500">Crea el perfil con los datos de identificación y contacto del paciente. Para activar su cuenta, recepción o administración podrá abrir su ficha y pulsar «Invitar al portal».</p>
       <div className="grid min-w-0 gap-5 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
-      <div className="min-w-0 space-y-5"><PanelClinico icon={UserRound} titulo="Nuevo paciente" ayuda="Identificación y contacto" suave><div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-xl font-semibold text-blue-700">{datos.nombre.trim().split(/\s+/).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || <UserRound size={28} />}</div><p className="break-words text-base font-semibold text-slate-900">{datos.nombre.trim() || 'Nombre del paciente'}</p><p className="mt-2 text-sm text-slate-500">{datos.telefono || 'Añade un teléfono de contacto.'}</p></PanelClinico><PanelClinico icon={HeartPulse} titulo="Antecedentes relevantes" ayuda="Incluye alergias o condiciones previas para facilitar la atención."><p className="text-sm leading-relaxed text-slate-500">Revisa el nombre y el teléfono antes de guardar el perfil.</p></PanelClinico></div>
+      <div className="min-w-0 space-y-5"><PanelClinico icon={UserRound} titulo="Nuevo paciente" ayuda="Identificación y contacto" suave><div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-xl font-semibold text-blue-700">{datos.nombre.trim().split(/\s+/).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || <UserRound size={28} />}</div><p className="break-words text-base font-semibold text-slate-900">{datos.nombre.trim() || 'Nombre del paciente'}</p><p className="mt-2 text-sm text-slate-500">{datos.telefono || 'Añade un teléfono de contacto.'}</p></PanelClinico><PanelClinico icon={HeartPulse} titulo={soloAdministrativo ? "Antes de registrar" : "Antecedentes relevantes"} ayuda={soloAdministrativo ? "Busca primero por nombre, correo o teléfono para evitar duplicados." : "Incluye alergias o condiciones previas para facilitar la atención."}><p className="text-sm leading-relaxed text-slate-500">Revisa el nombre y el teléfono antes de guardar el perfil.</p></PanelClinico></div>
       <PanelClinico icon={UserRound} titulo="Datos del paciente" ayuda="Completa la información que tengas disponible.">
       <form id="form-registrar-paciente" onSubmit={handleSubmit}>
         <CamposPaciente
+          soloAdministrativo={soloAdministrativo}
           datos={datos}
           onChange={actualizarCampo}
           prefijoId="modal-paciente"

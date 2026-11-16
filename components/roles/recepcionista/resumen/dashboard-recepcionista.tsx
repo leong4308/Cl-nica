@@ -5,6 +5,7 @@ import { Stethoscope } from 'lucide-react'
 import type { ClinicActions } from '@/components/modulos/compartidos/types'
 import { cargarMedicosTurno, type CitaPanel, type MedicoTurno } from '@/lib/supabase/datos'
 import { leerMedicosTurno } from '@/lib/supabase/cache-modulos'
+import { SolicitudesCambio } from '@/components/modulos/citas/solicitudes-cambio'
 import { EstadisticasRecepcion } from './estadisticas/estadisticas-recepcion'
 import { AccionesRapidasRecepcion } from './acciones-rapidas/acciones-rapidas-recepcion'
 import { CitasRecepcionHoy } from './agenda-hoy/citas-recepcion-hoy'
@@ -59,6 +60,7 @@ export function DashboardRecepcionista({
         <AccionesRapidasRecepcion openModal={openModal} />
       </div>
 
+      <SolicitudesCambio />
       <EstadisticasRecepcion />
 
       <div className="grid gap-7 lg:grid-cols-3">

@@ -25,6 +25,7 @@ type UsuarioSistema = {
   nombre_completo: string
   telefono: string | null
   rol: 'admin' | 'medico' | 'enfermero' | 'recepcionista' | 'paciente'
+  puede_validar_laboratorio?: boolean
   esta_activo: boolean
   creado_en: string
   perfiles_medicos?: { id: number; especialidad: string; cedula_profesional: string; duracion_consulta: number; esta_activo: boolean }[] | null
@@ -328,6 +329,7 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
                             </span>
                           </div>
 
+                          {usr.rol === 'medico' && <label className="mb-3 flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={usr.puede_validar_laboratorio === true} disabled={actualizandoId === usr.id} onChange={async e => { const valor=e.target.checked; setActualizandoId(usr.id); try { const r=await fetch('/api/admin/users',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:usr.id,puede_validar_laboratorio:valor})}); if(!r.ok){const b=await r.json();setErrorCarga(b.error||'No se pudo cambiar el permiso.')}else setUsuarios(prev=>prev.map(x=>x.id===usr.id?{...x,puede_validar_laboratorio:valor}:x)) }catch{setErrorCarga('No se pudo cambiar el permiso.')}finally{setActualizandoId(null)} }} />Autorizar validación de laboratorio</label>}
                           {usr.rol !== 'admin' && (
                             <button
                               type="button"

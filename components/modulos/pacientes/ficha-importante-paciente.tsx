@@ -39,7 +39,7 @@ export function FichaImportantePaciente({ pacienteId, notasMedicasRaw, rol, onAc
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState<string | null>(null)
   const prefijo = useId()
-  const puedeEditar = ['admin', 'medico', 'enfermero', 'recepcionista'].includes(rol ?? rolSesion ?? '')
+  const puedeEditar = ['admin', 'medico'].includes(rol ?? rolSesion ?? '')
 
   useEffect(() => { setFicha(leerFichaClinica(notasMedicasRaw)) }, [notasMedicasRaw])
   useEffect(() => {

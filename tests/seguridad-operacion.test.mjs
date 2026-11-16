@@ -4,8 +4,15 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import ts from 'typescript'
 const require=createRequire(import.meta.url)
-function cargar(ruta,deps={}){const js=ts.transpileModule(readFileSync(new URL(ruta,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,exports={};new Function('require','exports',js)(id=>deps[id]??require(id),exports);return exports}
+function cargar(ruta,deps={}){const js=ts.transpileModule(readFileSync(new URL(ruta,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,exports={};new Function('require','exports',js)(id=>id==='@/lib/supabase/error-operacion'?cargar('../lib/supabase/error-operacion.ts'):deps[id]??require(id),exports);return exports}
 const recuperacion=cargar('../lib/cuenta/recuperacion.ts')
+
+test('el bloqueo impide a administración usar la clave de servicio para leer o modificar cuentas',async()=>{
+ const db={auth:{getUser:async()=>({data:{user:{id:'cuenta'}}})},rpc:async()=>({data:{bloqueada:true}}),from:()=>({select(){return this},eq(){return this},maybeSingle:async()=>({data:{rol:'admin',esta_activo:true}})})}
+ const api=cargar('../app/api/admin/users/route.ts',{'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/supabase/server':{createClient:async()=>db},'@supabase/supabase-js':{createClient:()=>db}})
+ assert.equal((await api.GET()).status,423)
+ for(const metodo of ['POST','PATCH'])assert.equal((await api[metodo](new Request('http://localhost/api/admin/users',{method:metodo,body:'{}'}))).status,423)
+})
 test('la recuperación rechaza destinos externos, claves débiles y confirmaciones distintas',()=>{
  for(const url of ['https://ejemplo.test','//ejemplo.test','/\\ejemplo.test','/\r\nejemplo'])assert.equal(recuperacion.destinoSeguro(url),'/')
  assert.equal(recuperacion.destinoSeguro('/restablecer-contrasena'),'/restablecer-contrasena')

@@ -1,7 +1,7 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 
-async function preparar(page: Page) {
+async function preparar(page: Page, rol = 'admin') {
   const user = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', role: 'authenticated', email: 'prueba@example.test', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
   const encode = (valor: object) => Buffer.from(JSON.stringify(valor)).toString('base64url')
   const token = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })}.firma-prueba`
@@ -21,7 +21,7 @@ async function preparar(page: Page) {
   await page.route('**/rest/v1/**', async (route) => {
     const tabla = new URL(route.request().url()).pathname.split('/').pop()
     let data: object[] = []
-    if (tabla === 'usuarios') data = [{ id: 3, auth_user_id: user.id, nombre_completo: 'Profesional de prueba', correo: user.email, rol: 'admin', esta_activo: true }]
+    if (tabla === 'usuarios') data = [{ id: 3, auth_user_id: user.id, nombre_completo: 'Profesional de prueba', correo: user.email, rol, esta_activo: true }]
     if (tabla === 'perfiles_pacientes') data = [paciente()]
     if (tabla === 'citas') data = citas
     if (tabla === 'expedientes') data = expedientes
@@ -40,11 +40,69 @@ async function preparar(page: Page) {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   await page.getByRole('button', { name: 'Pacientes', exact: true }).click()
   const abrir = async () => {
-    await page.getByRole('row').filter({ hasText: 'Paciente de prueba' }).getByRole('button', { name: 'Ver detalle' }).click()
+    if (rol === 'recepcionista') await page.getByRole('article').filter({ hasText: 'Paciente de prueba' }).getByRole('button', { name: 'Ver datos', exact: true }).click()
+    else await page.getByRole('row').filter({ hasText: 'Paciente de prueba' }).getByRole('button', { name: 'Ver detalle' }).click()
     return page.getByRole('dialog')
   }
   return { modal: await abrir(), abrir, escrituras }
 }
+
+test('invitar al portal confirma el correo y muestra el resultado sin crear otra ficha', async ({ page }) => {
+  const envios: any[] = []
+  await page.route('**/api/pacientes/7/portal', r => {
+    if (r.request().method() === 'POST') { envios.push(r.request().postDataJSON()); return r.fulfill({ json: { ok: true, mensaje: 'El servicio de correo aceptó la invitación.' } }) }
+    return r.fulfill({ json: { correo: 'paciente@example.test', activa: false, invitada: envios.length > 0, enviada: envios.length ? new Date().toISOString() : null, configurado: true } })
+  })
+  const { modal, escrituras } = await preparar(page)
+  const panel = modal.getByRole('region', { name: 'Acceso al portal del paciente' })
+  await expect(panel.getByRole('button', { name: 'Invitar al portal' })).toBeDisabled()
+  await panel.getByRole('checkbox').check()
+  await panel.getByRole('button', { name: 'Invitar al portal' }).click()
+  await expect(panel.getByRole('status')).toContainText('aceptó la invitación')
+  await expect(panel.getByRole('button', { name: 'Reenviar invitación' })).toBeDisabled()
+  expect(envios).toEqual([{ confirmarCorreo: true }]); expect(escrituras).toHaveLength(0)
+})
+
+test('una ficha con cuenta vinculada ofrece recuperar el acceso y evita nuevas invitaciones', async ({ page }) => {
+  await page.route('**/api/pacientes/7/portal', r => r.fulfill({ json: { correo: 'paciente@example.test', activa: true, configurado: true } }))
+  const { modal } = await preparar(page)
+  await expect(modal.getByText(/Cuenta vinculada/)).toBeVisible()
+  await expect(modal.getByRole('button', { name: 'Invitar al portal' })).toHaveCount(0)
+})
+
+test('recepción invita desde los datos administrativos sin entrar al historial clínico', async ({ page }) => {
+  await page.route('**/api/pacientes/7/portal', r => r.fulfill({ json: { correo: 'paciente@example.test', activa: false, configurado: true } }))
+  const { modal } = await preparar(page, 'recepcionista')
+  await expect(modal.getByRole('button', { name: 'Invitar al portal' })).toBeVisible()
+  await expect(modal.getByRole('tab', { name: 'Historial clínico' })).toHaveCount(0)
+})
+
+for (const rol of ['admin', 'recepcionista']) test(`${rol}: edita el correo de una ficha sin cuenta desde Guardar cambios`, async ({ page }) => {
+  const cambios: any[] = []
+  await page.route('**/api/pacientes/7', r => {
+    if (r.request().method() === 'PATCH') { cambios.push(r.request().postDataJSON()); return r.fulfill({ json: { ok: true, correoActual: 'nuevo@example.test' } }) }
+    return r.fulfill({ json: { puedeEditarCorreo: true, accesoVinculado: false, paciente: { nombre: 'Paciente de prueba', correo: 'paciente@example.test', telefono: '5555555555', fechaNacimiento: '', genero: '', contactoEmergencia: '', telefonoEmergencia: '' } } })
+  })
+  const { modal } = await preparar(page, rol)
+  await modal.getByRole('button', { name: 'Editar información', exact: true }).click()
+  const editar = page.getByRole('dialog', { name: 'Editar información del paciente' })
+  await expect(editar.getByLabel('Correo de acceso')).toBeEditable()
+  await editar.getByLabel('Correo de acceso').fill('nuevo@example.test')
+  await editar.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
+  await expect(editar).toHaveCount(0)
+  expect(cambios).toHaveLength(1); expect(cambios[0]).toMatchObject({ correo: 'nuevo@example.test', correoAnterior: 'paciente@example.test' })
+})
+
+test('un correo de acceso activo queda pendiente sin cerrar el formulario ni reemplazar el actual', async ({ page }) => {
+  await page.route('**/api/pacientes/7', r => r.fulfill({ json: r.request().method() === 'PATCH' ? { ok: true, correoActual: 'paciente@example.test', correoPendiente: 'nuevo@example.test', mensaje: 'El paciente debe confirmar el nuevo correo.' } : { puedeEditarCorreo: true, accesoVinculado: true, paciente: { nombre: 'Paciente de prueba', correo: 'paciente@example.test', telefono: '', fechaNacimiento: '', genero: '', contactoEmergencia: '', telefonoEmergencia: '' } } }))
+  const { modal } = await preparar(page)
+  await modal.getByRole('button', { name: 'Editar información', exact: true }).click()
+  const editar = page.getByRole('dialog', { name: 'Editar información del paciente' })
+  await editar.getByLabel('Correo de acceso').fill('nuevo@example.test')
+  await editar.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
+  await expect(editar.getByText(/Cambio pendiente de confirmación/)).toBeVisible()
+  await expect(editar.getByLabel('Correo de acceso')).toHaveValue('paciente@example.test')
+})
 
 test('Importante permite editar alertas desde el botón inferior sin modificar signos', async ({ page }) => {
   const { modal, abrir, escrituras } = await preparar(page)

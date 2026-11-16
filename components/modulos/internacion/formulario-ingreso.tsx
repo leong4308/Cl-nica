@@ -13,7 +13,7 @@ export function FormularioIngreso({ datos, borrador, onChange, ingreso, disabled
   const cerrado = ingreso && ingreso.estado !== 'activa'
   const medico = datos.medicos.find((m) => m.id === Number(borrador.medicoId))
   const clinicaId = ingreso?.clinicaId ?? medico?.clinicaId
-  const candidatas = datos.camas.filter((cama) => (!clinicaId || cama.clinicaId === clinicaId) && (!cama.ocupada || cama.id === ingreso?.camaId))
+  const candidatas = datos.camas.filter((cama) => (!clinicaId || cama.clinicaId === clinicaId) && ((!cama.ocupada && cama.habilitada !== false) || cama.id === ingreso?.camaId))
   const habitaciones = [...new Set(candidatas.map((cama) => cama.habitacion))]
   const seleccionada = datos.camas.find((cama) => cama.id === Number(borrador.camaId))
   const visibles = candidatas.filter((cama) => (habitacion === 'todas' || cama.habitacion === habitacion) && `${cama.numero} ${cama.habitacion} ${cama.tipo}`.toLowerCase().includes(busqueda.toLowerCase()))

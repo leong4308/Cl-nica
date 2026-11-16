@@ -1,11 +1,11 @@
-import { Bed, CalendarDays, ClipboardList, FileText, FlaskConical, LayoutDashboard, Settings, Stethoscope, UserRound, UsersRound } from 'lucide-react'
+import { Building2, Inbox, ListOrdered, ChartNoAxesCombined, Bed, CalendarDays, ClipboardList, FileText, FlaskConical, LayoutDashboard, Settings, Stethoscope, UserRound, UsersRound } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
 /**
  * Permisos por rol:
  * - admin: Ve todo (dashboard global, todos los módulos, gestión de usuarios)
- * - recepcionista: Resumen, Citas, Pacientes, Médicos (solo directorio), Expedientes
+ * - recepcionista: Resumen, Citas, Pacientes, Médicos (solo directorio)
  * - medico: Citas, Pacientes y Expedientes; Mi Consulta queda en administración
  * - enfermero: Resumen, Citas, Pacientes, Internación, Órdenes médicas
  * - paciente: Solo su perfil (no aplica menú lateral)
@@ -19,6 +19,7 @@ type NavItem = {
 }
 
 export const navItems: NavItem[] = [
+  { label: 'Enfermería', icon: ClipboardList, roles: ['admin', 'medico'] },
   {
     label: 'Resumen',
     icon: LayoutDashboard,
@@ -47,7 +48,7 @@ export const navItems: NavItem[] = [
   {
     label: 'Expedientes',
     icon: FileText,
-    roles: ['admin', 'recepcionista', 'medico'],
+    roles: ['admin', 'medico'],
   },
   {
     label: 'Internación',
@@ -64,6 +65,11 @@ export const navItems: NavItem[] = [
     icon: FlaskConical,
     roles: ['admin', 'medico', 'enfermero'],
   },
+  { label: 'Comunicaciones', icon: Inbox, roles: ['admin', 'recepcionista'] },
+  { label: 'Lista de espera', icon: ListOrdered, roles: ['admin', 'recepcionista'] },
+  { label: 'Consultorios', icon: Building2, roles: ['admin', 'recepcionista'] },
+  { label: 'Reportes', icon: ChartNoAxesCombined, roles: ['admin'] },
+  { label: 'Controles', icon: CalendarDays, roles: ['medico'] },
 ]
 
 export function obtenerNavItemsPorRol(rol: RolUsuario): NavItem[] {

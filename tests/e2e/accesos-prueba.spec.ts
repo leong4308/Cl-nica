@@ -1,5 +1,5 @@
 import { simularDirectorioPacientes } from './pacientes-fixture'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './fixture'
 import cuentas from '../../lib/cuenta/cuentas-prueba.json'
 
 async function preparar(page: Page, rol = 'admin', habilitado = true, retrasar = false) {
@@ -44,7 +44,8 @@ for (const cuenta of cuentas) {
     await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible()
     expect(ingresos).toHaveLength(1)
     expect(ingresos[0]).toMatchObject({ email: cuenta.correo, password: 'Clinica123*' })
-    if (cuenta.rol === 'enfermero' || cuenta.rol === 'recepcionista') await expect(page.getByRole('heading', { name: `Hola, ${cuenta.nombre}` })).toBeVisible()
+    if (cuenta.rol === 'enfermero') await expect(page.getByRole('heading', { name: 'Mi turno de enfermería' })).toBeVisible()
+    if (cuenta.rol === 'recepcionista') await expect(page.getByRole('heading', { name: `Hola, ${cuenta.nombre}` })).toBeVisible()
     if (cuenta.rol === 'admin') await expect(page.getByRole('button', { name: 'Mi Consulta', exact: true })).toBeVisible()
     else await expect(page.getByRole('button', { name: 'Mi Consulta', exact: true })).toHaveCount(0)
     if (cuenta.rol !== 'admin') await expect(page.getByRole('button', { name: 'Usuarios', exact: true })).toHaveCount(0)

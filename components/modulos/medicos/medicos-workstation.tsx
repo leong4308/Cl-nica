@@ -1,4 +1,5 @@
 'use client'
+import { EstadoLlegada } from '@/components/modulos/citas/estado-llegada'
 
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileText, Plus, RefreshCw, Settings2, Stethoscope, UserRound } from 'lucide-react'
@@ -127,7 +128,7 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
     if (prescripciones.some((p) => !p.nombre.trim() || (p.textoOriginal === undefined && !p.posologia.trim()))) { notify('Completa el nombre y las indicaciones de cada medicamento.'); return }
     setGuardando(true)
     try {
-      const r = await finalizarConsultaYFirmar({ citaId: cita.id, soap, diagnosticos: soap.diagnosticos, prescripciones, signosVitales: cita.signosVitales, concluir })
+      const r = await finalizarConsultaYFirmar({ citaId: cita.id, version: cita.versionConsulta, soap, diagnosticos: soap.diagnosticos, prescripciones, signosVitales: cita.signosVitales, concluir })
       notify(r.mensaje)
       if (r.ok) { setCambios(false); setRevision((v) => v + 1) }
     } finally { setGuardando(false) }
@@ -175,6 +176,7 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
         <div className="min-w-0 space-y-5">
           {cita ? <>
             <PacienteHeader cita={cita} onAbrirFicha={abrirFicha} />
+            {esMedico && <EstadoLlegada key={cita.id} citaId={cita.id} />}
             <div className="flex flex-wrap gap-2" role="tablist" aria-label="Información del paciente en consulta">{tabs.map((t) => <button key={t.id} type="button" id={`consulta-tab-${t.id}`} role="tab" aria-controls="consulta-panel" aria-selected={tab === t.id} disabled={guardando} onClick={() => setTab(t.id as typeof tab)} className={'rounded-xl px-4 py-2.5 text-sm font-semibold ' + (tab === t.id ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-600')}>{t.texto}</button>)}</div>
             <div id="consulta-panel" role="tabpanel" aria-labelledby={`consulta-tab-${tab}`} className="space-y-5">
               {tab === 'paciente' ? <>

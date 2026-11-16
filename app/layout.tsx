@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { ProtectorSesion } from '@/components/sesion/protector-sesion'
 
 export const metadata: Metadata = {
   title: 'Clínica Nova | Sistema de citas médicas',
@@ -22,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased">
-        {children}
+        <ProtectorSesion>{children}</ProtectorSesion>
       </body>
     </html>
   )

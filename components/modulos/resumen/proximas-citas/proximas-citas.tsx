@@ -24,6 +24,7 @@ type EstadoPanel = 'Confirmada' | 'Pendiente' | 'Reagendar'
 
 function estadoDe(cita: CitaPanel, ahoraMs: number): EstadoPanel | null {
   if (ESTADOS_FINALES.has(cita.estado)) return null
+  if (cita.llegada || cita.enConsulta) return 'Confirmada'
   const transcurridos = (ahoraMs - cita.inicio) / 60_000
   if (transcurridos < 0) return 'Confirmada'
   if (transcurridos <= MINUTOS_CORTESIA) return 'Pendiente'
@@ -182,8 +183,8 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
               {delDia.map(({ cita, estado }) => {
                 const necesitaReagenda = estado === 'Reagendar'
                 const estaPendiente = estado === 'Pendiente'
-                const muestraConfirmar = filtroActivo === 'Actuales' || filtroActivo === 'Pendientes'
-                const muestraReagendar = filtroActivo === 'Pendientes' || filtroActivo === 'Reagendar'
+                const muestraConfirmar = !cita.llegada && (filtroActivo === 'Actuales' || filtroActivo === 'Pendientes')
+                const muestraReagendar = !cita.llegada && (filtroActivo === 'Pendientes' || filtroActivo === 'Reagendar')
                 return (
                   <div
                     key={cita.id}
@@ -212,6 +213,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      {(cita.llegada || cita.enConsulta) && <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">{cita.enConsulta ? 'En consulta' : 'En espera'}</span>}
                       {estaPendiente && (
                         <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-800">
                           Esperando check-in
@@ -247,7 +249,7 @@ export function ProximasCitas({ ahora, navigate, onAccion }: PropsPanel) {
       </div>
 
       <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
-        {`${citasFiltradas.length} de ${clasificadas.length} cita(s) próximas por resolver · se reagendan tras ${MINUTOS_CORTESIA} min sin check-in`}
+        {`${citasFiltradas.length} de ${clasificadas.length} cita(s) próximas por resolver · revisar llegadas con más de ${MINUTOS_CORTESIA} min de demora`}
       </div>
     </div>
   )

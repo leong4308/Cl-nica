@@ -33,8 +33,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
     const { data: solicitante } = await sessionClient.from('usuarios').select('id, rol, esta_activo, nombre_completo').eq('auth_user_id', user.id).maybeSingle()
-    if (!solicitante?.esta_activo || !['admin', 'medico', 'enfermero', 'recepcionista'].includes(solicitante.rol)) return NextResponse.json({ error: 'No tienes permiso para modificar esta ficha.' }, { status: 403 })
+    if (!solicitante?.esta_activo || !['admin', 'medico', 'enfermero'].includes(solicitante.rol)) return NextResponse.json({ error: 'La información clínica solo puede modificarla personal autorizado.' }, { status: 403 })
 
+    if (solicitante.rol === 'enfermero') return NextResponse.json({ error: 'Registra las mediciones y notas de enfermería desde Mi turno para conservar su historial.' }, { status: 403 })
     const body = await request.json()
     const pacienteId = Number(body.pacienteId)
     if (!Number.isSafeInteger(pacienteId) || pacienteId <= 0) {
