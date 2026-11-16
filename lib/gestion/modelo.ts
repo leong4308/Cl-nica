@@ -3,7 +3,7 @@ export const ROLES_GESTION: Record<ModuloGestion, string[]> = { envios: ['admin'
 export const TITULOS_GESTION: Record<ModuloGestion, string> = { envios: 'Comunicaciones', espera: 'Lista de espera', consultorios: 'Consultorios', controles: 'Controles de seguimiento', reportes: 'Reportes administrativos' }
 const CAMPOS: Record<string, string[]> = {
   'consultorios:sala': ['clinicaId', 'nombre', 'ubicacion'], 'consultorios:editar_sala': ['id', 'version', 'nombre', 'ubicacion', 'activo'],
-  'consultorios:turno': ['consultorioId', 'medicoId', 'desde', 'hasta', 'dia', 'inicio', 'fin'], 'consultorios:baja_turno': ['id', 'version'],
+  'consultorios:turno': ['consultorioId', 'medicoId', 'desde', 'hasta', 'dia', 'inicio', 'fin'], 'consultorios:baja_turno': ['id', 'version'], 'consultorios:prorrogar_turno': ['id', 'version', 'hasta'],
   'espera:inscribir': ['pacienteId', 'medicoId', 'citaId', 'desde', 'hasta', 'inicio', 'fin'], 'espera:retirar': ['id', 'version'], 'espera:ofertar': ['id', 'version', 'inicio'], 'espera:aceptar': ['ofertaId'], 'espera:rechazar': ['ofertaId'],
   'controles:crear': ['pacienteId', 'citaId', 'fecha', 'titulo', 'indicaciones', 'diasAviso'], 'controles:completar': ['id', 'version', 'nota'], 'controles:cancelar': ['id', 'version', 'nota'], 'controles:vincular_cita': ['id', 'version', 'citaId'], 'envios:reintentar': ['id', 'canal'],
 }

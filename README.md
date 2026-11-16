@@ -29,7 +29,7 @@ Para revisar la aplicación compilada, ejecuta `pnpm build` y después `pnpm sta
 
 1. Conserva un respaldo del proyecto antes de actualizar su base.
 2. Configura `SUPABASE_DB_URL` en `.env.local` con la URI de **Supabase → Connect** y la contraseña de la base. No es la clave de servicio. Los caracteres especiales de la contraseña deben codificarse en la URI. Nunca subas ese archivo a Git.
-3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `041_lectura_orden_insertada.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
+3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `042_prorroga_consultorios.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
 4. Ejecuta `pnpm agenda:importar` para copiar las agendas privadas anteriores a PostgreSQL sin sobrescribir las ya publicadas. No se inventan horarios.
 5. También se pueden ejecutar esos archivos SQL, en orden numérico, desde el editor de Supabase. La importación de agendas sigue siendo necesaria si había horarios guardados en Storage.
 6. Inicia sesión como administrador y abre **Configuración → Verificar estado**. Comprueba los distintos roles antes de publicar.
@@ -181,4 +181,6 @@ La API valida los campos y la función SQL obtiene la ficha desde la sesión act
 
 ## Revisión final del 16 de noviembre de 2026
 
-Consulta [el informe de revisión de los cinco roles](docs/revision-final-2026-11-16.md) para conocer el alcance, las versiones comprobadas y las condiciones pendientes del despliegue. La base requiere la versión **41**. Las muestras ambulatorias respetan la asignación de enfermería y las órdenes hospitalarias pueden devolver su identificador al guardarse sin ampliar permisos clínicos.
+Consulta [el informe de revisión de los cinco roles](docs/revision-final-2026-11-16.md) para conocer el alcance, las versiones comprobadas y las condiciones pendientes del despliegue. La base requiere la versión **42**. Las muestras ambulatorias respetan la asignación de enfermería y las órdenes hospitalarias pueden devolver su identificador al guardarse sin ampliar permisos clínicos.
+
+La migración 042 permite prorrogar una asignación mediante la acción administrativa `consultorios:prorrogar_turno` (`id`, `version`, `hasta`). Crea una continuación desde el día siguiente al vencimiento, conservando consultorio, médico, día y horas. Exige sesión de administrador, versión vigente e idempotencia; conserva las restricciones de cruce y la auditoría. Cada continuación dura hasta 366 días y debe empezar dentro del próximo año.

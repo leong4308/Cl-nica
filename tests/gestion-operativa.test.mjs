@@ -59,3 +59,33 @@ test('Telegram presenta botones de oferta sin crear tokens de confirmación de o
   assert.equal(enviados[0].reply_markup.inline_keyboard[0][0].callback_data, `espera:a:${clave}`)
   assert.ok(!operaciones.includes('crearAccion'))
 })
+
+
+test('la prórroga de consultorios solo acepta administración, versión y fecha válida', () => {
+  const datos={id:1,version:'a'.repeat(32),hasta:'2027-11-30'}
+  assert.deepEqual(modelo.datosGestion('consultorios','prorrogar_turno',{...datos,medicoId:999,consultorioId:999},'admin'),datos)
+  for(const rol of ['recepcionista','medico','enfermero','paciente'])assert.throws(()=>modelo.datosGestion('consultorios','prorrogar_turno',datos,rol))
+  assert.throws(()=>modelo.datosGestion('consultorios','prorrogar_turno',{...datos,hasta:'2027-02-30'},'admin'),/Fecha/)
+  assert.throws(()=>modelo.datosGestion('consultorios','prorrogar_turno',{...datos,version:'otra'},'admin'),/Actualiza/)
+})
+
+
+const consultorios = cargar('../lib/gestion/consultorios.ts', { '@/lib/agenda/modelo': cargar('../lib/agenda/modelo.ts') })
+const turnoVisual = { id:1,consultorioId:1,medicoId:1,medico:'Médico de prueba',dia:1,inicio:'08:00:00',fin:'20:00:00',desde:'2026-11-16',hasta:'2027-11-16',activo:true,version:'a'.repeat(32) }
+test('la vista semanal une renovaciones contiguas sin alterar los periodos originales',()=>{
+ const turnos=[{...turnoVisual},{...turnoVisual,id:2,desde:'2027-11-17',hasta:'2027-11-30'}],antes=JSON.stringify(turnos)
+ const franjas=consultorios.agruparFranjasConsultorio(turnos)
+ assert.equal(franjas.length,1);assert.equal(franjas[0].hasta,'2027-11-30');assert.equal(JSON.stringify(turnos),antes)
+ assert.equal(consultorios.franjasEnFecha(franjas,1,'2027-11-30').length,1)
+ assert.equal(consultorios.franjasEnFecha(franjas,1,'2027-12-01').length,0)
+})
+test('un hueco de fechas o una asignación desactivada no se presentan como atención continua',()=>{
+ const franjas=consultorios.agruparFranjasConsultorio([turnoVisual,{...turnoVisual,id:2,desde:'2027-11-18',hasta:'2027-11-30'},{...turnoVisual,id:3,activo:false,desde:'2027-11-17',hasta:'2027-11-17'}])
+ assert.equal(franjas.length,2);assert.equal(consultorios.franjasEnFecha(franjas,1,'2027-11-17').length,0)
+ assert.equal(consultorios.franjasEnFecha(franjas,1,'2027-11-18').length,1)
+})
+test('el resumen mantiene separados los médicos, espacios y bloques partidos',()=>{
+ const franjas=consultorios.agruparFranjasConsultorio([turnoVisual,{...turnoVisual,id:2,inicio:'15:00:00',fin:'18:00:00'},{...turnoVisual,id:3,medicoId:2},{...turnoVisual,id:4,consultorioId:2}])
+ assert.equal(franjas.length,4);assert.equal(consultorios.franjasEnFecha(franjas,2,'2026-11-16').length,1)
+ assert.equal(consultorios.franjasEnFecha(franjas,99,'2026-11-16').length,0)
+})

@@ -34,7 +34,7 @@ before(async () => {
   await db.exec("insert into perfiles_enfermeros(id,usuario_id,clinica_id) values(1,5,1); insert into auth.sessions select id,id from auth.users")
   for(const tabla of ['usuarios','perfiles_pacientes']) await db.exec(`select setval(pg_get_serial_sequence('${tabla}','id'),(select max(id) from ${tabla}))`)
   await db.exec("update auth.users a set email=u.correo,email_confirmed_at=clock_timestamp() from usuarios u where u.auth_user_id=a.id")
-  for (const nombre of ['018_seguridad_y_auditoria.sql','019_transacciones_clinicas.sql','020_notificaciones.sql','021_telegram_desvinculacion.sql','022_portal_paciente.sql','023_resultados_publicados_paciente.sql','024_respuestas_citas.sql','025_telegram_https.sql','026_reagenda_turnos.sql','027_autogestion_y_sesiones.sql','028_enfermeria.sql','029_controles_enfermeria.sql','030_recepcion.sql','031_consulta_medica.sql','032_administracion_camas.sql','033_portal_y_correo.sql','034_correo_paciente.sql','035_consultorios.sql','036_espera_y_controles.sql','037_comunicaciones_y_reportes.sql','038_datos_personales_paciente.sql','039_conflicto_perfil.sql','040_muestras_ambulatorias.sql','041_lectura_orden_insertada.sql']) { try { await db.exec(readFileSync(new URL('../supabase/migraciones/'+nombre,import.meta.url),'utf8').replaceAll('clock_timestamp()', 'public.reloj_aceptacion()')) } catch(e){throw Error(nombre+': '+e.message+' '+(e.where??'')+' '+(e.position??''))} }
+  for (const nombre of ['018_seguridad_y_auditoria.sql','019_transacciones_clinicas.sql','020_notificaciones.sql','021_telegram_desvinculacion.sql','022_portal_paciente.sql','023_resultados_publicados_paciente.sql','024_respuestas_citas.sql','025_telegram_https.sql','026_reagenda_turnos.sql','027_autogestion_y_sesiones.sql','028_enfermeria.sql','029_controles_enfermeria.sql','030_recepcion.sql','031_consulta_medica.sql','032_administracion_camas.sql','033_portal_y_correo.sql','034_correo_paciente.sql','035_consultorios.sql','036_espera_y_controles.sql','037_comunicaciones_y_reportes.sql','038_datos_personales_paciente.sql','039_conflicto_perfil.sql','040_muestras_ambulatorias.sql','041_lectura_orden_insertada.sql','042_prorroga_consultorios.sql']) { try { await db.exec(readFileSync(new URL('../supabase/migraciones/'+nombre,import.meta.url),'utf8').replaceAll('clock_timestamp()', 'public.reloj_aceptacion()')) } catch(e){throw Error(nombre+': '+e.message+' '+(e.where??'')+' '+(e.position??''))} }
   await db.exec("revoke all on reloj_aceptacion from authenticated,anon;insert into catalogo_analisis(id,nombre) values(1,'Estudio de aceptación')")
 })
 after(async()=>{ await db?.close() })
@@ -166,6 +166,27 @@ test('flujo completo enlaza los cinco roles desde registro e invitación hasta c
   assert.ok((await db.query('select fecha_toma_muestra from solicitudes_analisis where id=$1',[id])).rows[0].fecha_toma_muestra)
   await avanzar('20:01');assert.equal((await rpc(5,'clinica_enfermeria_panel()')).muestras.length,0)
   await assert.rejects(enfermeria(5,'muestra',{pacienteId:paciente,solicitudId:id,etapa:'tomada'}),e=>e.code==='42501')
+ })
+
+ await t.test('la prórroga anual usa la RPC administrativa y conserva horarios, permisos e idempotencia',async()=>{
+  const sala2=(await gestion(1,'consultorios','sala',{clinicaId:1,nombre:'Sala de prórroga',ubicacion:''})).id
+  const fechas=(await db.query('select ($1::date+365)::text original,($1::date+379)::text hasta,($1::date+733)::text excesiva',[dia])).rows[0]
+  const original=(await gestion(1,'consultorios','turno',{consultorioId:sala2,medicoId:2,desde:dia,hasta:fechas.original,dia:0,inicio:'08:00',fin:'20:00'})).id
+  const p=await rpc(1,'clinica_consultorios_panel()'),version=p.turnos.find(t=>t.id===original).version
+  const datos={id:original,version,hasta:fechas.hasta},k=clave()
+  for(const n of [2,4,5,12])await assert.rejects(gestion(n,'consultorios','prorrogar_turno',datos),e=>e.code==='42501')
+  await assert.rejects(gestion(1,'consultorios','prorrogar_turno',{...datos,version:'0'.repeat(32)}),e=>e.code==='PT409')
+  await assert.rejects(gestion(1,'consultorios','prorrogar_turno',{...datos,hasta:fechas.original}),/continuación/)
+  await assert.rejects(gestion(1,'consultorios','prorrogar_turno',{...datos,hasta:fechas.excesiva}),/continuación/)
+  await assert.rejects(gestion(1,'consultorios','prorrogar_turno',{...datos,medicoId:1}),/solo admite/)
+  const n=await rpc(1,'clinica_operar_modulo($1,$2,$3,$4)',['consultorios','prorrogar_turno',JSON.stringify(datos),k])
+  assert.equal((await rpc(1,'clinica_operar_modulo($1,$2,$3,$4)',['consultorios','prorrogar_turno',JSON.stringify(datos),k])).id,n.id)
+  await assert.rejects(gestion(1,'consultorios','prorrogar_turno',datos),e=>e.code==='23P01')
+  const nuevo=(await rpc(4,'clinica_consultorios_panel()')).turnos.find(t=>t.id===n.id)
+  assert.equal(nuevo.hasta,fechas.hasta);assert.equal(nuevo.medicoId,2);assert.equal(nuevo.consultorioId,sala2)
+  assert.equal(nuevo.inicio,'08:00:00');assert.equal(nuevo.fin,'20:00:00');assert.equal(nuevo.dia,0)
+  assert.equal((await rpc(1,'clinica_consultorios_panel()')).turnos.find(t=>t.id===original).hasta,fechas.original)
+  await assert.rejects(rpc(1,'clinica_consultorios_mutar($1,$2)',['prorrogar_turno',JSON.stringify(datos)]),e=>e.code==='42501')
  })
 
 })

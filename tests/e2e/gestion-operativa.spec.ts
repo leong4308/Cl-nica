@@ -27,7 +27,7 @@ test('administración registra consultorio y turno, preserva el formulario ante 
   await page.getByRole('button', { name: 'Guardar consultorio o asignación' }).click(); await expect(page.getByRole('heading', { name: 'Consultorio 201', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Asignar consultorio', exact: true }).click(); await page.getByRole('combobox', { name: 'Médico', exact: true }).selectOption('1'); await page.getByRole('button', { name: 'Guardar consultorio o asignación' }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'ya tiene una asignación' })).toBeVisible(); await expect(page.getByRole('combobox', { name: 'Médico', exact: true })).toHaveValue('1')
-  await page.getByRole('button', { name: 'Guardar consultorio o asignación' }).click(); await expect(page.getByRole('button', { name: 'Desactivar asignación' })).toBeVisible()
+  await page.getByRole('button', { name: 'Guardar consultorio o asignación' }).click(); await page.getByRole('button', { name: 'Ver asignaciones', exact: true }).click(); await expect(page.getByRole('button', { name: /Desactivar asignación de/ })).toBeVisible()
   expect(escrituras[1].clave).toBe(escrituras[2].clave)
   await page.screenshot({ path: '.herramientas/gestion-consultorios.png', fullPage: true })
 })
@@ -85,4 +85,55 @@ test('móvil conserva accesibles el menú de paciente y los formularios nuevos s
  await page.screenshot({ path: '.herramientas/gestion-movil.png', fullPage: true })
  await page.getByRole('button', { name: 'Abrir menú', exact: true }).click(); await page.getByRole('button', { name: 'Mis controles', exact: true }).click()
  await expect(page.getByRole('heading', { name: 'Mis controles', exact: true })).toBeVisible()
+})
+
+
+function tresConsultorios() {
+ const nombres=['Dra. Ana López','Dr. Jorge Méndez','Dra. Laura Ruiz']
+ const datos={clinicas:[{id:1,nombre:'Clínica Nova - Sede Central'}],medicos:nombres.map((nombre,i)=>({id:i+1,nombre,clinicaId:1,asignado:true})),salas:nombres.map((_,i)=>({id:i+1,clinicaId:1,nombre:'Consultorio '+(i+1),ubicacion:'',activo:true,version})),turnos:[] as any[]}
+ const dias=[[0,1,2,4,6],[0,2,3,5,6],[0,1,3,4,5]]
+ for(let m=0;m<3;m++)for(const dia of dias[m])for(const [inicio,fin] of m===0?[['08:00:00','20:00:00']]:m===1?[['08:00:00','14:00:00'],['15:00:00','20:00:00']]:[['08:00:00','15:00:00'],['16:00:00','20:00:00']]){
+  for(const [desde,hasta] of [['2026-11-01','2027-11-16'],['2027-11-17','2027-11-30']])datos.turnos.push({id:datos.turnos.length+1,consultorioId:m+1,medicoId:m+1,medico:nombres[m],dia,inicio,fin,desde,hasta,activo:true,version})
+ }
+ return datos
+}
+test('los tres consultorios muestran la semana completa sin desplazamiento en escritorio',async({page})=>{
+ await page.setViewportSize({width:1920,height:950})
+ await page.route('**/api/gestion/consultorios',r=>r.fulfill({json:tresConsultorios()}))
+ await entrar(page,'recepcionista');await page.getByRole('button',{name:'Consultorios',exact:true}).click()
+ for(const ancho of [1920,1366]){
+  await page.setViewportSize({width:ancho,height:900})
+  for(let i=1;i<=3;i++){
+   const tarjeta=page.getByRole('region',{name:'Consultorio '+i,exact:true})
+   await expect(tarjeta).toBeVisible();await expect(tarjeta.getByRole('row')).toHaveCount(8)
+   await expect(tarjeta.getByText('30 nov 2027',{exact:true})).toBeVisible()
+   const caja=await tarjeta.boundingBox();expect(caja!.y+caja!.height).toBeLessThanOrEqual(900)
+  }
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+ }
+ await page.setViewportSize({width:1920,height:950});await page.screenshot({path:'.herramientas/consultorios-compacto.png',fullPage:true})
+})
+test('los periodos completos se consultan por páginas y las renovaciones futuras aparecen programadas',async({page})=>{
+ await page.route('**/api/gestion/consultorios',r=>r.fulfill({json:tresConsultorios()}))
+ await entrar(page,'recepcionista');await page.getByRole('button',{name:'Consultorios',exact:true}).click()
+ await page.getByRole('region',{name:'Consultorio 2',exact:true}).getByRole('button',{name:'Ver asignaciones',exact:true}).click()
+ const dialogo=page.getByRole('dialog');await expect(dialogo.getByRole('article')).toHaveCount(8)
+ await expect(dialogo.getByText('20 asignaciones · Página 1 de 3')).toBeVisible()
+ await dialogo.getByRole('button',{name:'Página siguiente de asignaciones'}).click()
+ await expect(dialogo.getByText('Programada',{exact:true}).first()).toBeVisible()
+ await expect(dialogo.getByRole('button',{name:/Desactivar/})).toHaveCount(0)
+ await dialogo.getByRole('button',{name:'Cerrar detalle',exact:true}).click()
+ await page.getByLabel('Consultar fecha',{exact:true}).fill('2027-12-01')
+ await expect(page.getByText('Sin horario asignado para esta fecha',{exact:true})).toHaveCount(3)
+})
+test('en móvil se cambia de consultorio sin recorrer todas las tarjetas ni desbordar la pantalla',async({page})=>{
+ await page.setViewportSize({width:390,height:844})
+ await page.route('**/api/gestion/consultorios',r=>r.fulfill({json:tresConsultorios()}))
+ await entrar(page,'recepcionista');await page.getByRole('button',{name:'Consultorios',exact:true}).click()
+ await expect(page.getByRole('complementary')).not.toBeInViewport()
+ await page.getByRole('combobox',{name:'Ver consultorio',exact:true}).selectOption('3')
+ await expect(page.getByRole('region',{name:'Consultorio 3',exact:true})).toBeVisible()
+ await expect(page.getByRole('region',{name:'Consultorio 1',exact:true})).toHaveCount(0)
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+ await page.screenshot({path:'.herramientas/consultorios-compacto-movil.png',fullPage:true,animations:'disabled'})
 })
