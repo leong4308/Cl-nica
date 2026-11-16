@@ -17,6 +17,14 @@ pnpm test:e2e
 
 Las pruebas normales usan datos simulados o una base PostgreSQL aislada en memoria, sin tocar historias reales. Las pruebas antiguas de `panel.spec.ts` se ejecutan únicamente con `E2E_INTEGRACION_REAL=true`, `E2E_USUARIO` y `E2E_CLAVE`, en un entorno de prueba con sus datos específicos. En Windows puede usarse `PLAYWRIGHT_CHANNEL=chrome` si Chrome está instalado y no se descargó Chromium.
 
+## Limpieza y preparación para main
+
+`pnpm limpiar --ver` muestra los registros y resultados temporales que se pueden retirar. `pnpm limpiar` elimina los `.log`, cachés de TypeScript y reportes generados de pruebas. Si un archivo está en uso, lo conserva y lo indica. La limpieza no sigue enlaces ni elimina el código, las pruebas, las migraciones, las dependencias, la compilación de Next.js o los respaldos.
+
+Las pruebas de `tests/` y las migraciones de `supabase/migraciones/` se conservan en Git: el workflow verifica funciones y permisos antes de integrar cambios, y las migraciones permiten reproducir la base de datos. Esos archivos no aparecen en la interfaz de la aplicación. `.gitignore` excluye registros, reportes, herramientas locales, respaldos, la clave de los respaldos y archivos de entorno; `.env.example` conserva únicamente la plantilla de configuración.
+
+Para revisar la aplicación compilada, ejecuta `pnpm build` y después `pnpm start`. Para preparar el envío, ejecuta la limpieza y revisa `git status` antes de crear el commit.
+
 ## Instalar la actualización de seguridad
 
 1. Conserva un respaldo del proyecto antes de actualizar su base.
