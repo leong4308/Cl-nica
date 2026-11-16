@@ -29,7 +29,7 @@ Para revisar la aplicación compilada, ejecuta `pnpm build` y después `pnpm sta
 
 1. Conserva un respaldo del proyecto antes de actualizar su base.
 2. Configura `SUPABASE_DB_URL` en `.env.local` con la URI de **Supabase → Connect** y la contraseña de la base. No es la clave de servicio. Los caracteres especiales de la contraseña deben codificarse en la URI. Nunca subas ese archivo a Git.
-3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `029_controles_enfermeria.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
+3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `041_lectura_orden_insertada.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
 4. Ejecuta `pnpm agenda:importar` para copiar las agendas privadas anteriores a PostgreSQL sin sobrescribir las ya publicadas. No se inventan horarios.
 5. También se pueden ejecutar esos archivos SQL, en orden numérico, desde el editor de Supabase. La importación de agendas sigue siendo necesaria si había horarios guardados en Storage.
 6. Inicia sesión como administrador y abre **Configuración → Verificar estado**. Comprueba los distintos roles antes de publicar.
@@ -178,3 +178,7 @@ Los módulos verifican permisos y sesión en API y PostgreSQL. Los registros cl�
 `038_datos_personales_paciente.sql` y `039_conflicto_perfil.sql` habilitan **Mis datos → Editar mis datos**, también desde **Mi perfil**. El paciente actualiza su nombre, teléfono, fecha de nacimiento, género y contacto de emergencia. Los campos opcionales pueden quedar vacíos. El correo de acceso conserva el cambio verificado a través de recepción; no se modifican roles, médicos, diagnósticos, recetas ni resultados desde este formulario.
 
 La API valida los campos y la función SQL obtiene la ficha desde la sesión activa, sin recibir un identificador de paciente. Guarda nombre/contactos en una transacción con auditoría y una versión de los datos personales. Una edición concurrente conserva el formulario y pide cargar los datos actuales antes de reemplazarlos. Las sesiones bloqueadas o fichas inactivas no guardan datos. Tras guardar, Mis datos y el encabezado se actualizan sin cerrar la sesión.
+
+## Revisión final del 16 de noviembre de 2026
+
+Consulta [el informe de revisión de los cinco roles](docs/revision-final-2026-11-16.md) para conocer el alcance, las versiones comprobadas y las condiciones pendientes del despliegue. La base requiere la versión **41**. Las muestras ambulatorias respetan la asignación de enfermería y las órdenes hospitalarias pueden devolver su identificador al guardarse sin ampliar permisos clínicos.

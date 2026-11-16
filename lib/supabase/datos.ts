@@ -1395,12 +1395,18 @@ export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error:
   const supabase = createClient()
   let episodioId = datos.episodioId
 
+  // El episodio de una nueva prescripción debe pertenecer al médico de la sesión.
+  const { data: medicoId, error: errorMedico } = await supabase.rpc('clinica_medico')
+  if (errorMedico) return { error: errorMedico.message }
+  if (medicoId) episodioId = undefined
+
   // Si no hay episodioId, buscar o crear uno para la internación
   if (!episodioId || episodioId === 0) {
     const { data: epExistente } = await supabase
       .from('episodios_medicos')
       .select('id')
       .eq('internacion_id', datos.internacionId)
+      .eq('medico_id', medicoId)
       .limit(1)
       .maybeSingle()
 
@@ -1411,6 +1417,7 @@ export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error:
         .from('episodios_medicos')
         .insert({
           internacion_id: datos.internacionId,
+          medico_id: medicoId,
           tipo_episodio: 'Evolución',
           descripcion: 'Episodio generado para orden médica',
         })
@@ -1441,7 +1448,7 @@ export async function crearOrdenMedica(datos: DatosNuevaOrden): Promise<{ error:
       orden_medica_id: orden.id,
       analisis_id: datos.analisisId,
       estado_analisis: 'solicitado',
-      observaciones: datos.instrucciones ?? null,
+      // Las indicaciones están en la orden; no son una validación del resultado.
     })
     if (errorSolicitud) return { error: 'La orden se guardó, pero no se pudo generar la solicitud de laboratorio.', id: orden.id }
   }
