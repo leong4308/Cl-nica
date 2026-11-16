@@ -42,7 +42,7 @@ export function BarraLateralRecepcionista({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${
+      className={`menu-lateral fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${
         abierto ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
@@ -57,7 +57,7 @@ export function BarraLateralRecepcionista({
         <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
 
-      <nav className="flex flex-col gap-1 px-4 pt-7">
+      <nav className="flex shrink-0 flex-col gap-1 px-4 pt-7">
         <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">
           Menú de Recepción
         </p>

@@ -179,3 +179,73 @@ html[data-reducir-animaciones='true'] *, html[data-reducir-animaciones='true'] *
     @apply bg-background text-foreground;
   }
 }
+
+/* El menú sigue desplazándose con rueda, tacto y foco cuando la pantalla es corta. */
+.menu-lateral {
+  scrollbar-width: none;
+  overscroll-behavior-y: contain;
+}
+.menu-lateral::-webkit-scrollbar {
+  display: none;
+}
+
+/* Administración tiene más opciones: ajustamos el espacio a la altura disponible. */
+@media (min-width: 1024px) {
+  .menu-lateral-admin .menu-lateral-navegacion {
+    padding-top: 1rem;
+    gap: .125rem;
+  }
+  .menu-lateral-admin .menu-lateral-titulo {
+    margin-bottom: .5rem;
+  }
+  .menu-lateral-admin .menu-lateral-administracion {
+    margin-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  .menu-lateral-admin .menu-lateral-administracion > div {
+    gap: .125rem;
+  }
+  .menu-lateral-admin .menu-lateral-opcion {
+    min-height: 2.25rem;
+    padding-top: .5rem;
+    padding-bottom: .5rem;
+  }
+}
+@media (min-width: 1024px) and (max-height: 800px) {
+  .menu-lateral-admin .menu-lateral-navegacion {
+    padding-top: .75rem;
+  }
+  .menu-lateral-admin .menu-lateral-titulo {
+    margin-bottom: .375rem;
+  }
+  .menu-lateral-admin .menu-lateral-administracion {
+    margin-top: .75rem;
+    padding-bottom: .75rem;
+  }
+  .menu-lateral-admin .menu-lateral-opcion {
+    min-height: 2rem;
+    padding-top: .375rem;
+    padding-bottom: .375rem;
+  }
+}
+@media (min-width: 1024px) and (max-height: 700px) {
+  .menu-lateral-admin .menu-lateral-navegacion,
+  .menu-lateral-admin .menu-lateral-administracion > div {
+    gap: 0;
+  }
+  .menu-lateral-admin .menu-lateral-navegacion {
+    padding-top: .5rem;
+  }
+  .menu-lateral-admin .menu-lateral-titulo {
+    margin-bottom: .25rem;
+  }
+  .menu-lateral-admin .menu-lateral-administracion {
+    margin-top: .5rem;
+    padding-bottom: .5rem;
+  }
+  .menu-lateral-admin .menu-lateral-opcion {
+    min-height: 1.875rem;
+    padding-top: .25rem;
+    padding-bottom: .25rem;
+  }
+}

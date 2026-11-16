@@ -137,3 +137,29 @@ test('en móvil se cambia de consultorio sin recorrer todas las tarjetas ni desb
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
  await page.screenshot({path:'.herramientas/consultorios-compacto-movil.png',fullPage:true,animations:'disabled'})
 })
+
+
+test('el menú administrativo cabe sin barra visible y conserva el acceso en pantallas cortas',async({page})=>{
+ await page.setViewportSize({width:1920,height:944})
+ await page.route('**/api/gestion/consultorios',r=>r.fulfill({json:tresConsultorios()}))
+ await entrar(page,'admin')
+ const menu=page.getByRole('complementary')
+ for(const altura of [944,768,676]){
+  await page.setViewportSize({width:1366,height:altura})
+  expect(await menu.evaluate(el=>getComputedStyle(el).scrollbarWidth)).toBe('none')
+  expect(await menu.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true)
+  for(const nombre of ['Enfermería','Consultorios','Reportes','Usuarios','Historial de cambios','Configuración']){
+   const opcion=menu.getByRole('button',{name:nombre,exact:true})
+   await expect(opcion).toBeVisible();const caja=await opcion.boundingBox()
+   expect(caja!.y).toBeGreaterThanOrEqual(0);expect(caja!.y+caja!.height).toBeLessThanOrEqual(altura)
+  }
+ }
+ await page.setViewportSize({width:1366,height:400})
+ await menu.getByRole('button',{name:'Configuración',exact:true}).focus()
+ expect(await menu.evaluate(el=>el.scrollTop)).toBeGreaterThan(0)
+ await expect(menu.getByRole('button',{name:'Configuración',exact:true})).toBeInViewport()
+ await page.setViewportSize({width:1920,height:944})
+ await menu.getByRole('button',{name:'Consultorios',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Consultorio 3',exact:true})).toBeVisible()
+ await page.screenshot({path:'.herramientas/menu-lateral-compacto.png',fullPage:true,animations:'disabled'})
+})

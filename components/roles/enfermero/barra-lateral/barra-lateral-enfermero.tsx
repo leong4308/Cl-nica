@@ -42,11 +42,11 @@ export function BarraLateralEnfermero({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${
+      className={`menu-lateral fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${
         abierto ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
-      <div className="flex h-[82px] items-center gap-3 border-b border-slate-100 px-7">
+      <div className="flex h-[82px] shrink-0 items-center gap-3 border-b border-slate-100 px-7">
         <div className="flex size-10 items-center justify-center rounded-xl bg-teal-600 text-white shadow-sm shadow-teal-200">
           <HeartPulse size={23} />
         </div>
@@ -57,7 +57,7 @@ export function BarraLateralEnfermero({
         <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
 
-      <nav className="flex flex-col gap-1 px-4 pt-7">
+      <nav className="flex shrink-0 flex-col gap-1 px-4 pt-7">
         <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">
           Menú de Enfermería
         </p>

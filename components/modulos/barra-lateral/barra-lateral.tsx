@@ -53,7 +53,7 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
       : 'Sistema Médico'
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`menu-lateral ${esAdmin ? 'menu-lateral-admin' : ''} fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${abierto ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-[82px] shrink-0 items-center gap-3 border-b border-slate-100 px-7">
         <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-200"><HeartPulse size={23} /></div>
         <div>
@@ -63,8 +63,8 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
         <BotonCerrarBarra onCerrar={onCerrar} />
       </div>
 
-      <nav className="flex flex-col gap-1 px-4 pt-7">
-        <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Menú principal</p>
+      <nav className="menu-lateral-navegacion flex shrink-0 flex-col gap-1 px-4 pt-7">
+        <p className="menu-lateral-titulo mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Menú principal</p>
         {itemsNav.map((item) => (
           <BotonNavLateral
             key={item.label}
@@ -79,8 +79,8 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
 
       {/* Sección de Administración — solo visible para admin */}
       {esAdmin && (
-        <div className="mt-8 shrink-0 px-4 pb-6">
-          <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Administración</p>
+        <div className="menu-lateral-administracion mt-8 shrink-0 px-4 pb-6">
+          <p className="menu-lateral-titulo mb-3 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Administración</p>
           <div className="flex flex-col gap-1">
             {itemsAdministracion.map(({ label, icono: Icono }) => (
               <BotonAdminLateral key={label} etiqueta={label} Icono={Icono} onAbrirModal={onAbrirModal} />
