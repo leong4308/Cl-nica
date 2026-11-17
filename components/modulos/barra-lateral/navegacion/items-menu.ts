@@ -19,7 +19,7 @@ type NavItem = {
 }
 
 export const navItems: NavItem[] = [
-  { label: 'Enfermería', icon: ClipboardList, roles: ['admin', 'medico'] },
+  { label: 'Enfermería', icon: ClipboardList, roles: ['admin'] },
   {
     label: 'Resumen',
     icon: LayoutDashboard,

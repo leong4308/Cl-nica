@@ -81,7 +81,7 @@ export function ConsultaSoap({ soap, onChangeSoap }: ConsultaSoapProps) {
           </h3>
         </div>
 
-        <p className="text-xs text-slate-500">Usa Guardar borrador para conservar tus cambios.</p>
+        <p className="text-xs text-slate-500">Usa Guardar para conservar tus cambios.</p>
       </div>
 
       {/* Grid 2x2 Formato SOAP */}

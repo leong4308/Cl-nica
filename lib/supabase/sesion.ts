@@ -57,4 +57,7 @@ export async function cerrarSesion() {
   salidaExplicita = true
   const { error } = await createClient().auth.signOut({ scope: 'local' })
   if (error) { salidaExplicita = false; throw error }
+  if (typeof window !== 'undefined') {
+    try { for (const clave of Object.keys(window.sessionStorage)) if (clave.startsWith('cn:consulta:')) window.sessionStorage.removeItem(clave) } catch {}
+  }
 }

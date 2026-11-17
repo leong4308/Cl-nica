@@ -1,4 +1,5 @@
 'use client'
+import { ConfirmacionClinica, type ConfirmacionClinicaDatos } from '../compartidos/confirmacion-clinica'
 import { EstadoLlegada } from '@/components/modulos/citas/estado-llegada'
 
 import { useEffect, useRef, useState } from 'react'
@@ -42,6 +43,7 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
   const [soap, setSoap] = useState(vacio)
   const [prescripciones, setPrescripciones] = useState<MedicamentoPrescrito[]>([])
   const [cambios, setCambios] = useState(false)
+  const [confirmacion, setConfirmacion] = useState<ConfirmacionClinicaDatos | null>(null)
   const cargada = useRef<CitaAgendaMedico | undefined>(undefined)
 
   const esMedico = usuario?.rol === 'medico'
@@ -106,21 +108,23 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
     return () => window.removeEventListener('beforeunload', avisar)
   }, [cambios])
 
-  function descartar() { return !cambios || window.confirm('Hay cambios de consulta sin guardar. ¿Quieres descartarlos?') }
-  function cambiarContexto() {
-    if (guardando || !descartar()) return false
+  function confirmarCambio(accion: () => void) {
+    if (guardando) return
+    if (cambios) setConfirmacion({ titulo: 'Cambios sin guardar', mensaje: 'Si cambias de consulta, médico o fecha, se descartarán los cambios pendientes de esta consulta.', confirmar: 'Descartar cambios', accion })
+    else accion()
+  }
+  function limpiarContexto() {
     setCambios(false); cargada.current = undefined; setSeleccionId(0); setCitas([]); setResumen(null); setTab('paciente')
-    return true
   }
   function cambiarFecha(nueva: string) {
-    if (nueva && nueva !== fecha && cambiarContexto()) setFecha(nueva)
+    if (nueva && nueva !== fecha) confirmarCambio(() => { limpiarContexto(); setFecha(nueva) })
   }
   function cambiarMedico(id: number) {
-    if (id === medicoId || cambiarContexto()) { setMedicoId(id); setVista('agenda') }
+    if (id === medicoId) { setVista('agenda'); return }
+    confirmarCambio(() => { limpiarContexto(); setMedicoId(id); setVista('agenda') })
   }
   function seleccionarCita(id: number) {
-    if (guardando || id === seleccionId || !descartar()) return
-    setCambios(false); setSeleccionId(id); setTab('paciente')
+    if (id !== seleccionId) confirmarCambio(() => { setCambios(false); setSeleccionId(id); setTab('paciente') })
   }
   async function guardar(concluir: boolean) {
     if (!cita || !puedeRegistrarConsulta || guardando || cargando) return
@@ -143,7 +147,7 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
   const abrirFicha = () => { if (cita) openModal(`PacienteDetalle: ${cita.pacienteId}`) }
   const tabs = [{ id: 'paciente', texto: 'Datos del paciente' }, ...(!esRecepcion ? [{ id: 'historial', texto: 'Historial' }] : []), ...(puedeRegistrarConsulta ? [{ id: 'consulta', texto: 'Registrar consulta' }] : [])]
 
-  return <section className="min-w-0 space-y-5">
+  return <section className="min-w-0 space-y-5">{confirmacion && <ConfirmacionClinica {...confirmacion} onCancelar={() => setConfirmacion(null)} onConfirmar={() => { const accion = confirmacion.accion; setConfirmacion(null); accion() }} />}
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div><p className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-600"><Stethoscope size={16} />Atención y seguimiento</p><h2 className="text-2xl font-semibold tracking-tight text-slate-900">{puedeRegistrarConsulta ? 'Mi Consulta' : 'Agenda médica'}</h2><p className="mt-2 text-sm text-slate-500">{puedeRegistrarConsulta ? 'Consulta la agenda y registra la atención del paciente.' : 'Organiza citas, revisa intervalos y consulta la disponibilidad.'}</p></div>
       <div className="flex flex-wrap gap-2">
@@ -186,7 +190,7 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
                 <AvisoClinico mensaje={cita.estado === 'atendida' ? 'Esta cita ya fue atendida. Consulta o corrige su expediente desde Expedientes.' : cita.estado === 'cancelada' ? 'No se puede finalizar una cita cancelada.' : null} />
                 <ConsultaSoap key={`soap-${cita.id}`} soap={soap} onChangeSoap={(v) => { setSoap(v); setCambios(true) }} />
                 <PrescripcionReceta key={`receta-${cita.id}`} prescripciones={prescripciones} onActualizarPrescripciones={(v) => { setPrescripciones(v); setCambios(true) }} />
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"><p role="status" className="text-xs text-slate-500">{guardando ? 'Guardando consulta...' : cambios ? 'Cambios sin guardar' : 'Sin cambios pendientes'}</p><div className="flex flex-wrap gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={() => void guardar(false)}><FileText size={16} />Guardar borrador</button><button type="button" className={BOTON_PRIMARIO} onClick={() => void guardar(true)}>Guardar y finalizar consulta</button></div></div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"><p role="status" className="text-xs text-slate-500">{guardando ? 'Guardando consulta...' : cambios ? 'Cambios sin guardar' : 'Sin cambios pendientes'}</p><div className="flex flex-wrap gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={() => void guardar(false)}><FileText size={16} />Guardar</button><button type="button" className={BOTON_PRIMARIO} onClick={() => void guardar(true)}>Guardar y finalizar consulta</button></div></div>
               </fieldset>}
             </div>
           </> : <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-16 text-center"><span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-500"><UserRound size={26} /></span><h3 className="mt-4 text-base font-semibold text-slate-800">{cargando ? 'Cargando citas' : 'Tu agenda está lista'}</h3><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">{cargando ? 'Estamos consultando la información del día seleccionado.' : 'Selecciona una cita para consultar al paciente o elige otra fecha.'}</p>{puedeAgendar && !cargando && <button type="button" className={BOTON_PRIMARIO + ' mt-5'} disabled={!medico} onClick={() => setAgendar(true)}><Plus size={16} />Nueva cita</button>}</div>}

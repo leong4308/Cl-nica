@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (!cita && a.usuario.rol !== 'medico') return NextResponse.json({ error: 'Selecciona la consulta desde la agenda administrativa.' }, { status: 403 })
   if (dia && (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !Number.isFinite(Date.parse(dia)) || new Date(dia).toISOString().slice(0, 10) !== dia)) return NextResponse.json({ error: 'Fecha inválida.' }, { status: 400 })
   const r = cita ? await a.db.rpc('clinica_consulta_leer', { p_cita: Number(cita) }) : await a.db.rpc('clinica_medico_panel', { p_dia: dia || null })
-  return r.error ? errorOperacion(r.error) : NextResponse.json(r.data, { headers })
+  return r.error ? errorOperacion(r.error) : NextResponse.json(cita ? { ...r.data, editorId: a.user?.id } : r.data, { headers })
 }
 export async function POST(request: Request) {
   if (!origenValido(request)) return NextResponse.json({ error: 'Origen inválido.' }, { status: 403 })

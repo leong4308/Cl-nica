@@ -32,6 +32,7 @@ async function preparar(page: Page, rol = 'enfermero', vacio = false) {
   await page.locator('input[type=email]').fill(user.email)
   await page.locator('input[type=password]').fill('ClaveSimulada123*')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+  if (rol === 'medico') { await expect(page.getByRole('heading', { name: 'Citas médicas', exact: true })).toBeVisible(); return { datos, escrituras } }
   if (rol !== 'enfermero') await page.getByRole('button', { name: 'Enfermería', exact: true }).click()
   await expect(page.getByRole('heading', { name: rol === 'enfermero' ? 'Mi turno de enfermería' : 'Seguimiento de enfermería' })).toBeVisible()
   return { datos, escrituras }
@@ -114,20 +115,12 @@ test('administración asigna paciente y turno, sin poder programar una dosis mé
   await expect(page.getByRole('dialog').getByRole('option', { name: 'Dosis de medicamento' })).toHaveCount(0)
 })
 
-test('el médico programa una dosis vinculada a una prescripción vigente', async ({ page }) => {
+test('el médico no muestra el módulo de enfermería ni sus formularios de programación', async ({ page }) => {
   const { escrituras } = await preparar(page, 'medico')
-  await page.getByRole('button', { name: 'Programar atención', exact: true }).click()
-  const modal = page.getByRole('dialog', { name: 'Programar atención' })
-  await modal.getByLabel('Tipo de tarea', { exact: true }).selectOption('medicamento')
-  await modal.getByLabel('Nombre de la tarea').fill('Dosis autorizada')
-  await modal.getByLabel('Hora programada · fecha').fill('2026-11-12')
-  await modal.getByLabel('Hora programada · hora').fill('10:00')
-  await modal.getByLabel('Prescripción médica', { exact: true }).selectOption('40')
-  await modal.getByLabel('Dosis indicada por el médico').fill('Dosis de la prescripción')
-  await modal.getByLabel('Vía indicada por el médico').fill('Vía de la prescripción')
-  await modal.getByRole('button', { name: 'Guardar registro' }).click()
-  await expect(modal).toHaveCount(0)
-  expect(escrituras[0]).toMatchObject({ accion: 'programar', datos: { tipo: 'medicamento', ordenId: 40, programada: '2026-11-12T16:00:00.000Z' } })
+  await expect(page.getByRole('button', { name: 'Enfermería', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Programar atención', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Seguimiento de enfermería', exact: true })).toHaveCount(0)
+  expect(escrituras).toHaveLength(0)
 })
 
 test('una nota en móvil conserva el borrador ante error', async ({ page }) => {

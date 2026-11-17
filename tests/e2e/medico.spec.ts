@@ -7,13 +7,13 @@ async function preparar(page:Page,cerrada=false){
  await page.route('**/auth/v1/**',r=>r.fulfill({json:r.request().url().endsWith('/user')?user:{user,access_token:token,refresh_token:'simulado',expires_in:3600,token_type:'bearer'}}))
  await page.route('**/rest/v1/**',r=>r.fulfill({json:new URL(r.request().url()).pathname.endsWith('/usuarios')?[{id:2,auth_user_id:user.id,nombre_completo:'Médico de prueba',rol:'medico',esta_activo:true}]:[]}))
  const contenido={subjetivo:'Evolución registrada',objetivo:'Exploración documentada',diagnostico:'Problema clínico registrado',plan:'Plan registrado',pronostico:'',seguimiento:'Control según evolución',recetaLibre:'',medicamentos:[]}
- const ctx={cita:{id:35,pacienteId:1,paciente:'Paciente de prueba',medico:'Médico de prueba',cedula:'CED-1',inicio:'2026-11-12T18:00:00Z',estado:cerrada?'atendida':'confirmada',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:{id:1,contenido,estado_nota:cerrada?'cerrada':'borrador',diagnostico:contenido.diagnostico,receta:null,notas_doctor:null,cerrada_en:cerrada?'2026-11-12T18:00:00Z':null},correcciones:[] as object[],ordenes:[] as object[],catalogo:[{id:1,nombre:'Estudio de prueba'}]}
+ const ctx={editorId:user.id,cita:{id:35,pacienteId:1,paciente:'Paciente de prueba',medico:'Médico de prueba',cedula:'CED-1',inicio:'2026-11-12T18:00:00Z',estado:cerrada?'atendida':'confirmada',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:{id:1,contenido,estado_nota:cerrada?'cerrada':'borrador',diagnostico:contenido.diagnostico,receta:null,notas_doctor:null,cerrada_en:cerrada?'2026-11-12T18:00:00Z':null},correcciones:[] as object[],ordenes:[] as object[],catalogo:[{id:1,nombre:'Estudio de prueba'}]}
  const panel={dia:'2026-11-12',ahora:'2026-11-12T18:00:00Z',citas:[{id:35,pacienteId:1,paciente:'Paciente de prueba',inicio:'2026-11-12T18:00:00Z',fin:'2026-11-12T18:20:00Z',estado:ctx.cita.estado,motivo:'Seguimiento',llegada:'2026-11-12T17:50:00Z',enConsulta:'2026-11-12T17:55:00Z'}],abiertas:[],resultados:[{id:70,paciente:'Paciente de prueba',estudio:'Resultado de prueba',resultado:'Informe disponible',fecha:'2026-11-12T17:00:00Z',version:'b'.repeat(32),conPdf:false}],incidencias:[],puedeValidarLaboratorio:false}
- const escrituras:any[]=[];let fallo=false
+ const escrituras:any[]=[];let fallo=false,versionNota=1
  await page.route('**/api/documentos-clinicos/**',r=>r.fulfill({json:{archivos:[]}}))
  await page.route('**/api/medico**',r=>{
   if(r.request().method()==='POST'){const b=r.request().postDataJSON();escrituras.push(b);if(fallo){fallo=false;return r.fulfill({status:503,json:{error:'No se pudo verificar el guardado. Tu borrador se conserva.'}})}
-   if(b.accion==='guardar'){ctx.nota.contenido=b.datos.contenido;if(b.datos.cerrar){ctx.nota.estado_nota='cerrada';ctx.nota.cerrada_en='2026-11-12T18:00:00Z';ctx.cita.estado='atendida'}}
+   if(b.accion==='guardar'){ctx.nota.contenido=b.datos.contenido;ctx.version=(++versionNota).toString(16).padStart(32,'0');if(b.datos.cerrar){ctx.nota.estado_nota='cerrada';ctx.nota.cerrada_en='2026-11-12T18:00:00Z';ctx.cita.estado='atendida'}}
    if(b.accion==='corregir')ctx.correcciones.push({id:1,autor:'Médico de prueba',motivo:b.datos.motivo,texto:b.datos.texto,fecha:'2026-11-12T18:00:00Z'})
    if(b.accion==='orden')ctx.ordenes.push({id:80,tipo:b.datos.tipo,descripcion:b.datos.descripcion,instrucciones:b.datos.instrucciones,estado:'prescrita'})
    if(b.accion==='revisar')panel.resultados=[]
@@ -23,6 +23,8 @@ async function preparar(page:Page,cerrada=false){
  })
  await page.goto('/');await page.locator('input[type=email]').fill(user.email);await page.locator('input[type=password]').fill('ClaveSimulada123*');await page.getByRole('button',{name:'Ingresar',exact:true}).click()
  await expect(page.getByRole('heading',{name:'Citas médicas',exact:true})).toBeVisible()
+ const raiz=new URL('/',page.url()).href
+ await page.route(raiz,async r=>{const respuesta=await r.fetch({headers:{...r.request().headers(),cookie:''}});await r.fulfill({response:respuesta})})
  return {ctx,panel,escrituras,fallar:()=>{fallo=true}}
 }
 test('consulta estructurada finaliza con confirmación y emite receta desde la nota cerrada',async({page})=>{
@@ -32,20 +34,20 @@ test('consulta estructurada finaliza con confirmación y emite receta desde la n
  await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Plan actualizado por el médico')
  await page.screenshot({path:'.herramientas/medico-consulta.png',fullPage:true})
  await expect(modal.getByRole('button',{name:'Receta PDF',exact:true})).toHaveCount(0)
- await modal.getByRole('button',{name:'Finalizar consulta',exact:true}).click();expect(escrituras).toHaveLength(0)
+ await modal.getByRole('button',{name:'Finalizar consulta',exact:true}).click();expect(escrituras.filter(e=>e.datos?.cerrar)).toHaveLength(0)
  await modal.getByRole('button',{name:'Confirmar cierre de consulta',exact:true}).click()
  await expect(modal.getByText('Cita #35 · Nota cerrada')).toBeVisible()
- expect(escrituras[0]).toMatchObject({accion:'guardar',datos:{citaId:35,cerrar:true,contenido:{plan:'Plan actualizado por el médico'}}})
+ expect(escrituras.find(e=>e.datos?.cerrar)).toMatchObject({accion:'guardar',datos:{citaId:35,cerrar:true,contenido:{plan:'Plan actualizado por el médico'}}})
  await expect(modal.getByLabel('Diagnóstico o problema clínico')).toBeDisabled()
  const popup=page.waitForEvent('popup');await modal.getByRole('button',{name:'Receta PDF',exact:true}).click();await expect((await popup).getByText('Prescripción vinculada a la consulta #35')).toBeVisible()
 })
 test('un fallo temporal conserva el borrador y reintentar usa el mismo identificador',async({page})=>{
  const {escrituras,fallar}=await preparar(page);await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
  const modal=page.getByRole('dialog');await modal.getByLabel('Exploración y hallazgos').fill('Hallazgos que deben conservarse');fallar()
- await modal.getByRole('button',{name:'Guardar borrador',exact:true}).click()
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click()
  await expect(modal.getByRole('alert')).toContainText('Tu borrador se conserva')
  await expect(modal.getByLabel('Exploración y hallazgos')).toHaveValue('Hallazgos que deben conservarse')
- await modal.getByRole('button',{name:'Guardar borrador',exact:true}).click();await expect(modal.getByRole('status')).toContainText('Atención registrada')
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click();await expect(modal.getByRole('status')).toContainText('Atención registrada')
  expect(escrituras[0].clave).toBe(escrituras[1].clave)
 })
 test('una aclaración conserva la nota cerrada y registra motivo y autor',async({page})=>{
@@ -69,4 +71,132 @@ test('revisión de resultados y diseño móvil sin validación de laboratorio au
  await expect(page.getByRole('button',{name:'Mi Consulta',exact:true})).toHaveCount(0)
  const ancho=await page.evaluate(()=>({doc:document.documentElement.scrollWidth,pantalla:innerWidth}));expect(ancho.doc).toBeLessThanOrEqual(ancho.pantalla+1)
  await page.screenshot({path:'.herramientas/medico-movil.png',fullPage:true})
+})
+
+test('el médico no ve Enfermería y Guardar conserva la consulta como borrador',async({page})=>{
+ const {ctx,escrituras}=await preparar(page)
+ await expect(page.getByRole('button',{name:'Enfermería',exact:true})).toHaveCount(0)
+ await expect(page.getByRole('button',{name:'Abrir seguimiento de enfermería',exact:true})).toHaveCount(0)
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await expect(modal.getByRole('button',{name:'Guardar borrador',exact:true})).toHaveCount(0)
+ await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Plan conservado sin cerrar la cita')
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click()
+ await expect(modal.getByRole('status')).toContainText('Atención registrada')
+ expect(ctx.nota.estado_nota).toBe('borrador');expect(ctx.cita.estado).toBe('confirmada')
+ expect(escrituras.at(-1)).toMatchObject({accion:'guardar',datos:{cerrar:false}})
+})
+
+test('autoguarda la nota y cerrar inmediatamente conserva el último texto al reabrir',async({page})=>{
+ const {ctx,escrituras}=await preparar(page)
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await modal.getByLabel('Motivo, síntomas y evolución').fill('Evolución protegida automáticamente')
+ await expect.poll(()=>ctx.nota.contenido.subjetivo).toBe('Evolución protegida automáticamente')
+ expect(escrituras.some(e=>e.datos.cerrar)).toBe(false)
+ await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Última edición antes de salir')
+ await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
+ await expect(modal).toHaveCount(0)
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ await expect(modal.getByLabel('Plan de tratamiento e indicaciones')).toHaveValue('Última edición antes de salir')
+ expect(ctx.nota.estado_nota).toBe('borrador')
+})
+
+test('recarga accidental recupera el texto y el medicamento incompleto sin emitir una receta parcial',async({page})=>{
+ const {escrituras}=await preparar(page)
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ let modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await modal.getByLabel('Exploración y hallazgos').fill('Exploración que no debe perderse')
+ await modal.getByRole('button',{name:'Agregar medicamento',exact:true}).click()
+ await modal.getByLabel('Medicamento',{exact:true}).fill('Medicamento pendiente de completar')
+ await page.reload();await expect(page.getByRole('heading',{name:'Citas médicas',exact:true})).toBeVisible()
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await expect(modal.getByLabel('Exploración y hallazgos')).toHaveValue('Exploración que no debe perderse')
+ await expect(modal.getByLabel('Medicamento',{exact:true})).toHaveValue('Medicamento pendiente de completar')
+ await expect(modal.getByLabel('Dosis',{exact:true})).toHaveValue('')
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click()
+ await expect(modal.getByRole('alert')).toContainText('Completa nombre, dosis')
+ expect(escrituras).toHaveLength(0)
+})
+
+test('la alerta de medicamento permite cancelar y bloquea fondo, teclado y desplazamiento',async({page})=>{
+ await preparar(page);const nativos:string[]=[];page.on('dialog',d=>{nativos.push(d.type());void d.dismiss()})
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await modal.getByRole('button',{name:'Agregar medicamento',exact:true}).click()
+ await modal.getByLabel('Medicamento',{exact:true}).fill('Medicamento que requiere confirmación')
+ await modal.getByRole('button',{name:'Quitar medicamento',exact:true}).click()
+ const alerta=page.getByRole('alertdialog',{name:'Eliminar medicamento',exact:true})
+ await expect(alerta).toContainText('Medicamento que requiere confirmación')
+ expect(await page.evaluate(()=>document.body.style.overflow)).toBe('hidden')
+ for(let i=0;i<8;i++){await page.keyboard.press('Tab');expect(await alerta.evaluate(el=>el.contains(document.activeElement))).toBe(true)}
+ const scroll=await page.evaluate(()=>({y:scrollY,main:document.querySelector('main')?.scrollTop}))
+ await page.mouse.move(4,4);await page.mouse.wheel(0,700)
+ expect(await page.evaluate(()=>({y:scrollY,main:document.querySelector('main')?.scrollTop}))).toEqual(scroll)
+ await page.locator('button').filter({hasText:/^Nueva cita$/}).click({force:true})
+ await expect(alerta).toBeVisible();await expect(page.getByRole('dialog',{name:'Nueva cita',exact:true})).toHaveCount(0)
+ await page.screenshot({path:'.herramientas/alerta-eliminar-medicamento.png',fullPage:true})
+ await alerta.getByRole('button',{name:'Cancelar',exact:true}).click()
+ await expect(modal.getByLabel('Medicamento',{exact:true})).toHaveValue('Medicamento que requiere confirmación')
+ await modal.getByRole('button',{name:'Quitar medicamento',exact:true}).click();await page.keyboard.press('Escape')
+ await expect(alerta).toHaveCount(0);await expect(modal).toBeVisible()
+ await modal.getByRole('button',{name:'Quitar medicamento',exact:true}).click()
+ await alerta.getByRole('button',{name:'Eliminar medicamento',exact:true}).click()
+ await expect(modal.getByLabel('Medicamento',{exact:true})).toHaveCount(0)
+ expect(nativos).toEqual([])
+})
+
+test('un borrador de otra versión requiere revisión y no sobrescribe al servidor automáticamente',async({page})=>{
+ const {ctx,escrituras}=await preparar(page)
+ const copia={...ctx.nota.contenido,plan:'Avance recuperado del médico'}
+ await page.evaluate(({copia,editorId})=>sessionStorage.setItem(`cn:consulta:${editorId}:35`,JSON.stringify({version:'b'.repeat(32),contenido:copia,actualizado:Date.now()})),{copia,editorId:ctx.editorId})
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await expect(modal.getByText('Hay un borrador recuperado, pero la nota del servidor cambió.',{exact:false})).toBeVisible()
+ await expect(modal.getByLabel('Plan de tratamiento e indicaciones')).toHaveValue('Plan registrado')
+ await modal.getByRole('button',{name:'Recuperar mi borrador',exact:true}).click()
+ await expect(modal.getByLabel('Plan de tratamiento e indicaciones')).toHaveValue('Avance recuperado del médico')
+ expect(escrituras).toHaveLength(0)
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click()
+ await expect.poll(()=>ctx.nota.contenido.plan).toBe('Avance recuperado del médico')
+})
+
+test('escribir durante un autoguardado conserva la edición más reciente y la guarda después',async({page})=>{
+ const {ctx}=await preparar(page);let soltar:()=>void=()=>{},retenido=false
+ const espera=new Promise<void>(resolve=>{soltar=resolve})
+ await page.route('**/api/medico**',async r=>{if(r.request().method()==='POST'&&!retenido){retenido=true;await espera}await r.fallback()})
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true}),plan=modal.getByLabel('Plan de tratamiento e indicaciones')
+ await plan.fill('Primer avance')
+ await expect.poll(()=>retenido).toBe(true)
+ await expect(plan).toBeEnabled();await plan.fill('Edición más reciente durante el envío')
+ soltar()
+ await expect(plan).toHaveValue('Edición más reciente durante el envío')
+ await expect.poll(()=>ctx.nota.contenido.plan).toBe('Edición más reciente durante el envío')
+})
+
+test('si fallan servidor y recuperación, cerrar pide una alerta de la aplicación y cancelar conserva el texto',async({page})=>{
+ await preparar(page)
+ await page.evaluate(()=>{
+  const original=Storage.prototype.setItem
+  ;(window as any).__restaurarStorage=()=>{Storage.prototype.setItem=original}
+  Storage.prototype.setItem=function(k,v){if(this===window.sessionStorage)throw new DOMException('Sin espacio','QuotaExceededError');return original.call(this,k,v)}
+ })
+ await page.route('**/api/medico**',r=>r.request().method()==='POST'?r.fulfill({status:503,json:{error:'No se pudo guardar. Tu borrador se conserva.'}}):r.fallback())
+ const nativos:string[]=[];page.on('dialog',d=>{nativos.push(d.type());void d.dismiss()})
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Texto protegido mientras decido qué hacer')
+ await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
+ const alerta=page.getByRole('alertdialog',{name:'Cambios sin guardar',exact:true})
+ await expect(alerta).toContainText('perderás los cambios')
+ await alerta.getByRole('button',{name:'Cancelar',exact:true}).click()
+ await expect(modal.getByLabel('Plan de tratamiento e indicaciones')).toHaveValue('Texto protegido mientras decido qué hacer')
+ expect(nativos).toEqual([])
+ await page.evaluate(()=>(window as any).__restaurarStorage())
+ await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Texto protegido después de cancelar')
+ await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
+ await expect(modal).toHaveCount(0)
+ expect(await page.evaluate(()=>document.body.style.overflow)).toBe('')
 })

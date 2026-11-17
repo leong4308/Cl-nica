@@ -195,6 +195,9 @@ test('receta exige indicaciones explícitas y permite corregir los medicamentos'
   await expect(page.getByLabel('Indicaciones del medicamento 1',{exact:true})).toHaveValue('Indicación corregida')
   await expect(page.getByText('Cambios sin guardar',{exact:true})).toBeVisible()
   await page.getByRole('button',{name:'Eliminar medicamento 1',exact:true}).click()
+  const alerta=page.getByRole('alertdialog',{name:'Eliminar medicamento',exact:true})
+  await expect(alerta).toContainText('Medicamento de prueba')
+  await alerta.getByRole('button',{name:'Eliminar medicamento',exact:true}).click()
   await expect(page.getByText('Aún no hay medicamentos en esta receta.')).toBeVisible()
 })
 
@@ -208,7 +211,7 @@ test('guardar y reabrir un borrador conserva campos y receta sin finalizar ni du
   await page.getByLabel('Medicamento',{exact:true}).fill('Medicamento de prueba')
   await page.getByLabel('Indicaciones del medicamento',{exact:true}).fill('Indicación documentada')
   await page.getByRole('button',{name:'Agregar a la receta',exact:true}).click()
-  await page.getByRole('button',{name:'Guardar borrador',exact:true}).click()
+  await page.getByRole('button',{name:'Guardar',exact:true}).click()
   await expect.poll(()=>expedientes.length).toBe(1)
   await expect(page.getByRole('button',{name:'Actualizar',exact:true})).toBeEnabled()
   const guardado={...expedientes[0]}
@@ -217,7 +220,7 @@ test('guardar y reabrir un borrador conserva campos y receta sin finalizar ni du
   await page.getByRole('tab',{name:'Registrar consulta'}).click()
   await expect(page.getByLabel('S • Subjetivo (Motivo y Anamnesis)',{exact:true})).toHaveValue('Evolución registrada por el profesional')
   await expect(page.getByLabel('Nombre del medicamento 1',{exact:true})).toHaveValue('Medicamento de prueba')
-  await page.getByRole('button',{name:'Guardar borrador',exact:true}).click()
+  await page.getByRole('button',{name:'Guardar',exact:true}).click()
   await expect(page.getByRole('button',{name:'Actualizar',exact:true})).toBeEnabled()
   expect(expedientes).toEqual([guardado])
   expect(cambiosCita).toEqual([])

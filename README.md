@@ -199,6 +199,14 @@ El remitente `onboarding@resend.dev` solo permite pruebas al correo titular de R
 Si npm consume `--port` en PowerShell, el lanzador también acepta el puerto abreviado (`npm run start:avisos -- 3001`). Para evitar la interpretación de argumentos de npm, usa directamente `node .\scripts\aplicacion-con-avisos.mjs start --port 3001`. El puerto se pasa a Next como opción y no como directorio.
 
 
+## Consulta médica: borradores y confirmaciones
+
+El menú del médico ya no muestra el módulo Enfermería. Las incidencias del equipo de atención siguen visibles en su agenda, con acceso a Pacientes. El botón de la nota se llama **Guardar** y conserva la consulta como borrador; **Finalizar consulta** sigue requiriendo confirmación y la validación clínica existente.
+
+Las notas editables se autoguardan después de una pausa de 1.5 segundos. Cada cambio también se protege en `sessionStorage`, separado por la cuenta autenticada y la cita, para recuperar una recarga accidental. Un medicamento incompleto se conserva en esa copia temporal hasta completar sus indicaciones; no se emite una receta parcial. Las copias caducan a las 24 horas y se retiran después de guardar, finalizar o cerrar sesión expresamente. Si la versión del servidor cambió, recuperar el borrador exige revisarlo antes de guardar.
+
+Las confirmaciones de eliminación de medicamentos, descarte y recarga de notas utilizan alertas de la aplicación. Las ventanas modales bloquean los clics y el desplazamiento del fondo, mantienen el foco dentro y respetan el bloqueo de sesión sin desmontar los formularios. Cerrar una nota intenta guardar su avance; si fallan tanto el servidor como el almacenamiento temporal, se pide confirmación antes de perder cambios.
+
 ## Validación de contactos y revisión funcional (044)
 
 Los teléfonos personales y de emergencia admiten exactamente 10 dígitos; se conservan ceros iniciales y no se recortan números pegados demasiado largos. Registro, pacientes, perfil y enfermería comparten restricciones de nombres, nacimiento y contacto de emergencia, respaldadas por validación de API y triggers SQL. La migración 044 normaliza únicamente separadores de números nacionales existentes sin cambiar sus dígitos.

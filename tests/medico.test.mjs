@@ -6,6 +6,28 @@ import ts from 'typescript'
 const require=createRequire(import.meta.url)
 function cargar(ruta,deps={}){const js=ts.transpileModule(readFileSync(new URL(ruta,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const exports={};new Function('require','exports',js)(id=>deps[id]??require(id),exports);return exports}
 const modelo=cargar('../lib/medico/modelo.ts')
+const borradores=cargar('../lib/medico/borrador.ts')
+
+test('la recuperación separa cuenta y cita, conserva medicamentos incompletos e ignora campos calculados del servidor',()=>{
+ const datos={...modelo.CONTENIDO_VACIO,medicamentos:[{nombre:'Medicamento de prueba',dosis:'',via:'',frecuencia:'',duracion:''}]}
+ assert.equal(borradores.medicamentosCompletos(datos),false)
+ assert.equal(borradores.firmaContenidoConsulta(datos),borradores.firmaContenidoConsulta({...datos,signos:{pulso:70}}))
+ const clave=borradores.claveBorradorConsulta('medico-uno',35),map=new Map(),storage={getItem:k=>map.get(k)??null,removeItem:k=>map.delete(k)}
+ map.set(clave,JSON.stringify({version:'a'.repeat(32),contenido:datos,actualizado:100000}))
+ assert.deepEqual(borradores.leerBorradorConsulta(clave,storage,100000).contenido,datos)
+ assert.equal(borradores.leerBorradorConsulta(borradores.claveBorradorConsulta('medico-dos',35),storage,100000),null)
+ assert.equal(borradores.leerBorradorConsulta(borradores.claveBorradorConsulta('medico-uno',36),storage,100000),null)
+ assert.equal(borradores.leerBorradorConsulta(clave,storage,100000+24*3600000+1),null);assert.equal(map.size,0)
+ for(const contenido of [{...datos,medicamentos:[null]},{...datos,plan:'a'.repeat(8001)}]){map.set(clave,JSON.stringify({version:'a'.repeat(32),contenido,actualizado:100000}));assert.equal(borradores.leerBorradorConsulta(clave,storage,100000),null)}
+})
+
+test('el medicamento completo exige vía y demás indicaciones; el almacenamiento bloqueado se comunica sin romper la consulta',()=>{
+ const datos={...modelo.CONTENIDO_VACIO,medicamentos:[{nombre:'Medicamento',dosis:'Dosis indicada',via:'Vía indicada',frecuencia:'Frecuencia indicada',duracion:'Duración indicada'}]}
+ assert.equal(borradores.medicamentosCompletos(datos),true)
+ assert.equal(borradores.medicamentosCompletos({...datos,medicamentos:[{...datos.medicamentos[0],via:'a'.repeat(121)}]}),false)
+ const previo=globalThis.window
+ try{globalThis.window={sessionStorage:{setItem:()=>{throw Error('cuota')}}};assert.equal(borradores.protegerBorradorConsulta('propio','a'.repeat(32),datos),false)}finally{if(previo===undefined)delete globalThis.window;else globalThis.window=previo}
+})
 test('lectura de notas previas conserva texto y no inventa dosis ni exploración',()=>{
  const r=modelo.contenidoInicial({contenido:{},diagnostico:'Diagnóstico previo',receta:'Texto previo',notas_doctor:'Nota previa'})
  assert.equal(r.recetaLibre,'Texto previo');assert.equal(r.objetivo,'');assert.equal(r.plan,'');assert.deepEqual(r.medicamentos,[])

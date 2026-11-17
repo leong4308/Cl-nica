@@ -4,6 +4,7 @@ import { useId, useState } from 'react'
 import { Pill, Plus, Trash2 } from 'lucide-react'
 import type { MedicamentoPrescrito } from './types'
 import { VADEMECUM_POPULAR } from './datos-medicos'
+import { ConfirmacionClinica } from '../compartidos/confirmacion-clinica'
 import { BOTON_SECUNDARIO, CAMPO_CLINICO, ETIQUETA_CLINICA } from '../compartidos/editor-clinico'
 
 export function PrescripcionReceta({ prescripciones, onActualizarPrescripciones }: {
@@ -11,6 +12,7 @@ export function PrescripcionReceta({ prescripciones, onActualizarPrescripciones 
   onActualizarPrescripciones: (nuevas: MedicamentoPrescrito[]) => void
 }) {
   const catalogoId = useId()
+  const [eliminar, setEliminar] = useState<MedicamentoPrescrito | null>(null)
   const [nombre, setNombre] = useState('')
   const [indicaciones, setIndicaciones] = useState('')
   const [presentacion, setPresentacion] = useState('')
@@ -25,6 +27,9 @@ export function PrescripcionReceta({ prescripciones, onActualizarPrescripciones 
   }
   function modificar(id: string, cambios: Partial<MedicamentoPrescrito>) {
     onActualizarPrescripciones(prescripciones.map((p) => p.id === id ? { ...p, ...cambios } : p))
+  }
+  function quitar(id: string) {
+    setEliminar(prescripciones.find(p => p.id === id) ?? null)
   }
   return (
     <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
@@ -42,7 +47,7 @@ export function PrescripcionReceta({ prescripciones, onActualizarPrescripciones 
       {!prescripciones.length ? <p className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500">Aún no hay medicamentos en esta receta.</p> : (
         <div className="space-y-4">{prescripciones.map((p, i) => (
           <div key={p.id} className="space-y-3 rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-slate-500">Medicamento {i + 1}</p><button type="button" aria-label={`Eliminar medicamento ${i + 1}`} className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => onActualizarPrescripciones(prescripciones.filter((m) => m.id !== p.id))}><Trash2 size={16} /></button></div>
+            <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-slate-500">Medicamento {i + 1}</p><button type="button" aria-label={`Eliminar medicamento ${i + 1}`} className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => quitar(p.id)}><Trash2 size={16} /></button></div>
             {p.textoOriginal !== undefined ? <label className={ETIQUETA_CLINICA}>Receta previa (texto libre)<textarea className={CAMPO_CLINICO} rows={3} value={p.textoOriginal} onChange={(e) => modificar(p.id, { nombre: e.target.value, textoOriginal: e.target.value })} /></label> : <>
               <label className={ETIQUETA_CLINICA}>Nombre<input aria-label={`Nombre del medicamento ${i + 1}`} className={CAMPO_CLINICO} value={p.nombre} onChange={(e) => modificar(p.id, { nombre: e.target.value })} /></label>
               <label className={ETIQUETA_CLINICA}>Indicaciones<textarea aria-label={`Indicaciones del medicamento ${i + 1}`} className={CAMPO_CLINICO} rows={2} value={p.posologia} onChange={(e) => modificar(p.id, { posologia: e.target.value })} /></label>
@@ -51,6 +56,7 @@ export function PrescripcionReceta({ prescripciones, onActualizarPrescripciones 
           </div>
         ))}</div>
       )}
+    {eliminar && <ConfirmacionClinica titulo="Eliminar medicamento" mensaje={`Vas a eliminar «${eliminar.nombre.trim() || 'Medicamento sin nombre'}» de esta receta. Revisa que sea el medicamento correcto antes de continuar.`} confirmar="Eliminar medicamento" onCancelar={() => setEliminar(null)} onConfirmar={() => { onActualizarPrescripciones(prescripciones.filter(p => p.id !== eliminar.id)); setEliminar(null) }} />}
     </section>
   )
 }

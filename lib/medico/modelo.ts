@@ -2,6 +2,7 @@ export type MedicamentoConsulta = { nombre: string; dosis: string; via: string; 
 export type ContenidoConsulta = { subjetivo: string; objetivo: string; diagnostico: string; plan: string; pronostico: string; seguimiento: string; recetaLibre: string; medicamentos: MedicamentoConsulta[] }
 export const CONTENIDO_VACIO: ContenidoConsulta = { subjetivo: '', objetivo: '', diagnostico: '', plan: '', pronostico: '', seguimiento: '', recetaLibre: '', medicamentos: [] }
 export type ConsultaMedica = {
+  editorId?: string
   cita: { id: number; pacienteId: number; paciente: string; nacimiento: string | null; medico: string; cedula: string; inicio: string; estado: string; motivo: string | null; alertas: string | null }
   signos?: {valores:Record<string,number>;fecha:string;autor:string}|null
   version: string; puedeSolicitarCambio?: boolean; puedeEditar: boolean
@@ -17,7 +18,7 @@ export function contenidoInicial(nota: ConsultaMedica['nota']): ContenidoConsult
 export async function operarMedico(accion: string, datos: Record<string, unknown>, clave: string) {
   const r = await fetch('/api/medico', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion, datos, clave }) })
   const b = await r.json()
-  if (!r.ok) throw Error(b.error || 'No se pudo guardar la atención.')
+  if (!r.ok) throw Object.assign(Error(b.error || 'No se pudo guardar la atención.'), { status: r.status })
   return b as { id?: number; mensaje: string }
 }
 const escapar = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))

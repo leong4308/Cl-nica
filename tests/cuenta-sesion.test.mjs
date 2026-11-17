@@ -16,9 +16,10 @@ const preferencias = cargar('../lib/cuenta/preferencias.ts')
 const validacion = cargar('../lib/cuenta/validacion.ts')
 const navegacion = cargar('../components/modulos/barra-lateral/navegacion/items-menu.ts')
 
-test('Mi Consulta es exclusiva de administración y el médico inicia en Citas', () => {
+test('Mi Consulta y el módulo Enfermería son exclusivos de administración; el médico inicia en Citas', () => {
   for (const rol of ['admin', 'medico', 'enfermero', 'recepcionista', 'paciente']) {
     assert.equal(navegacion.obtenerNavItemsPorRol(rol).some((item) => item.label === 'Mi Consulta'), rol === 'admin')
+    assert.equal(navegacion.obtenerNavItemsPorRol(rol).some((item) => item.label === 'Enfermería'), rol === 'admin')
   }
   assert.equal(navegacion.obtenerItemDefaultPorRol('medico'), 'Citas')
 })
