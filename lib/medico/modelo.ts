@@ -3,6 +3,7 @@ export type ContenidoConsulta = { subjetivo: string; objetivo: string; diagnosti
 export const CONTENIDO_VACIO: ContenidoConsulta = { subjetivo: '', objetivo: '', diagnostico: '', plan: '', pronostico: '', seguimiento: '', recetaLibre: '', medicamentos: [] }
 export type ConsultaMedica = {
   editorId?: string
+  esAdministrador?: boolean
   cita: { id: number; pacienteId: number; paciente: string; nacimiento: string | null; medico: string; cedula: string; inicio: string; estado: string; motivo: string | null; alertas: string | null }
   signos?: {valores:Record<string,number>;fecha:string;autor:string}|null
   version: string; puedeSolicitarCambio?: boolean; puedeEditar: boolean

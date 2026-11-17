@@ -13,7 +13,7 @@
     "test:db": "node --test tests/supabase.test.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "test:sql": "node --test --test-concurrency=1 tests/sql-operacion.test.mjs tests/enfermeria-sql.test.mjs tests/recepcion-sql.test.mjs tests/medico-sql.test.mjs tests/admin-camas-sql.test.mjs tests/portal-correo-sql.test.mjs tests/correo-paciente-sql.test.mjs tests/gestion-operativa-sql.test.mjs tests/mis-datos-sql.test.mjs tests/flujo-completo-sql.test.mjs tests/registro-paciente-sql.test.mjs tests/equipo-eliminaciones-sql.test.mjs tests/ingreso-urgente-sql.test.mjs",
+    "test:sql": "node --test --test-concurrency=1 tests/sql-operacion.test.mjs tests/enfermeria-sql.test.mjs tests/recepcion-sql.test.mjs tests/medico-sql.test.mjs tests/admin-camas-sql.test.mjs tests/portal-correo-sql.test.mjs tests/correo-paciente-sql.test.mjs tests/gestion-operativa-sql.test.mjs tests/mis-datos-sql.test.mjs tests/flujo-completo-sql.test.mjs tests/registro-paciente-sql.test.mjs tests/equipo-eliminaciones-sql.test.mjs tests/ingreso-urgente-sql.test.mjs tests/edicion-admin-sql.test.mjs",
     "db:actualizar": "node scripts/aplicar-mejoras.mjs",
     "agenda:importar": "node scripts/importar-agendas.mjs",
     "respaldo:crear": "node scripts/respaldo.mjs crear",

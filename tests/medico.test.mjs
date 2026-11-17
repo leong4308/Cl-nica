@@ -51,6 +51,11 @@ test('API médica exige sesión, rol, versión y operaciones cerradas sin acepta
  for(const v of [{...b,accion:'borrar'},{...b,datos:{version:'caducada'}},{...b,clave:'inventada'},{...b,datos:[]}])assert.equal((await enviar(v)).status,400)
  assert.equal(llamadas.length,0)
  assert.equal((await enviar({...b,autor:999})).status,200);assert.equal(llamadas[0].nombre,'clinica_medico_operar');assert.ok(!('autor' in llamadas[0].datos))
+ assert.equal((await enviar({...b,accion:'editar_admin'})).status,403)
+ acceso.usuario.rol='admin'
+ assert.equal((await enviar({...b,accion:'editar_admin',autor:999,esAdministrador:true})).status,200)
+ assert.equal(llamadas.at(-1).nombre,'clinica_admin_editar_nota');assert.ok(!('autor' in llamadas.at(-1).datos))
+ acceso.usuario.rol='medico'
  assert.equal((await api.GET(new Request('http://localhost/api/medico?dia=2026-02-30'))).status,400)
 })
 test('el endpoint anterior no sobrescribe una nota existente sin su versión',async()=>{

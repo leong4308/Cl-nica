@@ -14,7 +14,9 @@ import { cargarHistorialPaciente, type HistorialPaciente } from '@/lib/supabase/
 import { subirDocumentoClinico } from '@/lib/documentos-clinicos'
 import { leerFichaClinica } from '@/lib/pacientes/ficha-clinica'
 const caja = 'rounded-xl border border-slate-200 bg-white p-4 sm:p-5'
-export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = 'nota' }: { citaId: number; onClose: () => void; onControl?: (pacienteId: number, citaId: number) => void; tabInicial?: 'nota' | 'historial' | 'correcciones' }) {
+export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = 'nota', modoInicial = 'editar' }: { citaId: number; onClose: () => void; onControl?: (pacienteId: number, citaId: number) => void; tabInicial?: 'nota' | 'historial' | 'correcciones'; modoInicial?: 'ver' | 'editar' }) {
+  const [editando, setEditando] = useState(modoInicial === 'editar')
+  const modoEdicion = useRef(modoInicial === 'editar'); modoEdicion.current = editando
   const [consulta, setConsulta] = useState<ConsultaMedica | null>(null), [datos, setDatos] = useState<ContenidoConsulta>(CONTENIDO_VACIO)
   const [error, setError] = useState(''), [mensaje, setMensaje] = useState(''), [guardando, setGuardando] = useState(false), [cambios, setCambios] = useState(false)
   const [tab, setTab] = useState<string>(tabInicial), [motivo, setMotivo] = useState(''), [correccion, setCorreccion] = useState('')
@@ -33,8 +35,11 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
   const sucio = useRef(false), ocupado = useRef(false), pausaAuto = useRef(false), protegida = useRef(false), claveLocal = useRef<string | null>(null)
   const enCurso = useRef<Promise<boolean> | null>(null), montado = useRef(true)
   const cerrada = consulta?.nota?.estado_nota === 'cerrada'
-  const editable = consulta?.puedeEditar && !cerrada && ['pendiente', 'confirmada'].includes(consulta.cita.estado)
-  const puedeEditar = (c: ConsultaMedica | null) => Boolean(c?.puedeEditar && c.nota?.estado_nota !== 'cerrada' && ['pendiente', 'confirmada'].includes(c.cita.estado))
+  const edicionAdmin = (c: ConsultaMedica | null) => Boolean(c?.esAdministrador && c.nota)
+  const admiteEdicion = (c: ConsultaMedica | null) => Boolean(c?.puedeEditar && (edicionAdmin(c) || c.nota?.estado_nota !== 'cerrada' && ['pendiente', 'confirmada'].includes(c.cita.estado)))
+  const puedeEditar = (c: ConsultaMedica | null) => modoEdicion.current && admiteEdicion(c)
+  const editable = editando && admiteEdicion(consulta)
+  const administrativo = edicionAdmin(consulta)
   function proteger() {
     protegida.current = Boolean(actual.current && protegerBorradorConsulta(claveLocal.current, actual.current.version, contenidoActual.current))
     return protegida.current
@@ -50,17 +55,17 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     return b as ConsultaMedica
   }
   function presentar(b: ConsultaMedica, inicial = false) {
-    actual.current = b; setConsulta(b); claveLocal.current = b.editorId ? claveBorradorConsulta(b.editorId, citaId) : null
+    actual.current = b; setConsulta(b); if (inicial && tabInicial === 'nota' && modoInicial === 'editar' && !b.esAdministrador && b.nota?.estado_nota === 'cerrada') setTab('correcciones'); claveLocal.current = b.editorId ? claveBorradorConsulta(b.editorId, citaId) : null
     const servidor = contenidoInicial(b.nota)
     contenidoActual.current = servidor; setDatos(servidor); sucio.current = false; setCambios(false); pausaAuto.current = false; setRecuperable(null)
-    if (!puedeEditar(b)) { retirarBorradorConsulta(claveLocal.current); return }
+    if (!puedeEditar(b)) { if (!admiteEdicion(b)) retirarBorradorConsulta(claveLocal.current); return }
     if (inicial && claveLocal.current) {
       let copia: BorradorConsulta | null = null
       try { copia = leerBorradorConsulta(claveLocal.current, window.sessionStorage) } catch {}
       if (copia && firmaContenidoConsulta(copia.contenido) !== firmaContenidoConsulta(servidor)) {
         if (copia.version !== b.version) { setRecuperable(copia); pausaAuto.current = true; return }
         contenidoActual.current = copia.contenido; setDatos(copia.contenido); sucio.current = true; setCambios(true); protegida.current = true
-        setEstadoBorrador('Se recuperó tu borrador después de salir. El autoguardado está activo.'); return
+        setEstadoBorrador(edicionAdmin(b) ? 'Se recuperaron tus cambios. Pulsa Guardar cambios para actualizar el expediente.' : 'Se recuperó tu borrador después de salir. El autoguardado está activo.'); return
       }
     }
     retirarBorradorConsulta(claveLocal.current); protegida.current = false
@@ -84,9 +89,10 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     setError(''); setConfirmacion({ titulo: 'Finalizar consulta', mensaje: 'Se guardará la nota y la cita quedará atendida. Después del cierre no podrás modificar la nota original; podrás añadir aclaraciones. ¿Deseas finalizar la consulta?', confirmar: 'Confirmar cierre de consulta', tono: 'primario', accion: () => { void ejecutar('guardar', { cerrar: true }) } })
   }
   function solicitudGuardar(cerrar: boolean) {
-    const payload = { citaId, version: actual.current!.version, contenido: contenidoActual.current, cerrar }, firma = JSON.stringify({ accion: 'guardar', payload })
+    const accion = !cerrar && edicionAdmin(actual.current) ? 'editar_admin' : 'guardar'
+    const payload = { citaId, version: actual.current!.version, contenido: contenidoActual.current, cerrar }, firma = JSON.stringify({ accion, payload })
     if (pendiente.current?.firma !== firma) pendiente.current = { firma, clave: crypto.randomUUID() }
-    return { payload, clave: pendiente.current.clave }
+    return { payload, clave: pendiente.current.clave, accion }
   }
   async function guardarNota(cerrar = false, automatico = false): Promise<boolean> {
     if (enCurso.current) { if (automatico) return false; await enCurso.current }
@@ -96,9 +102,9 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     const guardar = async () => {
       ocupado.current = true
       if (automatico) setAutoguardando(true); else { setGuardando(true); setError(''); setMensaje(''); setConflicto(false) }
-      const { payload, clave } = solicitudGuardar(cerrar), firma = firmaContenidoConsulta(payload.contenido)
+      const { payload, clave, accion } = solicitudGuardar(cerrar), firma = firmaContenidoConsulta(payload.contenido)
       try {
-        const r = await operarMedico('guardar', payload, clave), b = await leerServidor()
+        const r = await operarMedico(accion, payload, clave), b = await leerServidor()
         if (!montado.current || citaActualId.current !== payload.citaId) return true
         // No se reemplaza una edición que se hizo mientras viajaba el autoguardado.
         const servidor = contenidoInicial(b.nota)
@@ -109,7 +115,7 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
           contenidoActual.current = servidor; setDatos(servidor); sucio.current = false; setCambios(false); retirarBorradorConsulta(claveLocal.current); protegida.current = false
         } else proteger()
         setEstadoBorrador(cerrar ? '' : automatico ? 'Guardado automáticamente en la clínica.' : 'Guardado en la clínica.')
-        if (!automatico) notificar(cerrar ? 'Consulta finalizada correctamente.' : 'Consulta guardada.')
+        if (!automatico) notificar(cerrar ? 'Consulta finalizada correctamente.' : accion === 'editar_admin' ? 'Cambios guardados en el expediente.' : 'Consulta guardada.')
         window.dispatchEvent(new Event('datos-actualizados')); return true
       } catch (e) {
         pausaAuto.current = true
@@ -122,15 +128,15 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     try { return await trabajo } finally { if (enCurso.current === trabajo) enCurso.current = null }
   }
   useEffect(() => {
-    if (!editable || !cambios || guardando || autoguardando || pausaAuto.current) return
+    if (!editable || administrativo || !cambios || guardando || autoguardando || pausaAuto.current) return
     const t = window.setTimeout(() => { void guardarNota(false, true) }, 1500)
     return () => window.clearTimeout(t)
-  }, [datos, cambios, editable, guardando, autoguardando])
+  }, [datos, cambios, editable, administrativo, guardando, autoguardando])
   useEffect(() => {
     const protegerSalida = (e: BeforeUnloadEvent) => {
       if (!sucio.current || !puedeEditar(actual.current)) return
       const segura = proteger()
-      if (!ocupado.current && !pausaAuto.current && medicamentosCompletos(contenidoActual.current)) {
+      if (!edicionAdmin(actual.current) && !ocupado.current && !pausaAuto.current && medicamentosCompletos(contenidoActual.current)) {
         const { payload, clave } = solicitudGuardar(false), body = JSON.stringify({ accion: 'guardar', datos: payload, clave })
         if (new TextEncoder().encode(body).length < 60000) void fetch('/api/medico', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {})
       }
@@ -142,7 +148,7 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
   async function salir() {
     if (enCurso.current) await enCurso.current
     if (ocupado.current) return
-    if (sucio.current && !pausaAuto.current && medicamentosCompletos(contenidoActual.current)) await guardarNota()
+    if (sucio.current && !edicionAdmin(actual.current) && !pausaAuto.current && medicamentosCompletos(contenidoActual.current)) await guardarNota()
     if (!sucio.current || proteger()) onClose()
     else setConfirmacion({ titulo: 'Cambios sin guardar', mensaje: 'No se pudo guardar ni proteger tu avance. Si cierras ahora, perderás los cambios de esta consulta.', confirmar: 'Cerrar sin guardar', accion: onClose })
   }
@@ -161,12 +167,13 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
   useEffect(()=>{if(tab!=='historial'||!consulta)return;let vigente=true;void cargarHistorialPaciente(consulta.cita.pacienteId).then(r=>{if(vigente){if(r.error)setError(r.error);else setHistorial(r.filas)}});return()=>{vigente=false}},[tab,consulta?.cita.pacienteId])
   useEffect(() => { if (llegada?.enConsulta) setError(texto => /Primero pulsa Iniciar atención|Recepción debe registrar/.test(texto) ? '' : texto) }, [llegada?.enConsulta])
   const alertas = leerFichaClinica(consulta?.cita.alertas)
-  return <ModalMarco title="Atención médica" ancho="max-w-6xl" contenidoFijo avisoEnLinea onClose={salir} aviso={error ? <NotificacionFlotante tono="error" mensaje={error} onCerrar={() => { setError(''); setMensaje('') }}>{conflicto && <button type="button" disabled={guardando} className="ml-3 font-semibold underline" onClick={() => { const recargar = () => { void cargar().then(() => setError('')).catch(e => setError(e.message)) }; if (!cambios) recargar(); else setConfirmacion({ titulo: 'Recargar nota del servidor', mensaje: 'Se reemplazará el avance de esta ventana por la nota guardada en la clínica. Los cambios pendientes se descartarán.', confirmar: 'Recargar nota', accion: recargar }) }}>Recargar nota del servidor</button>}</NotificacionFlotante> : mensaje ? <NotificacionFlotante key={notificacionId} mensaje={mensaje} onCerrar={() => setMensaje('')} /> : undefined} footer={<div className="flex flex-wrap justify-between gap-3"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={salir}>Cerrar</button>{tab === 'nota' && editable && <div className="flex flex-wrap gap-2"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={() => void ejecutar('guardar', { contenido: datos, cerrar: false })}>Guardar</button><button disabled={guardando} className={BOTON_PRIMARIO} onClick={confirmarFinalizacion}>Finalizar consulta</button></div>}{cerrada && consulta?.puedeEditar && onControl && <button className={BOTON_PRIMARIO} onClick={() => onControl(consulta.cita.pacienteId, citaId)}>Programar control</button>}</div>}>
+  return <ModalMarco title="Atención médica" ancho="max-w-6xl" contenidoFijo avisoEnLinea onClose={salir} aviso={error ? <NotificacionFlotante tono="error" mensaje={error} onCerrar={() => { setError(''); setMensaje('') }}>{conflicto && <button type="button" disabled={guardando} className="ml-3 font-semibold underline" onClick={() => { const recargar = () => { void cargar().then(() => setError('')).catch(e => setError(e.message)) }; if (!cambios) recargar(); else setConfirmacion({ titulo: 'Recargar nota del servidor', mensaje: 'Se reemplazará el avance de esta ventana por la nota guardada en la clínica. Los cambios pendientes se descartarán.', confirmar: 'Recargar nota', accion: recargar }) }}>Recargar nota del servidor</button>}</NotificacionFlotante> : mensaje ? <NotificacionFlotante key={notificacionId} mensaje={mensaje} onCerrar={() => setMensaje('')} /> : undefined} footer={<div className="flex flex-wrap justify-between gap-3"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={salir}>Cerrar</button>{tab === 'nota' && editable && <div className="flex flex-wrap gap-2"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={() => void ejecutar('guardar', { contenido: datos, cerrar: false })}>{administrativo ? 'Guardar cambios' : 'Guardar'}</button>{!cerrada && ['pendiente', 'confirmada'].includes(consulta!.cita.estado) && <button disabled={guardando} className={BOTON_PRIMARIO} onClick={confirmarFinalizacion}>Finalizar consulta</button>}</div>}{!editando && admiteEdicion(consulta) && <button type="button" className={BOTON_PRIMARIO} onClick={() => { modoEdicion.current = true; setEditando(true); if (actual.current) presentar(actual.current, true); setTab('nota') }}>Editar nota</button>}{cerrada && consulta?.puedeEditar && onControl && <button className={BOTON_PRIMARIO} onClick={() => onControl(consulta.cita.pacienteId, citaId)}>Programar control</button>}</div>}>
     {confirmacion && <ConfirmacionClinica {...confirmacion} onCancelar={() => setConfirmacion(null)} onConfirmar={() => { const accion = confirmacion.accion; setConfirmacion(null); accion() }} />}
 
     {editable && estadoBorrador && <p aria-live="polite" className="mb-4 text-xs text-slate-500">{autoguardando ? 'Guardando automáticamente…' : estadoBorrador}</p>}
     {recuperable && <section className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-900">Hay un borrador recuperado, pero la nota del servidor cambió. No se reemplazará automáticamente. Puedes recuperar tu avance para revisarlo y después pulsar Guardar.</p><button type="button" className={BOTON_SECUNDARIO + ' mt-3'} onClick={() => { const copia = recuperable.contenido; contenidoActual.current = copia; setDatos(copia); sucio.current = true; setCambios(true); proteger(); setRecuperable(null); setEstadoBorrador('Borrador recuperado. Revisa la nota y pulsa Guardar para confirmar tus cambios.'); }}>Recuperar mi borrador</button><button type="button" className={BOTON_SECUNDARIO + ' ml-3 mt-3'} onClick={() => { setConfirmacion({ titulo: 'Descartar borrador recuperado', mensaje: 'Se eliminará la copia de recuperación de esta pestaña y se conservará la nota del servidor.', confirmar: 'Descartar borrador', accion: () => { retirarBorradorConsulta(claveLocal.current); setRecuperable(null); pausaAuto.current = false } }) }}>Conservar nota del servidor</button></section>}
     {!consulta ? <p className="py-8 text-sm text-slate-500">{error ? 'La consulta no está disponible.' : 'Consultando nota…'}</p> : <div className="space-y-5"><div className="rounded-2xl bg-slate-50 p-5"><p className="text-xs font-medium text-blue-700">Cita #{citaId} · {cerrada ? 'Nota cerrada' : 'Borrador'}</p><h3 className="mt-2 text-xl font-semibold">{consulta.cita.paciente}</h3><p className="mt-2 text-sm text-slate-600">{consulta.cita.medico} · {consulta.cita.motivo}</p><p className="mt-3 text-xs text-slate-600">Alergias: {alertas.alergias || 'Sin registro'} · Antecedentes: {alertas.condicionesCronicas || 'Sin registro'}</p></div>
+      {administrativo && editando && <p className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">Edición administrativa: modifica la nota y pulsa Guardar cambios. El historial conserva el contenido anterior y quién realizó la modificación.</p>}
       <EstadoLlegada citaId={citaId} onEstado={setLlegada} />
       {consulta.signos && <section className={caja}><h4 className="font-semibold">{cerrada?'Signos conservados al cerrar la nota':'Últimos signos registrados por enfermería'}</h4><p className="mt-2 text-xs text-slate-500">{fechaEnfermeria(consulta.signos.fecha)} · {consulta.signos.autor}</p><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{SIGNOS_ENFERMERIA.filter(s=>consulta.signos?.valores[s.id]!=null).map(s=><div className="rounded-xl bg-slate-50 p-3" key={s.id}><dt className="text-xs text-slate-500">{s.nombre}</dt><dd className="mt-1 font-semibold">{consulta.signos!.valores[s.id]} <span className="text-xs font-normal text-slate-500">{s.unidad}</span></dd></div>)}</dl></section>}
       <nav aria-label="Secciones de atención" className="flex flex-wrap gap-2">{[['nota', 'Nota clínica'], ['ordenes', 'Órdenes ambulatorias'], ['documentos', 'Documentos'], ['historial', 'Historial del paciente'], ['cita', 'Coordinar cita'], ['correcciones', 'Aclaraciones']].filter(([id])=>id!=='cita'||consulta.puedeSolicitarCambio).map(([id, titulo]) => <button disabled={guardando} key={id} className={tab === id ? BOTON_PRIMARIO : BOTON_SECUNDARIO} onClick={() => setTab(id)}>{titulo}</button>)}</nav>

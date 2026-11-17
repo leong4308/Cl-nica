@@ -117,7 +117,7 @@ for (const accion of ['Ver detalle', 'Editar registro']) {
  test(`expediente estructurado: ${accion} abre una sola ventana sin pasar por el editor antiguo`,async({page})=>{
   const {expediente}=await preparar(page,'Expedientes')
   expediente.estado_nota='cerrada'
-  await page.route('**/api/medico**',r=>r.fulfill({json:{editorId:'11111111-1111-4111-8111-111111111111',cita:{id:1,pacienteId:1,paciente:'Paciente de prueba',medico:'Dra. de prueba',cedula:'PRUEBA',inicio:'2026-11-05T12:00:00Z',estado:'atendida',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:{id:1,estado_nota:'cerrada',contenido:{subjetivo:'Evolución',objetivo:'Exploración',diagnostico:'Diagnóstico registrado',plan:'Plan registrado',pronostico:'',seguimiento:'',recetaLibre:'',medicamentos:[]}},correcciones:[],ordenes:[],catalogo:[]}}))
+  await page.route('**/api/medico**',r=>r.fulfill({json:{editorId:'11111111-1111-4111-8111-111111111111',cita:{id:1,pacienteId:1,paciente:'Paciente de prueba',medico:'Dra. de prueba',cedula:'PRUEBA',inicio:'2026-11-05T12:00:00Z',estado:'atendida',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),esAdministrador:true,puedeEditar:true,nota:{id:1,estado_nota:'cerrada',contenido:{subjetivo:'Evolución',objetivo:'Exploración',diagnostico:'Diagnóstico registrado',plan:'Plan registrado',pronostico:'',seguimiento:'',recetaLibre:'',medicamentos:[]}},correcciones:[],ordenes:[],catalogo:[]}}))
   await page.evaluate(()=>{
    (window as any).__ventanasAbiertas=[]
    const registrar=(el:Element)=>{if(el.matches('dialog'))(window as any).__ventanasAbiertas.push(el);el.querySelectorAll('dialog').forEach(d=>(window as any).__ventanasAbiertas.push(d))}
@@ -130,13 +130,46 @@ for (const accion of ['Ver detalle', 'Editar registro']) {
   await expect(page.locator('dialog[open]')).toHaveCount(1)
   expect(await page.evaluate(()=>(window as any).__ventanasAbiertas.length)).toBe(1)
   await expect(modal.getByRole('button',{name:'Receta PDF',exact:true})).toHaveCount(0)
-  if(accion==='Editar registro') await expect(modal.getByLabel('Texto de la aclaración')).toBeVisible()
+  if(accion==='Editar registro') { await expect(modal.getByLabel('Diagnóstico o problema clínico')).toBeEnabled(); await expect(modal.getByRole('button',{name:'Guardar cambios',exact:true})).toBeVisible(); await expect(modal.getByLabel('Texto de la aclaración')).toHaveCount(0) }
   else await expect(modal.getByLabel('Diagnóstico o problema clínico')).toBeDisabled()
   await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
   await expect(page.locator('dialog[open]')).toHaveCount(0)
  })
 }
 
+
+test('administración escribe y guarda directamente una nota cerrada sin aclaraciones ni autoguardado',async({page})=>{
+ const {expediente}=await preparar(page,'Expedientes');expediente.estado_nota='cerrada'
+ const contenido={subjetivo:'Evolución previa',objetivo:'Exploración previa',diagnostico:'Diagnóstico previo',plan:'Plan previo',pronostico:'',seguimiento:'',recetaLibre:'',medicamentos:[]}
+ const ctx={editorId:'11111111-1111-4111-8111-111111111111',esAdministrador:true,cita:{id:1,pacienteId:1,paciente:'Paciente de prueba',medico:'Dra. de prueba',cedula:'PRUEBA',inicio:'2026-11-05T12:00:00Z',estado:'atendida',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:{id:1,estado_nota:'cerrada',contenido,cerrada_en:'2026-11-05T12:20:00Z'},correcciones:[],ordenes:[],catalogo:[]}
+ const cambios:any[]=[];let fallar=true
+ await page.route('**/api/medico**',r=>{
+  if(r.request().method()==='POST'){
+   const b=r.request().postDataJSON();cambios.push(b)
+   if(fallar){fallar=false;return r.fulfill({status:503,json:{error:'Fallo temporal. Tus cambios se conservan.'}})}
+   ctx.nota.contenido=b.datos.contenido;ctx.version='b'.repeat(32);return r.fulfill({json:{ok:true,id:1,mensaje:'Cambios guardados en el expediente.'}})
+  }
+  return r.fulfill({json:ctx})
+ })
+ await page.getByRole('button',{name:'Editar registro',exact:true}).first().click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await expect(modal.getByLabel('Texto de la aclaración')).toHaveCount(0)
+ await modal.getByLabel('Diagnóstico o problema clínico').fill('Diagnóstico modificado por administración')
+ await modal.getByLabel('Motivo, síntomas y evolución').fill('Evolución revisada')
+ await page.waitForTimeout(1700);expect(cambios).toHaveLength(0)
+ await expect(modal.getByRole('button',{name:'Finalizar consulta',exact:true})).toHaveCount(0)
+ await modal.getByRole('button',{name:'Guardar cambios',exact:true}).click()
+ await expect(modal.getByRole('alert')).toContainText('Fallo temporal')
+ await expect(modal.getByLabel('Diagnóstico o problema clínico')).toHaveValue('Diagnóstico modificado por administración')
+ await modal.getByRole('button',{name:'Guardar cambios',exact:true}).click()
+ await expect(modal.getByRole('status')).toHaveText('Cambios guardados en el expediente.')
+ expect(cambios).toHaveLength(2);expect(cambios[0].clave).toBe(cambios[1].clave)
+ expect(cambios[1]).toMatchObject({accion:'editar_admin',datos:{citaId:1,contenido:{diagnostico:'Diagnóstico modificado por administración',subjetivo:'Evolución revisada'}}})
+ expect(ctx.nota.estado_nota).toBe('cerrada');expect(ctx.cita.estado).toBe('atendida')
+ await page.screenshot({path:'.herramientas/edicion-admin-nota-cerrada.png',fullPage:true})
+ await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
+ await expect(modal).toHaveCount(0)
+})
 
 test('eliminar un PDF requiere advertencia, motivo y confirmación y no guarda el formulario clínico',async({page})=>{
  const {escrituras}=await preparar(page, 'Expedientes')

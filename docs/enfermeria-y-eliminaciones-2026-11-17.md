@@ -21,3 +21,9 @@ El botón azul abre **Registrar ingreso urgente**, con selección directa de pac
 Internación permite filtrar camas ocupadas, libres y fuera de servicio. Las ocupadas muestran paciente, médico, fecha de ingreso y una ventana de detalle. Las libres permiten abrir la admisión con la cama preseleccionada. Los nombres de habitación y cama se normalizan para evitar prefijos duplicados. El censo se limita a la clínica del enfermero y no revela diagnóstico ni historial sin asignación.
 
 Validado: compilación, 26 pruebas unitarias relacionadas, 17 comprobaciones SQL de admisión y flujo completo, 15 recorridos de navegador de enfermería y equipo (incluido ingreso móvil), nueve comprobaciones de base real y acceso de los cinco roles. Versión 48 instalada con respaldo previo; lectura real confirmó siete pacientes disponibles, cinco camas libres y una ocupada con paciente y médico identificables. No se crearon hospitalizaciones ni se enviaron avisos de prueba a pacientes reales.
+
+## Edición de notas cerradas por administración (049)
+
+Editar expediente abre Nota clínica con los campos habilitados para el administrador. Ver abre la lectura y permite pasar a Editar nota. Los cambios administrativos se guardan expresamente mediante Guardar cambios; no se exige crear una aclaración ni se reabre la cita. El contenido anterior y nuevo quedan auditados con la cuenta real. La fecha y autor de cierre, el médico tratante y los signos conservados permanecen vinculados al mismo expediente. La versión impide sobrescribir cambios de otra ventana y la clave de operación evita duplicar un reintento.
+
+La migración 049 se instaló tras crear un respaldo verificado. Pruebas aisladas verificaron edición, historial, control de versión, reintento y permisos. La lectura real de la consulta #45 confirmó administrador, nota cerrada y permiso de edición; no se modificó su contenido durante la comprobación.
