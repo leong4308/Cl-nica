@@ -132,7 +132,6 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
                   </button>
                 ))}
               </div>
-              <p className="mt-3 leading-relaxed">Contraseña de prueba: <code className="rounded border border-blue-200 bg-white px-1.5 py-0.5 font-semibold text-slate-900">{accesos.clave}</code></p>
             </section>
           )}
         </div>

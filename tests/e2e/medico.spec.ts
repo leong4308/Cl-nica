@@ -14,7 +14,7 @@ async function preparar(page:Page,cerrada=false){
  await page.route('**/api/documentos-clinicos/**',r=>r.fulfill({json:{archivos:[]}}))
  await page.route('**/api/medico**',r=>{
   if(r.request().method()==='POST'){const b=r.request().postDataJSON();escrituras.push(b);if(fallo){fallo=false;return r.fulfill({status:503,json:{error:'No se pudo verificar el guardado. Tu borrador se conserva.'}})}
-   if(b.accion==='guardar'){ctx.nota.contenido=b.datos.contenido;ctx.version=(++versionNota).toString(16).padStart(32,'0');if(b.datos.cerrar){ctx.nota.estado_nota='cerrada';ctx.nota.cerrada_en='2026-11-12T18:00:00Z';ctx.cita.estado='atendida'}}
+   if(b.accion==='guardar'){ctx.nota.contenido=b.datos.contenido;ctx.version=(++versionNota).toString(16).padStart(32,'0');if(b.datos.cerrar){ctx.nota.estado_nota='cerrada';ctx.nota.cerrada_en='2026-11-12T18:00:00Z';ctx.cita.estado='atendida';panel.citas[0].estado='atendida'}}
    if(b.accion==='corregir')ctx.correcciones.push({id:1,autor:'Médico de prueba',motivo:b.datos.motivo,texto:b.datos.texto,fecha:'2026-11-12T18:00:00Z'})
    if(b.accion==='orden')ctx.ordenes.push({id:80,tipo:b.datos.tipo,descripcion:b.datos.descripcion,instrucciones:b.datos.instrucciones,estado:'prescrita'})
    if(b.accion==='revisar')panel.resultados=[]
@@ -24,6 +24,7 @@ async function preparar(page:Page,cerrada=false){
  })
  await page.goto('/');await page.locator('input[type=email]').fill(user.email);await page.locator('input[type=password]').fill('ClaveSimulada123*');await page.getByRole('button',{name:'Ingresar',exact:true}).click()
  await expect(page.getByRole('heading',{name:'Citas médicas',exact:true})).toBeVisible()
+ if(cerrada) await page.getByRole('button',{name:'Historial de citas',exact:true}).click()
  const raiz=new URL('/',page.url()).href
  await page.route(raiz,async r=>{const respuesta=await r.fetch({headers:{...r.request().headers(),cookie:''}});await r.fulfill({response:respuesta})})
  return {ctx,panel,escrituras,fallar:()=>{fallo=true}}
@@ -216,7 +217,7 @@ test('Guardar muestra una notificación flotante aunque la nota esté desplazada
  await modal.getByRole('button',{name:'Guardar',exact:true}).click()
  const aviso=modal.getByRole('status')
  await expect(aviso).toHaveText('Consulta guardada.')
- await expect(aviso).toHaveCSS('position','fixed');await expect(aviso).toBeInViewport()
+ await expect(aviso).toHaveCSS('position','relative');await expect(aviso).toBeInViewport()
  await page.screenshot({path:'.herramientas/consulta-notificacion-guardada.png'})
  await aviso.getByRole('button',{name:'Cerrar notificación',exact:true}).click();await expect(aviso).toHaveCount(0)
  const guardadas=escrituras.length
@@ -267,4 +268,54 @@ test('finalizar sin iniciar atención muestra un aviso a la derecha y no envía 
  await expect(aviso).toHaveCount(0)
  await modal.getByRole('button',{name:'Finalizar consulta',exact:true}).click()
  await expect(page.getByRole('alertdialog',{name:'Finalizar consulta'})).toBeVisible()
+})
+
+
+test('agenda activa excluye canceladas y finalizadas y el cierre confirmado pasa al historial',async({page})=>{
+ const {panel,ctx}=await preparar(page)
+ panel.citas.push({...panel.citas[0],id:36,paciente:'Paciente cancelado',estado:'cancelada_paciente'}, {...panel.citas[0],id:37,paciente:'Paciente finalizado',estado:'atendida'})
+ await page.getByRole('button',{name:'Actualizar',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Paciente cancelado',exact:true})).toHaveCount(0)
+ await expect(page.getByRole('heading',{name:'Paciente finalizado',exact:true})).toHaveCount(0)
+ await expect(page.getByRole('button',{name:'Abrir consulta',exact:true})).toHaveCount(1)
+ await page.getByRole('button',{name:'Historial de citas',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Paciente cancelado',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Paciente finalizado',exact:true})).toBeVisible()
+ await expect(page.getByRole('button',{name:'Abrir consulta',exact:true})).toHaveCount(0)
+ await page.getByRole('button',{name:'Agenda activa',exact:true}).click()
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await modal.getByRole('button',{name:'Finalizar consulta',exact:true}).click()
+ await page.getByRole('alertdialog').getByRole('button',{name:'Confirmar cierre de consulta',exact:true}).click()
+ await expect(modal.getByRole('status')).toContainText('Consulta finalizada correctamente.')
+ expect(ctx.nota.estado_nota).toBe('cerrada')
+ await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
+ await expect(page.getByRole('button',{name:'Abrir consulta',exact:true})).toHaveCount(0)
+ await page.getByRole('button',{name:'Historial de citas',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Paciente de prueba',exact:true,level:3})).toBeVisible()
+})
+
+test('los avisos no tapan el formulario, caducan a cinco segundos incluso con el cursor encima y no dan éxito falso',async({page})=>{
+ await preparar(page)
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await page.route('**/api/medico',r=>r.request().method()==='POST'?r.fulfill({json:{ok:true,mensaje:'Consulta guardada.'}}):r.fallback())
+ await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Texto que el servidor todavía no guardó')
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click()
+ const alerta=modal.getByRole('alert')
+ await expect(alerta).toContainText('La nota cambió')
+ await expect(modal.getByRole('status')).toHaveCount(0)
+ const aviso=await alerta.boundingBox(), formulario=await modal.locator('div.overflow-y-auto').first().boundingBox()
+ expect(aviso!.y+aviso!.height).toBeLessThanOrEqual(formulario!.y)
+ await alerta.hover()
+ await expect(alerta).toHaveCount(0,{timeout:7000})
+ await expect(modal.getByRole('status')).toHaveCount(0)
+ await expect(modal.getByLabel('Plan de tratamiento e indicaciones')).toHaveValue('Texto que el servidor todavía no guardó')
+ await page.unroute('**/api/medico')
+ await modal.getByLabel('Plan de tratamiento e indicaciones').fill('Plan con el aviso de error ya cerrado')
+ await modal.getByRole('button',{name:'Guardar',exact:true}).click()
+ const exito=modal.getByRole('status')
+ await expect(exito).toContainText('Consulta guardada.')
+ await exito.hover()
+ await expect(exito).toHaveCount(0,{timeout:7000})
 })

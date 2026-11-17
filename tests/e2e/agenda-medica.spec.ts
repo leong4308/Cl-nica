@@ -155,8 +155,9 @@ test('un médico sin pacientes recibe un estado vacío y no ve pacientes del dir
 test('recepción conserva las agendas y los descansos sin la pantalla de consulta',async({page})=>{
   await preparar(page,'recepcionista')
   await expect(page.getByRole('button',{name:'Mi Consulta',exact:true})).toHaveCount(0)
-  await page.getByRole('button',{name:'Médicos',exact:true}).click()
-  await expect(page.getByRole('heading',{name:'Médicos',exact:true})).toBeVisible()
+  await expect(page.getByRole('button',{name:'Médicos',exact:true})).toHaveCount(0)
+  await page.getByRole('button',{name:'Citas',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Agenda de recepción',exact:true})).toBeVisible()
   await expect(page.getByRole('tab',{name:'Registrar consulta'})).toHaveCount(0)
   await expect(page.getByRole('button',{name:'Configurar horario',exact:true})).toHaveCount(0)
   await expect(page.getByRole('button',{name:'Agendar cita',exact:true})).toBeVisible()

@@ -12,6 +12,7 @@ type PropsModalMarco = {
   children: ReactNode
   footer?: ReactNode
   aviso?: ReactNode
+  avisoEnLinea?: boolean
   ancho?: string
   contenidoFijo?: boolean
   role?: 'dialog' | 'alertdialog'
@@ -21,7 +22,7 @@ type PropsModalMarco = {
 const abiertos: HTMLDialogElement[] = []
 let overflowAnterior = '', paddingAnterior = ''
 
-export function ModalMarco({ title, onClose, children, footer, aviso, ancho = 'max-w-md', contenidoFijo = false, role = 'dialog', descripcionId }: PropsModalMarco) {
+export function ModalMarco({ title, onClose, children, footer, aviso, avisoEnLinea = false, ancho = 'max-w-md', contenidoFijo = false, role = 'dialog', descripcionId }: PropsModalMarco) {
   const dialogo = useRef<HTMLDialogElement>(null), tituloId = useId()
   useEffect(() => {
     const nodo = dialogo.current
@@ -89,9 +90,10 @@ export function ModalMarco({ title, onClose, children, footer, aviso, ancho = 'm
           </button>
         </div>
 
+        {avisoEnLinea && aviso && <div className="flex shrink-0 justify-end px-5 pb-3 sm:px-6">{aviso}</div>}
         <div className={contenidoFijo ? 'min-h-0 overflow-y-auto px-5 pb-5 sm:px-6' : 'mt-5 flex flex-col gap-3'}>{children}</div>
 
-        {contenidoFijo ? <div className="shrink-0 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">{footer}{aviso}</div> : <>{footer}{aviso}</>}
+        {contenidoFijo ? <div className="shrink-0 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">{footer}{!avisoEnLinea && aviso}</div> : <>{footer}{!avisoEnLinea && aviso}</>}
       </div>
     </dialog>
   )
