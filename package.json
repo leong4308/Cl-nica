@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/aplicacion-con-avisos.mjs dev",
     "build": "next build",
     "start": "next start",
     "limpiar": "node scripts/limpiar.mjs",
     "test": "pnpm test:unit && pnpm test:sql",
-    "test:unit": "node --test tests/panel.test.mjs tests/laboratorio.test.mjs tests/documentos-clinicos.test.mjs tests/cuenta-sesion.test.mjs tests/ficha-clinica.test.mjs tests/internacion.test.mjs tests/accesos-prueba.test.mjs tests/agenda.test.mjs tests/pacientes-medico.test.mjs tests/respaldo.test.mjs tests/seguridad-operacion.test.mjs tests/telegram.test.mjs tests/autogestion-reportes.test.mjs tests/enfermeria.test.mjs tests/recepcion.test.mjs tests/medico.test.mjs tests/admin-camas.test.mjs tests/portal-correo.test.mjs tests/correo-paciente.test.mjs tests/gestion-operativa.test.mjs",
+    "test:unit": "node --test tests/panel.test.mjs tests/laboratorio.test.mjs tests/documentos-clinicos.test.mjs tests/cuenta-sesion.test.mjs tests/ficha-clinica.test.mjs tests/internacion.test.mjs tests/accesos-prueba.test.mjs tests/agenda.test.mjs tests/pacientes-medico.test.mjs tests/respaldo.test.mjs tests/seguridad-operacion.test.mjs tests/telegram.test.mjs tests/autogestion-reportes.test.mjs tests/enfermeria.test.mjs tests/recepcion.test.mjs tests/medico.test.mjs tests/admin-camas.test.mjs tests/portal-correo.test.mjs tests/correo-paciente.test.mjs tests/gestion-operativa.test.mjs tests/aplicacion-avisos.test.mjs",
     "cuentas:prueba": "node scripts/crear-cuentas-prueba.mjs",
     "test:db": "node --test tests/supabase.test.mjs",
     "test:e2e": "playwright test",
@@ -21,7 +21,10 @@
     "respaldo:restaurar": "node scripts/respaldo.mjs restaurar",
     "respaldo:clave": "node scripts/crear-clave-respaldos.mjs",
     "notificaciones:escuchar": "node scripts/notificaciones.mjs",
-    "notificaciones:procesar": "node scripts/notificaciones.mjs --una-vez"
+    "notificaciones:procesar": "node scripts/notificaciones.mjs --una-vez",
+    "dev:solo": "next dev",
+    "start:avisos": "node scripts/aplicacion-con-avisos.mjs start",
+    "notificaciones:estado": "node scripts/estado-notificaciones.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

@@ -12,13 +12,14 @@ const unaVez = process.argv.includes('--una-vez')
 let activo = true, db, reservado = false
 process.on('SIGINT', () => { activo = false })
 process.on('SIGTERM', () => { activo = false })
+process.on('message', m => { if (m?.tipo === 'detener-notificaciones') activo = false })
 try {
   db = almacenHTTPS(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   const version = await db.version()
   if (correo && version < 33) throw Error('Instala la migración 033_portal_y_correo.sql para habilitar los correos.')
   if (version < 27) throw Error('Instala la migración 027_autogestion_y_sesiones.sql antes de iniciar este trabajador.')
   reservado = await db.reservar()
-  if (!reservado) throw Error('Ya hay un trabajador activo. Si terminó inesperadamente, su reserva vence en cinco minutos.')
+  if (!reservado) throw Object.assign(Error('Ya hay un trabajador activo. Si terminó inesperadamente, su reserva vence en cinco minutos.'), { code: 'TRABAJADOR_EXISTENTE' })
   if (!env.TELEGRAM_BOT_TOKEN && !correo && !unaVez) throw Error('Configura Telegram o el servicio de correo en .env.local.')
   if (env.TELEGRAM_BOT_TOKEN) {
     const bot = await llamarTelegram(env.TELEGRAM_BOT_TOKEN, 'getMe', {})
@@ -47,8 +48,14 @@ try {
     }
   } while (activo && !unaVez)
 } catch (e) {
-  console.error(e.code ? 'No se pudo iniciar. Código: ' + e.code : e.message)
-  process.exitCode = 1
+  if (e.code === 'TRABAJADOR_EXISTENTE') {
+    process.send?.({ tipo: 'trabajador-existente' })
+    if (!process.send) console.log('Los avisos ya están atendidos por otro trabajador activo; no se iniciará uno duplicado.')
+  } else {
+    console.error(e.code ? 'No se pudo iniciar. Código: ' + e.code : e.message)
+    process.exitCode = 1
+  }
 } finally {
   if (reservado) try { await db.liberar() } catch { /* La reserva vence sin intervención si no hay conexión. */ }
+  if (process.connected) process.disconnect()
 }

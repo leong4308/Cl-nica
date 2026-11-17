@@ -184,3 +184,14 @@ La API valida los campos y la función SQL obtiene la ficha desde la sesión act
 Consulta [el informe de revisión de los cinco roles](docs/revision-final-2026-11-16.md) para conocer el alcance, las versiones comprobadas y las condiciones pendientes del despliegue. La base requiere la versión **42**. Las muestras ambulatorias respetan la asignación de enfermería y las órdenes hospitalarias pueden devolver su identificador al guardarse sin ampliar permisos clínicos.
 
 La migración 042 permite prorrogar una asignación mediante la acción administrativa `consultorios:prorrogar_turno` (`id`, `version`, `hasta`). Crea una continuación desde el día siguiente al vencimiento, conservando consultorio, médico, día y horas. Exige sesión de administrador, versión vigente e idempotencia; conserva las restricciones de cruce y la auditoría. Cada continuación dura hasta 366 días y debe empezar dentro del próximo año.
+
+
+## Arranque local con recordatorios
+
+`npm run dev` inicia Next y el trabajador de Telegram/correo en la misma terminal. Acepta los argumentos habituales, por ejemplo `npm run dev -- --port 3001`. Al detener la aplicación, su trabajador recibe una orden de cierre para liberar la reserva. Si falla al arrancar, se reintenta; si otra instancia ya tiene la reserva, no se duplican los envíos y se comprueba de nuevo un minuto después. La cola y sus comprobaciones de vigencia permanecen en Supabase.
+
+Para ejecutar solo la interfaz utiliza `npm run dev:solo`. Con una compilación de producción puedes ejecutar `npm run start:avisos`; `npm start` sigue iniciando únicamente Next. En un despliegue remoto utiliza un trabajador permanente o el workflow de notificaciones configurado en la rama predeterminada. Los procesos locales se detienen al apagar el equipo.
+
+`npm run notificaciones:estado` consulta la reserva, la configuración y los recuentos de las colas sin enviar mensajes ni consumir actualizaciones del bot. Administración y recepción también pueden consultar **Comunicaciones**.
+
+El remitente `onboarding@resend.dev` solo permite pruebas al correo titular de Resend; no habilita recordatorios a los correos de los demás pacientes. No se redirigen sus datos a una dirección de prueba ni se cambian sus cuentas automáticamente. Para esos destinatarios hace falta verificar un dominio y usarlo en `EMAIL_FROM`. Referencia: [limitación del remitente de prueba de Resend](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
