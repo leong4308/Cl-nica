@@ -1,40 +1,5 @@
-'use client'
-
 import { Bed, Search, UserPlus } from 'lucide-react'
-import type { ClinicActions } from '@/components/modulos/compartidos/types'
-
-export function AccionesRapidasEnfermero({
-  openModal,
-  navigate,
-}: Pick<ClinicActions, 'openModal' | 'navigate'>) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => openModal('Registrar paciente')}
-        className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-teal-200 transition-all hover:bg-teal-700 active:scale-95"
-      >
-        <UserPlus size={16} />
-        Ingreso urgente de paciente
-      </button>
-
-      <button
-        type="button"
-        onClick={() => navigate('Internación')}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50/50 hover:text-teal-700 active:scale-95"
-      >
-        <Bed size={16} className="text-teal-600" />
-        Gestión de camas
-      </button>
-
-      <button
-        type="button"
-        onClick={() => openModal('Buscar paciente')}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 active:scale-95"
-      >
-        <Search size={16} className="text-slate-500" />
-        Buscar paciente
-      </button>
-    </div>
-  )
+import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from '@/components/modulos/compartidos/editor-clinico'
+export function AccionesRapidasEnfermero({onNavegar,onIngreso}:{onNavegar:(seccion:string)=>void;onIngreso:()=>void}) {
+ return <div className="flex flex-wrap gap-2"><button type="button" className={BOTON_PRIMARIO} onClick={onIngreso}><UserPlus size={16}/>Registrar ingreso urgente</button><button type="button" className={BOTON_SECUNDARIO} onClick={()=>onNavegar('Internación')}><Bed size={16}/>Mapa de camas</button><button type="button" className={BOTON_SECUNDARIO} onClick={()=>onNavegar('Pacientes')}><Search size={16}/>Buscar paciente asignado</button></div>
 }

@@ -1,4 +1,5 @@
 'use client'
+import { RetirarPdfLaboratorio } from '../../compartidos/retirar-pdf-laboratorio'
 
 import { useEffect, useRef, useState } from 'react'
 import { ModalMarco } from '../../compartidos/modal-marco'
@@ -203,7 +204,7 @@ export function ModalRegistrarResultado({
             </div>
             <section className="py-2"><h4 className="mb-3 flex items-center gap-2 text-sm font-semibold"><FileText size={17} className="text-blue-600" /> Resultado e interpretación</h4><p className="whitespace-pre-wrap break-words rounded-xl border border-slate-200 p-4 text-sm leading-relaxed text-slate-700">{solicitudSeleccionada.resultado || 'Aún no se ha capturado un resultado escrito.'}</p></section>
             <section><h4 className="mb-2 text-sm font-semibold">Observaciones técnicas</h4><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-600">{solicitudSeleccionada.observaciones || 'Sin observaciones adicionales.'}</p></section>
-            <section className="mt-2 rounded-xl border border-slate-200 p-4"><h4 className="mb-2 text-sm font-semibold">Documento PDF</h4>{solicitudSeleccionada.archivo ? <a href={`/api/laboratorio/${solicitudSeleccionada.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-2 break-all text-sm font-medium text-blue-600 hover:underline"><FileText size={17} className="shrink-0" /> Abrir PDF: {nombrePdf(solicitudSeleccionada.archivo)}</a> : <p className="text-sm text-slate-500">No hay un PDF adjunto a este resultado.</p>}</section>
+            <section className="mt-2 rounded-xl border border-slate-200 p-4"><h4 className="mb-2 text-sm font-semibold">Documento PDF</h4>{solicitudSeleccionada.archivo ? <a href={`/api/laboratorio/${solicitudSeleccionada.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-2 break-all text-sm font-medium text-blue-600 hover:underline"><FileText size={17} className="shrink-0" /> Abrir PDF: {nombrePdf(solicitudSeleccionada.archivo)}</a> : <p className="text-sm text-slate-500">No hay un PDF adjunto a este resultado.</p>}{solicitudSeleccionada.archivo && <RetirarPdfLaboratorio id={solicitudSeleccionada.id} onRetirado={() => { setTodasSolicitudes(prev => prev.map(s => s.id === solicitudSeleccionada.id ? { ...s, archivo: '' } : s)); onSave?.('PDF retirado. Actualiza el resultado antes de continuar.'); onClose() }} />}</section>
           </>
         )}
       </ModalMarco>

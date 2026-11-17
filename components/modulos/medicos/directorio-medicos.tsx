@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Stethoscope, Plus, Search, Building2, Clock, CheckCircle2, Award, Calendar } from 'lucide-react'
+import { Trash2, Stethoscope, Plus, Search, Building2, Clock, CheckCircle2, Award, Calendar } from 'lucide-react'
 import type { MedicoPerfil } from './types'
 import { cargarMedicos } from '@/lib/supabase/datos'
 import { BotonRegistrarMedico } from './registrar-medico'
@@ -53,6 +53,7 @@ export function DirectorioMedicos({
             key={medico.id}
             className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-blue-300 hover:shadow-md"
           >
+            {puedeRegistrar && <button type="button" aria-label={`Eliminar médico ${medico.nombre}`} className="absolute bottom-3 right-3 z-10 rounded-lg bg-white p-2 text-rose-600 hover:bg-rose-50" onClick={() => onAbrirModal(`EliminarRegistro: ${encodeURIComponent('Médicos')}:${medico.id}`)}><Trash2 size={15} /></button>}
             <div>
               {/* Avatar e Identidad */}
               <div className="flex items-start gap-3.5">

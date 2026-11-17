@@ -1,88 +1,30 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { Bed, ArrowRight, Activity } from 'lucide-react'
-import { cargarResumenCamas, type ResumenCamas } from '@/lib/supabase/datos'
-import { leerCamas } from '@/lib/supabase/cache-modulos'
-
-export function PanelCamasEnfermero({ onVerCamas }: { onVerCamas: () => void }) {
-  const [camas, setCamas] = useState<ResumenCamas>(() => leerCamas() ?? { ocupadas: 0, total: 0, libres: 0 })
-
-  useEffect(() => {
-    let vigente = true
-    const cargar = () => {
-      void cargarResumenCamas().then((res) => {
-        if (!vigente || res.error) return
-        setCamas(res.filas)
-      })
-    }
-    cargar()
-    window.addEventListener('datos-actualizados', cargar)
-    return () => {
-      vigente = false
-      window.removeEventListener('datos-actualizados', cargar)
-    }
-  }, [])
-
-  const porcentaje = camas.total ? Math.round((camas.ocupadas / camas.total) * 100) : 0
-
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
-            <Bed size={18} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Ocupación hospitalaria y camas</h3>
-            <p className="text-xs text-slate-400">Control de habitaciones y disponibilidad para internación</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onVerCamas}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-        >
-          Ver módulo de camas
-          <ArrowRight size={14} />
-        </button>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-xl bg-slate-50/70 p-4 border border-slate-100">
-          <p className="text-xs font-medium text-slate-500">Total de camas</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{camas.total}</p>
-          <p className="mt-0.5 text-[11px] text-slate-400">Capacidad hospitalaria</p>
-        </div>
-
-        <div className="rounded-xl bg-blue-50/70 p-4 border border-blue-100">
-          <p className="text-xs font-medium text-blue-700">Camas ocupadas</p>
-          <p className="mt-1 text-2xl font-bold text-blue-900">{camas.ocupadas}</p>
-          <p className="mt-0.5 text-[11px] text-blue-600 font-medium">{porcentaje}% de ocupación</p>
-        </div>
-
-        <div className="rounded-xl bg-emerald-50/70 p-4 border border-emerald-100">
-          <p className="text-xs font-medium text-emerald-700">Camas disponibles</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-900">{camas.libres}</p>
-          <p className="mt-0.5 text-[11px] text-emerald-600">Listas para admisión</p>
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <div className="flex justify-between text-xs mb-1.5">
-          <span className="font-medium text-slate-600 flex items-center gap-1">
-            <Activity size={14} className="text-teal-600" />
-            Capacidad hospitalaria en vivo
-          </span>
-          <span className="font-semibold text-slate-700">{porcentaje}%</span>
-        </div>
-        <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-teal-600 transition-all duration-500"
-            style={{ width: `${porcentaje}%` }}
-          />
-        </div>
-      </div>
-    </section>
-  )
+"use client"
+import { useState } from 'react'
+import { Bed, Stethoscope, UserRound } from 'lucide-react'
+import type { PanelEnfermeriaDatos } from '@/lib/enfermeria/modelo'
+import { fechaHospital, limpiarCama, limpiarHabitacion } from '@/lib/internacion/modelo'
+import type { NuevoMensajeEquipo } from '@/components/modulos/equipo/panel-equipo'
+import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from '@/components/modulos/compartidos/editor-clinico'
+import { ModalMarco } from '@/components/modulos/compartidos/modal-marco'
+type Cama = NonNullable<PanelEnfermeriaDatos['mapaCamas']>[number]
+const estado = (b: Cama) => b.esta_ocupada ? 'Ocupada' : !b.habilitada || !b.habitacion_activa ? 'Fuera de servicio' : 'Disponible'
+const colores: Record<string, string> = { Ocupada: 'border-blue-200 bg-blue-50 text-blue-950', Disponible: 'border-teal-200 bg-teal-50 text-teal-950', 'Fuera de servicio': 'border-slate-200 bg-slate-100 text-slate-600' }
+export function PanelCamasEnfermero({ datos, onVerCamas, detallado = false, onIngreso, onVerPaciente, onMensaje }: { datos: PanelEnfermeriaDatos; onVerCamas?: () => void; detallado?: boolean; onIngreso?: (camaId?: number) => void; onVerPaciente?: (id: number) => void; onMensaje?: (mensaje: NuevoMensajeEquipo) => void }) {
+ const [filtro, setFiltro] = useState('Todas'), [seleccion, setSeleccion] = useState<number | null>(null)
+ const c=datos.resumenCamas, camas=datos.mapaCamas??[], cama=camas.find(b=>b.id===seleccion), ocupante=cama?.ocupante
+ const porcentaje=c?.total?Math.round(c.ocupadas/c.total*100):0
+ const fueraServicio=c?.fueraServicio??camas.filter(b=>!b.habilitada||!b.habitacion_activa).length
+ const visibles=camas.filter(b=>filtro==='Todas'||estado(b)===filtro)
+ const cifras=[{titulo:'Total de camas',valor:c?.total??0},{titulo:'Camas ocupadas',valor:c?.ocupadas??0},{titulo:'Disponibles',valor:c?.libres??0},...(detallado?[{titulo:'Fuera de servicio',valor:fueraServicio}]:[])]
+ return <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+  <header className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 font-semibold"><Bed size={20} className="text-teal-700"/>{detallado?'Hospitalización y mapa de camas':'Ocupación hospitalaria y camas'}</h3><p className="mt-2 text-xs text-slate-500">{detallado?'Consulta el paciente, su médico responsable y la disponibilidad de tu clínica.':'Ocupación y disponibilidad actualizadas de tu clínica.'}</p></div><div className="flex flex-wrap gap-2">{onVerCamas&&<button type="button" className={BOTON_SECUNDARIO} onClick={onVerCamas}>Ver mapa de camas</button>}{detallado&&onIngreso&&<button type="button" className={BOTON_PRIMARIO} onClick={()=>onIngreso()}>Registrar ingreso urgente</button>}</div></header>
+  {!c?<p className="mt-5 text-sm text-slate-500">No se pudo consultar el mapa de camas.</p>:<><dl className={`mt-5 grid gap-3 ${detallado?'grid-cols-2 sm:grid-cols-4':'grid-cols-3'}`}>{cifras.map(v=><div key={v.titulo} className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">{v.titulo}</dt><dd className="mt-2 text-2xl font-semibold">{v.valor}</dd></div>)}</dl><div className="mt-5 flex justify-between text-xs text-slate-500"><span>Ocupación de la clínica</span><span>{porcentaje}%</span></div><div role="meter" aria-label="Porcentaje de camas ocupadas" aria-valuenow={porcentaje} aria-valuemin={0} aria-valuemax={100} className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-teal-600" style={{width:`${porcentaje}%`}}/></div></>}
+  {detallado&&<><div className="mt-6 flex flex-wrap gap-2" role="group" aria-label="Filtrar camas">{['Todas','Ocupada','Disponible','Fuera de servicio'].map(f=><button type="button" key={f} aria-pressed={filtro===f} onClick={()=>setFiltro(f)} className={`rounded-full border px-4 py-2 text-xs font-semibold ${filtro===f?'border-teal-700 bg-teal-700 text-white':'border-slate-200 bg-white text-slate-600'}`}>{f==='Ocupada'?'Ocupadas':f==='Disponible'?'Disponibles':f} ({f==='Todas'?camas.length:camas.filter(b=>estado(b)===f).length})</button>)}</div>
+   <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{visibles.map(b=><button type="button" key={b.id} aria-label={`Ver cama ${limpiarCama(b.numero)}, habitación ${limpiarHabitacion(b.habitacion)}`} onClick={()=>setSeleccion(b.id)} className={`min-w-0 rounded-2xl border p-4 text-left hover:shadow-md focus-visible:outline-2 focus-visible:outline-teal-700 ${colores[estado(b)]}`}><div className="flex items-center justify-between gap-2"><Bed size={21}/><span className="rounded-full bg-white/80 px-2 py-1 text-xs font-semibold">{estado(b)}</span></div><h4 className="mt-4 text-lg font-semibold">Cama {limpiarCama(b.numero)}</h4><p className="mt-1 text-xs">Habitación {limpiarHabitacion(b.habitacion)} · {b.tipo}</p>{b.ocupante?<div className="mt-4 space-y-2 border-t border-blue-200 pt-3"><p className="flex items-start gap-2 text-sm font-semibold"><UserRound size={16} className="mt-0.5 shrink-0"/>{b.ocupante.paciente}</p><p className="flex items-start gap-2 text-xs"><Stethoscope size={14} className="shrink-0"/>{b.ocupante.medico}</p><p className="text-xs">Ingreso: {fechaHospital(b.ocupante.fechaIngreso)}</p></div>:<p className="mt-4 text-sm">{estado(b)==='Disponible'?'Lista para registrar una admisión.':b.esta_ocupada?'Ocupación registrada. Revisa la ubicación con administración.':'No se ofrece para nuevos ingresos.'}</p>}<p className="mt-4 text-xs font-semibold underline underline-offset-4">Ver detalles →</p></button>)}</div>
+   {!visibles.length&&<p className="mt-4 rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">No hay camas con este estado.</p>}</>}
+  {detallado&&cama&&<ModalMarco title={`Habitación ${limpiarHabitacion(cama.habitacion)} · Cama ${limpiarCama(cama.numero)}`} ancho="max-w-2xl" contenidoFijo onClose={()=>setSeleccion(null)} footer={<div className="flex flex-wrap justify-between gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={()=>setSeleccion(null)}>Cerrar</button>{estado(cama)==='Disponible'&&onIngreso&&<button type="button" className={BOTON_PRIMARIO} onClick={()=>{setSeleccion(null);onIngreso(cama.id)}}>Ingresar paciente en esta cama</button>}{ocupante?.asignado&&onVerPaciente&&<button type="button" className={BOTON_PRIMARIO} onClick={()=>{setSeleccion(null);onVerPaciente(ocupante.pacienteId)}}>Ver cuidados del paciente</button>}</div>}>
+   <div className={`rounded-xl border p-4 ${colores[estado(cama)]}`}><p className="font-semibold">{estado(cama)}</p><p className="mt-1 text-sm">{cama.tipo}</p></div>
+   {ocupante?<div className="mt-5 space-y-4"><div><p className="text-xs text-slate-500">Paciente hospitalizado</p><p className="mt-1 text-lg font-semibold">{ocupante.paciente}</p><p className="mt-1 text-xs text-slate-500">Ingreso #{ocupante.id}</p></div><div className="grid gap-4 sm:grid-cols-2"><div><p className="text-xs text-slate-500">Médico responsable</p><p className="mt-2 text-sm font-medium">{ocupante.medico}</p></div><div><p className="text-xs text-slate-500">Fecha de ingreso</p><p className="mt-2 text-sm font-medium">{fechaHospital(ocupante.fechaIngreso,true)}</p></div></div><p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">{ocupante.asignado?'El paciente está asignado a tu turno. Puedes consultar y registrar sus cuidados.':'Puedes consultar su ubicación. Administración debe asignarte el turno para registrar cuidados y consultar su información clínica.'}</p>{onMensaje&&<button type="button" className={BOTON_SECUNDARIO} onClick={()=>{setSeleccion(null);onMensaje({rolDestino:'recepcionista',asunto:`Coordinar ingreso #${ocupante.id}`,contenido:`Solicito coordinación para el ingreso #${ocupante.id}, habitación ${limpiarHabitacion(cama.habitacion)}, cama ${limpiarCama(cama.numero)}.`})}}>Coordinar con recepción</button>}</div>:<p className="mt-5 text-sm text-slate-600">{estado(cama)==='Disponible'?'Esta cama está libre. Puedes seleccionarla para un nuevo ingreso.':cama.esta_ocupada?'La cama figura ocupada sin una hospitalización activa vinculada. Solicita a administración revisar la ocupación.':'Administración debe habilitar esta ubicación antes de poder utilizarla.'}</p>}
+  </ModalMarco>}
+ </section>
 }

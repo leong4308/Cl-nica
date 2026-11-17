@@ -12,6 +12,8 @@ export const test = base.extend<{ aislarNotificaciones: void }>({
     await page.route('**/api/pacientes/*/portal', r => r.fulfill({ json: { correo: 'paciente@example.test', activa: false, invitada: false, configurado: false } }))
     await page.route('**/api/gestion/**', r => r.fulfill({ json: { pacientes: [], medicos: [], clinicas: [], salas: [], turnos: [], solicitudes: [], ofertas: [], controles: [], citas: [], envios: [], porDia: [], porMedico: [], trabajadorActivo: false, ahora: new Date().toISOString() } }))
     await page.route('**/api/admin/camas', r => r.fulfill({ json: { clinicas: [], habitaciones: [], camas: [] } }))
+    await page.route('**/api/equipo', r => r.fulfill({ json: { usuarioId: 1, destinatarios: [], pacientes: [], conversaciones: [] } }))
+    await page.route('**/api/laboratorio/*?metadatos=1', r => r.fulfill({ json: { puedeEliminar: false, archivo: '' } }))
     await page.route('**/api/enfermeria', r => r.fulfill({ json: { rol:'enfermero',usuarioId:1,enfermeroId:1,servidorAhora:new Date().toISOString(),pacientes:[],enfermeros:[],turnos:[],tareas:[],registros:[],citas:[],ingresos:[],ordenes:[],muestras:[],movimientos:[],camas:[] } }))
     await page.route('**/api/sesion', async r => {
       const t = new Date().toISOString()

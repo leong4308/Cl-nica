@@ -12,6 +12,7 @@ async function preparar(page: Page, rol = 'admin', configurado = true) {
   let bloques=configurado?[{dia:0,inicio:'08:00',fin:'14:00'},{dia:1,inicio:'08:00',fin:'14:00'},{dia:2,inicio:'08:00',fin:'14:00'}]:[]
   let descansos=[{fecha:'2026-11-09',inicio:'09:00',fin:'09:40',motivo:'Descanso rotativo'}]
   const agendadas:any[]=[], horarios:any[]=[], expedientes:any[]=[], cambiosCita:any[]=[]
+  await page.route('**/api/admin/users',r=>r.fulfill({json:{usuarios:medicos.map(m=>({id:m.usuario_id,auth_user_id:null,correo:`medico${m.id}@example.test`,nombre_completo:m.usuarios.nombre_completo,telefono:null,rol:'medico',esta_activo:true,creado_en:'2026-01-01T00:00:00Z',perfiles_medicos:[m]}))}}))
   await page.route('**/api/accesos-prueba',r=>r.fulfill({json:{habilitado:false}}))
   await page.route('**/auth/v1/**',r=>r.fulfill({json:new URL(r.request().url()).pathname.endsWith('/user')?user:{access_token:token,token_type:'bearer',expires_in:7200,refresh_token:'refresh-prueba',user}}))
   await page.route('**/rest/v1/**',async r=>{
@@ -113,12 +114,56 @@ test('sin horario publicado no anuncia horas libres y recepción puede proponer 
   await modal.getByLabel('Fecha de la cita').fill('2026-11-10');await modal.getByLabel('Hora de la cita').fill('10:20');await modal.getByLabel('Motivo de la cita').fill('Revisión')
   await modal.getByRole('button',{name:'Agendar cita',exact:true}).click();await expect(modal).toHaveCount(0);expect(agendadas[0].hora).toBe('10:20')
 })
-test('administración asigna un descanso por fecha al médico seleccionado',async({page})=>{
-  const {horarios}=await preparar(page,'admin');await page.getByRole('button',{name:'Médicos',exact:true}).click();await page.getByRole('button',{name:'Configurar horario',exact:true}).click();const modal=page.getByRole('dialog')
+test('administración configura descansos desde Usuarios para el médico de la tarjeta y ya no desde Agenda médica',async({page})=>{
+  const {horarios}=await preparar(page,'admin')
+  await page.getByRole('button',{name:'Médicos',exact:true}).click()
+  await expect(page.getByRole('button',{name:'Configurar horario',exact:true})).toHaveCount(0)
+  await page.getByRole('button',{name:'Usuarios',exact:true}).click()
+  await page.getByRole('button',{name:'Configurar horario de Profesional 2',exact:true}).click()
+  const modal=page.getByRole('dialog',{name:'Horario y descansos del médico',exact:true})
+  await expect(modal.getByRole('heading',{name:'Profesional 2',exact:true})).toBeVisible()
+  await page.screenshot({path:'.herramientas/horario-semanal-usuarios.png',fullPage:true})
+  await modal.getByRole('tab',{name:'Descansos por fecha',exact:true}).click()
   await modal.getByLabel('Fecha del descanso 1').fill('2026-11-10');await modal.getByLabel('Inicio del descanso 1').fill('12:00');await modal.getByLabel('Fin del descanso 1').fill('13:00')
   await modal.getByRole('button',{name:'Guardar horario',exact:true}).click();await expect(modal).toHaveCount(0)
-  expect(horarios[0].id).toBe(1);expect(horarios[0].descansos[0]).toMatchObject({fecha:'2026-11-10',inicio:'12:00',fin:'13:00'})
+  expect(horarios[0].id).toBe(2);expect(horarios[0].descansos[0]).toMatchObject({fecha:'2026-11-10',inicio:'12:00',fin:'13:00'})
+  await expect(page.getByRole('dialog',{name:'Gestión de Usuarios',exact:true})).toBeVisible()
+  await expect(page.getByRole('dialog',{name:'Gestión de Usuarios',exact:true}).getByRole('status')).toContainText('Horario de Profesional 2 actualizado correctamente')
 })
+
+test('el horario semanal admite bloques, copia días, valida cruces y conserva cambios ante error en móvil',async({page})=>{
+ const {horarios}=await preparar(page,'admin')
+ await page.getByRole('button',{name:'Usuarios',exact:true}).click()
+ await page.getByRole('button',{name:'Configurar horario de Profesional 1',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Horario y descansos del médico',exact:true})
+ await modal.getByRole('checkbox',{name:'Atiende el martes',exact:true}).uncheck()
+ await expect(modal.getByRole('region',{name:'Horario del martes',exact:true})).toContainText('Sin atención')
+ const lunes=modal.getByRole('region',{name:'Horario del lunes',exact:true})
+ await lunes.getByLabel('Lunes: fin 1',{exact:true}).fill('12:00')
+ await lunes.getByRole('button',{name:'Añadir horario',exact:true}).click()
+ await lunes.getByLabel('Lunes: inicio 2',{exact:true}).fill('11:00');await lunes.getByLabel('Lunes: fin 2',{exact:true}).fill('17:00')
+ await modal.getByRole('button',{name:'Guardar horario',exact:true}).click()
+ await expect(modal.getByRole('alert')).toContainText('superponerse')
+ expect(horarios).toHaveLength(0)
+ await lunes.getByLabel('Lunes: inicio 2',{exact:true}).fill('13:00');await lunes.getByLabel('Lunes: intervalo 2',{exact:true}).fill('30')
+ await modal.getByText('Copiar horario a otros días',{exact:true}).click()
+ await modal.getByRole('checkbox',{name:'Copiar horario a miércoles',exact:true}).check();await modal.getByRole('checkbox',{name:'Copiar horario a viernes',exact:true}).check()
+ await modal.getByRole('button',{name:'Aplicar a días seleccionados',exact:true}).click()
+ await expect(modal.getByLabel('Viernes: inicio 2',{exact:true})).toHaveValue('13:00')
+ let fallar=true
+ await page.route('**/api/agenda/1',r=>{if(r.request().method()==='PATCH'&&fallar){fallar=false;return r.fulfill({status:409,json:{error:'El descanso coincide con una cita. Revisa las fechas.'}})}return r.fallback()})
+ await page.setViewportSize({width:390,height:844})
+ await expect(modal.getByRole('button',{name:'Guardar horario',exact:true})).toBeInViewport()
+ expect(await modal.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true)
+ await page.screenshot({path:'.herramientas/horario-movil-usuarios.png',fullPage:true})
+ await modal.getByRole('button',{name:'Guardar horario',exact:true}).click()
+ await expect(modal.getByRole('alert')).toContainText('coincide con una cita')
+ await expect(modal.getByLabel('Lunes: inicio 2',{exact:true})).toHaveValue('13:00')
+ await modal.getByRole('button',{name:'Guardar horario',exact:true}).click();await expect(modal).toHaveCount(0)
+ expect(horarios).toHaveLength(1);expect(horarios[0].bloques.filter((b:any)=>b.dia===2)).toHaveLength(0)
+ for(const dia of [1,3,5])expect(horarios[0].bloques.filter((b:any)=>b.dia===dia)).toEqual([{dia,inicio:'08:00',fin:'12:00'},{dia,inicio:'13:00',fin:'17:00',paso:30}])
+})
+
 test('el error al guardar mantiene el formulario de cita para corregirlo',async({page})=>{
   await preparar(page,'recepcionista',false);await page.route('**/api/citas',r=>r.fulfill({status:409,json:{error:'El médico tiene un descanso asignado en ese intervalo.'}}))
   await page.getByRole('button',{name:'Agendar cita',exact:true}).click();const modal=page.getByRole('dialog');await modal.getByLabel('Paciente',{exact:true}).fill('Paciente de prueba');await modal.getByRole('button',{name:'Paciente de prueba',exact:true}).click();await modal.getByLabel('Fecha de la cita').fill('2026-11-10');await modal.getByLabel('Hora de la cita').fill('10:00');await modal.getByLabel('Motivo de la cita').fill('Control conservado');await modal.getByRole('button',{name:'Agendar cita',exact:true}).click();await expect(modal.getByRole('alert')).toContainText('descanso asignado');await expect(modal.getByLabel('Motivo de la cita')).toHaveValue('Control conservado')

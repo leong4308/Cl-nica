@@ -11,6 +11,8 @@ export type PanelEnfermeriaDatos = {
   ordenes: { id: number; paciente_id: number; tipo_orden: string; descripcion: string; instrucciones: string | null; estado: string; version: string }[]
   muestras: { id: number; paciente_id: number; estudio: string; estado_analisis: string; fecha_toma_muestra: string | null; fecha_entrega_muestra?: string | null; resultado?: string | null; con_documento?: boolean }[]
   movimientos: { id: number; paciente_id: number; tipo: string; cama_id: number | null; version: string; indicacion: string; medico: string }[]
+  resumenCamas?: { total: number; ocupadas: number; libres: number; fueraServicio?: number }
+  mapaCamas?: { id: number; numero: string; habitacion: string; tipo: string; clinica_id: number; esta_ocupada: boolean; habilitada: boolean; habitacion_activa: boolean; ocupante?: { id: number; pacienteId: number; paciente: string; medicoId: number; medico: string; fechaIngreso: string; asignado: boolean } | null }[]
   camas: { id: number; clinica_id: number; habitacion: string; cama: string }[]
 }
 export type FormularioEnfermeria = { accion: string; titulo: string; pacienteId: number; inicial?: Record<string, unknown> }

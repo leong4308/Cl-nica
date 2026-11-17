@@ -1,5 +1,7 @@
 'use client'
 
+import { PanelEquipo } from '@/components/modulos/equipo/panel-equipo'
+import { ModalEliminarRegistro } from '@/components/modulos/compartidos/modal-eliminar-registro'
 import { PanelEnvios } from '@/components/modulos/gestion/panel-envios'
 import { PanelEspera } from '@/components/modulos/gestion/panel-espera'
 import { PanelConsultorios } from '@/components/modulos/gestion/panel-consultorios'
@@ -28,7 +30,6 @@ import { ModalAccionCita, type AccionCita } from '@/components/modulos/resumen/p
 import { LoginForm } from '@/components/login/login-form'
 import {
   actualizarEstadoCita,
-  eliminarCita,
   type CitaPanel,
   type EstadoCita,
 } from '@/lib/supabase/datos'
@@ -37,7 +38,6 @@ import { ModalGestionCamas } from '@/components/modulos/internacion/modal-gestio
 import { ModalConsultaMedica } from '@/components/roles/medico/modal-consulta-medica'
 import { ModalDetalleCita, ModalEditarCita } from '@/components/modulos/citas'
 import { ModalPerfilPaciente, ModalEditarPaciente } from '@/components/modulos/pacientes'
-import { ModalConfirmarEliminacion } from '@/components/modulos/citas/confirmar-eliminacion/modal-confirmar-eliminacion'
 import { precargarCita } from '@/lib/supabase/cache-cita'
 import { precargarModulos } from '@/lib/supabase/cache-modulos'
 import { InterfazRecepcionista } from '@/components/roles/recepcionista'
@@ -56,7 +56,7 @@ export default function Page() {
   const [comprobandoSesion, setComprobandoSesion] = useState(true)
   const autenticadoRef = useRef(false)
   const [controlInicial, setControlInicial] = useState<{ pacienteId: number; citaId: number } | undefined>()
-  const [active, setActive] = useState('Resumen')
+  const [active, setActive] = useState('Citas')
   const [menuOpen, setMenuOpen] = useState(false)
   const [modal, setModal] = useState<string | null>(null)
   const [citaAbierta, setCitaAbierta] = useState<CitaEnEdicion>(null)
@@ -114,11 +114,13 @@ export default function Page() {
 
   useEffect(() => { if (authenticated) aplicarPreferencias(perfil.preferencias ?? PREFERENCIAS_INICIALES) }, [authenticated, perfil.preferencias])
 
+  useEffect(() => { const abrir = () => { setActive('Equipo'); setMenuOpen(false) }; window.addEventListener('abrir-equipo', abrir); return () => window.removeEventListener('abrir-equipo', abrir) }, [])
+
   // Cuando cambia el rol, navegar al item por default de ese rol
   useEffect(() => {
     if (authenticated) {
       const inicio = perfil.preferencias?.paginaInicio
-      setActive(inicio && inicio !== 'Predeterminada' ? inicio : obtenerItemDefaultPorRol(perfil.rol))
+      setActive(inicio && inicio !== 'Predeterminada' && !(perfil.rol === 'admin' && inicio === 'Resumen') ? inicio : obtenerItemDefaultPorRol(perfil.rol))
     }
   }, [perfil.rol, authenticated])
 
@@ -150,7 +152,7 @@ const MODALES_CON_FORMULARIO = [
   'Nueva orden',
   'Registrar resultado',
 ]
-const MODALES_ACCIONES_CITA = ['Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'PacienteEditar', 'GestionOrden', 'GestionInternacion', 'GestionExpediente', 'GestionLaboratorio:']
+const MODALES_ACCIONES_CITA = ['EliminarRegistro:', 'Detalle', 'Editar', 'Eliminar', 'HistorialDetalle', 'PacienteDetalle', 'PacienteEditar', 'GestionOrden', 'GestionInternacion', 'GestionExpediente', 'GestionLaboratorio:']
 
 const openModal = (title: string) => {
   if (abrirSeccionCuenta(title)) return
@@ -169,13 +171,7 @@ const openModal = (title: string) => {
   }
 
   const onEliminarCita = async (citaId: number) => {
-    const { error } = await eliminarCita(citaId)
-    if (error) {
-      notify(`No se pudo eliminar: ${error}`)
-      return error
-    }
-    notify(`Cita eliminada correctamente`)
-    return null
+    setCitaAbierta(null); setModal(`EliminarRegistro: Citas:${citaId}`); return null
   }
 
   const accionesCita = {
@@ -222,6 +218,8 @@ const openModal = (title: string) => {
    * - Enfermero: ve Dashboard + Citas, Pacientes, Internación, Órdenes
    */
   const renderContenido = () => {
+    if (active === 'Equipo') return <PanelEquipo rol={perfil.rol} />
+    if (active === 'Resumen' && perfil.rol === 'admin') return <ModulePage active="Citas" {...actions} />
     if (active === 'Comunicaciones' && perfil.rol === 'admin') return <PanelEnvios />
     if (active === 'Lista de espera' && perfil.rol === 'admin') return <PanelEspera rol="admin" onPaciente={id => openModal(`PacienteDetalle: ${id}`)} />
     if (active === 'Consultorios' && perfil.rol === 'admin') return <PanelConsultorios rol="admin" />
@@ -346,12 +344,11 @@ const openModal = (title: string) => {
       {modal !== null && modal.startsWith('Editar: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
         <ModalEditarCita citaId={Number(modal.split(': ')[1])} onClose={() => setModal(null)} />
       )}
-      {modal !== null && modal.startsWith('Eliminar: ') && !Number.isNaN(Number(modal.split(': ')[1])) && (
-        <ModalConfirmarEliminacion
-          citaId={Number(modal.split(': ')[1])}
-          onClose={() => setModal(null)}
-          onConfirm={() => onEliminarCita(Number(modal.split(': ')[1]))}
-        />
+      {modal !== null && /^EliminarRegistro: [^:]+:[1-9][0-9]*$/.test(modal) && perfil.rol === 'admin' && (
+        <ModalEliminarRegistro key={modal} modulo={decodeURIComponent(modal.slice('EliminarRegistro: '.length).split(':')[0])} id={Number(modal.split(':').at(-1))} onClose={() => setModal(null)} onEliminado={notify} />
+      )}
+      {modal !== null && /^Eliminar: [1-9][0-9]*$/.test(modal) && perfil.rol === 'admin' && (
+        <ModalEliminarRegistro modulo="Citas" id={Number(modal.split(': ')[1])} onClose={() => setModal(null)} onEliminado={notify} />
       )}
       {(modal === 'Registrar paciente' || modal === 'Nuevo paciente') && (
         <ModalRegistrarPaciente

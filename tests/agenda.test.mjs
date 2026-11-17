@@ -79,7 +79,8 @@ function horarioApi({rol='admin',conflicto=false}={}) {
   const srv=cargar('../lib/agenda/servidor.ts',{'./modelo':m,'@/lib/cuenta/servidor':{}})
   const api=cargar('../app/api/agenda/[id]/route.ts',{'@/lib/agenda/modelo':m,'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/agenda/servidor':{...srv,accesoAgenda:async()=>({admin:db,db,usuario:{rol,id:90}}),medicoAgenda:async()=>medico,configuracionMedico:async()=>({bloques:[],descansos:[]})}})
   const guardar=(body={bloques,descansos:[{fecha:'2026-11-09',inicio:'09:00',fin:'09:20'}]})=>api.PATCH(new Request('http://localhost/api/agenda/1',{method:'PATCH',body:JSON.stringify(body)}),{params:Promise.resolve({id:'1'})})
-  return {guardar,escrituras}
+  const consultar=()=>api.GET(new Request('http://localhost/api/agenda/1?configuracion=1'),{params:Promise.resolve({id:'1'})})
+  return {guardar,consultar,escrituras}
 }
 test('solo administración asigna descansos y persiste la configuración privada',async()=>{
   const sinPermiso=horarioApi({rol:'recepcionista'});assert.equal((await sinPermiso.guardar()).status,403);assert.equal(sinPermiso.escrituras.length,0)
@@ -133,4 +134,10 @@ test('el borrador vacío no crea diagnóstico, receta ni hallazgos de ejemplo', 
   assert.equal(guardado.diagnostico, '')
   assert.equal(guardado.receta, '')
   assert.deepEqual(consulta.leerConsulta(guardado).soap, soap)
+})
+
+
+test('el editor administrativo consulta la configuración aunque no haya turnos publicados ni consultorio disponible',async()=>{
+ const e=horarioApi();const r=await e.consultar();assert.equal(r.status,200);assert.deepEqual(await r.json(),{bloques:[],descansos:[],duracionConsulta:20});assert.equal(e.escrituras.length,0)
+ for(const rol of ['medico','recepcionista','enfermero'])assert.equal((await horarioApi({rol}).consultar()).status,403)
 })

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import ts from 'typescript'
 const require=createRequire(import.meta.url)
-function cargar(ruta,deps={}){const js=ts.transpileModule(readFileSync(new URL(ruta,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,exports={};new Function('require','exports',js)(id=>id==='@/lib/supabase/error-operacion'?cargar('../lib/supabase/error-operacion.ts'):deps[id]??(id==='@/lib/cuenta/validacion'?cargar('../lib/cuenta/validacion.ts'):require(id)),exports);return exports}
+function cargar(ruta,deps={}){const js=ts.transpileModule(readFileSync(new URL(ruta,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,exports={};new Function('require','exports',js)(id=>id==='@/lib/supabase/error-operacion'?cargar('../lib/supabase/error-operacion.ts'):deps[id]??(id==='@/lib/cuenta/validacion'?cargar('../lib/cuenta/validacion.ts'):id==='@/lib/documentos-retirada'?cargar('../lib/documentos-retirada.ts'):require(id)),exports);return exports}
 const recuperacion=cargar('../lib/cuenta/recuperacion.ts')
 
 test('el bloqueo impide a administración usar la clave de servicio para leer o modificar cuentas',async()=>{

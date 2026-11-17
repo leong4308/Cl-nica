@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { ConfigurarHorario } from '@/components/modulos/medicos/configurar-horario'
 import {
   Users,
+  CalendarDays,
   UserPlus,
   Search,
   Shield,
@@ -44,6 +46,8 @@ const USUARIO_VACIO = {
 }
 
 export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave: (value: string) => void }) {
+  const [horarioMedico, setHorarioMedico] = useState<{ id: number; nombre: string } | null>(null)
+  const [avisoHorario, setAvisoHorario] = useState('')
   const [pestana, setPestana] = useState<'lista' | 'crear'>('lista')
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([])
   const [cargando, setCargando] = useState(true)
@@ -145,10 +149,12 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
   }
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2 sm:p-4 backdrop-blur-sm transition-all"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="titulo-gestion-usuarios"
       onMouseDown={onClose}
     >
       <div
@@ -162,7 +168,7 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Gestión de Usuarios</h2>
+                <h2 id="titulo-gestion-usuarios" className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Gestión de Usuarios</h2>
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
                   {usuarios.length} cuentas
                 </span>
@@ -227,6 +233,7 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
               <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
                 <Filter className="size-4 text-slate-400 shrink-0 hidden sm:block" />
                 <select
+                  aria-label="Filtrar usuarios por rol"
                   value={filtroRol}
                   onChange={(e) => setFiltroRol(e.target.value)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -250,6 +257,7 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+              {avisoHorario && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{avisoHorario}</p>}
               {cargando ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                   <Loader2 className="size-8 animate-spin text-blue-600 mb-2" />
@@ -271,12 +279,14 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
                   {usuariosFiltrados.map((usr) => {
                     const rolCfg = badgesRol[usr.rol] || badgesRol.paciente
                     const RolIcon = rolCfg.icon
-                    const med = usr.perfiles_medicos?.[0]
+                    const med = usr.perfiles_medicos?.find(m => m.esta_activo) ?? usr.perfiles_medicos?.[0]
                     const enf = usr.perfiles_enfermeros?.[0]
 
                     return (
                       <div
                         key={usr.id}
+                        role="article"
+                        aria-label={`Usuario ${usr.nombre_completo}`}
                         className="group relative flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm hover:border-blue-200 hover:shadow-md transition-all"
                       >
                         <div>
@@ -317,7 +327,8 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
                           )}
                         </div>
 
-                        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
+                        {usr.rol === 'medico' && med && <button type="button" aria-label={`Configurar horario de ${usr.nombre_completo}`} disabled={!usr.esta_activo || !med.esta_activo || actualizandoId === usr.id} onClick={() => { setAvisoHorario(''); setHorarioMedico({ id: med.id, nombre: usr.nombre_completo }) }} className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"><CalendarDays size={16} />Horario y descansos</button>}
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs">
                           <div className="flex items-center gap-1.5">
                             <span
                               className={`size-2 rounded-full ${
@@ -548,5 +559,7 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
         )}
       </div>
     </div>
+    {horarioMedico && <ConfigurarHorario key={horarioMedico.id} medicoId={horarioMedico.id} nombre={horarioMedico.nombre} onClose={() => setHorarioMedico(null)} onSave={() => { setAvisoHorario(`Horario de ${horarioMedico.nombre} actualizado correctamente.`); window.dispatchEvent(new Event('datos-actualizados')) }} />}
+    </>
   )
 }

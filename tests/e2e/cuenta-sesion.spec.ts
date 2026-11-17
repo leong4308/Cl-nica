@@ -242,3 +242,35 @@ for (const rol of ['enfermero', 'recepcionista']) {
     await expect(page.getByRole('heading', { name: 'Pacientes', exact: true })).toBeVisible()
   })
 }
+
+
+test('administración no muestra Resumen y eliminar paciente confirma el módulo correcto y conserva un conflicto',async({page})=>{
+ await preparar(page)
+ await expect(page.getByRole('complementary').getByRole('button',{name:'Resumen',exact:true})).toHaveCount(0)
+ const cambios:any[]=[];let version='a'.repeat(32)
+ await page.route('**/api/admin/eliminaciones**',r=>{
+  if(r.request().method()==='DELETE'){
+   const b=r.request().postDataJSON();cambios.push(b)
+   if(cambios.length===1){version='b'.repeat(32);return r.fulfill({status:409,json:{error:'El registro cambió. Revísalo antes de eliminar.'}})}
+   return r.fulfill({json:{ok:true,mensaje:'Registro eliminado con auditoría.'}})
+  }
+  const q=new URL(r.request().url()).searchParams;expect(q.get('modulo')).toBe('Pacientes');expect(q.get('id')).toBe('7')
+  return r.fulfill({json:{nombre:'Paciente de prueba',version,puedeEliminar:true,referencias:[]}})
+ })
+ await page.getByRole('button',{name:'Pacientes',exact:true}).click()
+ const fila=page.getByRole('row').filter({hasText:'Paciente de prueba'})
+ await fila.getByRole('button',{name:'Eliminar registro',exact:true}).click()
+ let modal=page.getByRole('dialog',{name:'Eliminar registro',exact:true})
+ await expect(modal.getByRole('alert').filter({hasText:'Vas a eliminar Paciente de prueba'})).toBeVisible()
+ await expect(modal.getByRole('button',{name:'Eliminar registro',exact:true})).toBeDisabled()
+ await modal.getByRole('button',{name:'Cancelar',exact:true}).click();expect(cambios).toHaveLength(0)
+ await fila.getByRole('button',{name:'Eliminar registro',exact:true}).click();modal=page.getByRole('dialog',{name:'Eliminar registro',exact:true})
+ await modal.getByLabel('Motivo de eliminación').fill('Registro duplicado de prueba funcional')
+ await modal.getByRole('checkbox').check();await modal.getByRole('button',{name:'Eliminar registro',exact:true}).click()
+ await expect(modal.getByText('El registro cambió. Revísalo antes de eliminar.',{exact:true})).toBeVisible()
+ await expect(modal.getByLabel('Motivo de eliminación')).toHaveValue('Registro duplicado de prueba funcional')
+ await modal.getByRole('button',{name:'Volver a revisar el registro'}).click()
+ await modal.getByRole('checkbox').check();await modal.getByRole('button',{name:'Eliminar registro',exact:true}).click()
+ await expect(modal).toHaveCount(0);expect(cambios).toHaveLength(2)
+ expect(cambios[1]).toEqual({modulo:'Pacientes',id:7,version:'b'.repeat(32),motivo:'Registro duplicado de prueba funcional',confirmado:true})
+})

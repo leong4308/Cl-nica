@@ -35,7 +35,7 @@ export function AccionesFilaModulo({
 
   // Reglas coherentes de permisos:
   // - Eliminar: ÚNICAMENTE Administradores
-  const puedeEliminar = esAdmin && modulo !== 'Expedientes'
+  const puedeEliminar = esAdmin
 
   // - Editar:
   //   * Citas: Admin, Recepcionista, Médico
@@ -81,7 +81,7 @@ export function AccionesFilaModulo({
         onView={handleVerPaciente}
         onHoverView={!Number.isNaN(numId) ? () => void precargarPerfilPaciente(numId) : undefined}
         onEdit={puedeEditar ? () => onAbrirModal(`PacienteEditar: ${id}`) : undefined}
-        onDelete={puedeEliminar ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
+        onDelete={puedeEliminar ? () => onAbrirModal(`EliminarRegistro: ${encodeURIComponent(modulo || 'Citas')}:${id}`) : undefined}
       />
     )
   }
@@ -204,7 +204,7 @@ export function AccionesFilaModulo({
             }
           : undefined
       }
-      onDelete={puedeEliminar && modulo !== 'Internación' ? () => onAbrirModal(`Eliminar: ${id}`) : undefined}
+      onDelete={puedeEliminar ? () => onAbrirModal(`EliminarRegistro: ${encodeURIComponent(modulo || 'Citas')}:${id}`) : undefined}
     />
   )
 }

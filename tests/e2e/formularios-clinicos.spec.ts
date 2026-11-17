@@ -18,6 +18,7 @@ async function preparar(page: Page, modulo: string) {
   await page.route('**/rest/v1/**', async (route) => {
     const req = route.request()
     const tabla = new URL(req.url()).pathname.split('/').pop()
+    if (tabla === 'clinica_historial_paciente') return route.fulfill({ json: [] })
     let data: object[] = []
     if (tabla === 'usuarios') data = [{ id: 1, auth_user_id: usuario.id, correo: usuario.email, nombre_completo: 'Administrador de prueba', rol: 'admin', esta_activo: true }]
     if (tabla === 'perfiles_pacientes') data = [paciente]
@@ -135,3 +136,27 @@ for (const accion of ['Ver detalle', 'Editar registro']) {
   await expect(page.locator('dialog[open]')).toHaveCount(0)
  })
 }
+
+
+test('eliminar un PDF requiere advertencia, motivo y confirmación y no guarda el formulario clínico',async({page})=>{
+ const {escrituras}=await preparar(page, 'Expedientes')
+ let eliminado=false;const retiradas:any[]=[]
+ await page.route('**/api/documentos-clinicos/expedientes/1',r=>{
+  if(r.request().method()==='DELETE'){retiradas.push(r.request().postDataJSON());eliminado=true;return r.fulfill({json:{ok:true}})}
+  return r.fulfill({json:{puedeEliminar:true,archivos:eliminado?[]:[{archivo:'12345678-informe.pdf',nombre:'informe.pdf',href:'/documento-de-prueba.pdf'}]}})
+ })
+ await page.getByRole('button',{name:'Expedientes',exact:true}).click()
+ await page.getByRole('button',{name:'Ver detalle',exact:true}).first().click()
+ await page.getByRole('button',{name:'Editar expediente',exact:true}).click()
+ await page.getByRole('button',{name:'Eliminar PDF informe.pdf',exact:true}).click()
+ let modal=page.getByRole('dialog',{name:'Eliminar archivo PDF',exact:true})
+ await expect(modal.getByRole('alert')).toContainText('informe.pdf')
+ await expect(modal.getByRole('button',{name:'Eliminar PDF',exact:true})).toBeDisabled()
+ await modal.getByRole('button',{name:'Cancelar',exact:true}).click();expect(retiradas).toHaveLength(0);expect(escrituras).toHaveLength(0)
+ await page.getByRole('button',{name:'Eliminar PDF informe.pdf',exact:true}).click();modal=page.getByRole('dialog',{name:'Eliminar archivo PDF',exact:true})
+ await modal.getByLabel('Motivo de eliminación').fill('Documento adjunto duplicado de prueba')
+ await modal.getByRole('checkbox').check();await modal.getByRole('button',{name:'Eliminar PDF',exact:true}).click()
+ await expect(modal).toHaveCount(0);expect(retiradas).toEqual([{archivo:'12345678-informe.pdf',motivo:'Documento adjunto duplicado de prueba',confirmado:true}]);expect(escrituras).toHaveLength(0)
+ await expect(page.getByRole('button',{name:'Eliminar PDF informe.pdf',exact:true})).toHaveCount(0)
+ await page.screenshot({path:'.herramientas/eliminacion-pdf-confirmada.png',fullPage:true})
+})

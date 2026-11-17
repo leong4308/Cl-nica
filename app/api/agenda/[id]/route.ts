@@ -5,8 +5,12 @@ import { origenValido } from '@/lib/cuenta/servidor'
 type Contexto = { params: Promise<{ id: string }> }
 export async function GET(request: Request, contexto: Contexto) {
   try { const acceso = await accesoAgenda(); if (acceso.respuesta) return acceso.respuesta
-    const id = idAgenda((await contexto.params).id), fecha = fechaAgenda(new URL(request.url).searchParams.get('fecha'))
+    const parametros = new URL(request.url).searchParams
+    const configuracion = parametros.get('configuracion') === '1'
+    if (configuracion && acceso.usuario.rol !== 'admin') return NextResponse.json({ error: 'Solo administración puede configurar horarios.' }, { status: 403 })
+    const id = idAgenda((await contexto.params).id), fecha = fechaAgenda(parametros.get('fecha'))
     const medico = await medicoAgenda(acceso.admin, id, acceso.usuario)
+    if (configuracion) return NextResponse.json({ ...await configuracionMedico(acceso.admin, medico), duracionConsulta: medico.duracion_consulta }, { headers: { 'Cache-Control': 'private, no-store' } })
     const [config, citas] = await Promise.all([configuracionMedico(acceso.admin, medico), citasAgenda(acceso.admin, id, fecha)])
     const resumen = resumirAgenda(config.bloques, citas, fecha, medico.duracion_consulta, new Date(), 7, config.descansos)
     const filtrados = await acceso.db.rpc('clinica_filtrar_consultorios', { p_medico: id, p_turnos: resumen.dias.flatMap(d => d.slots) })

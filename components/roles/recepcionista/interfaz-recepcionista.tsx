@@ -1,9 +1,10 @@
 'use client'
+import { PanelEquipo } from '@/components/modulos/equipo/panel-equipo'
 
 import { PanelEnvios } from '@/components/modulos/gestion/panel-envios'
 import { PanelEspera } from '@/components/modulos/gestion/panel-espera'
 import { PanelConsultorios } from '@/components/modulos/gestion/panel-consultorios'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { abrirSeccionCuenta } from '@/lib/cuenta/menu'
 import { BarraLateralRecepcionista } from './barra-lateral'
 import { navItemsRecepcion } from './barra-lateral/navegacion/items-menu'
@@ -27,12 +28,13 @@ export function InterfazRecepcionista({ usuario, paginaInicio, onCerrarSesion, o
     if (['Registrar paciente', 'Nuevo paciente', 'Nueva cita'].includes(titulo) || /^(PacienteDetalle|PacienteEditar|Editar): [0-9]+$/.test(titulo)) setModal(titulo)
   }
   const navigate = (seccion: string) => { if (navItemsRecepcion.some(([label]) => label === seccion)) { setActive(seccion); setMenuOpen(false) } }
+  useEffect(() => { const abrir = () => { setActive('Equipo'); setMenuOpen(false) }; window.addEventListener('abrir-equipo', abrir); return () => window.removeEventListener('abrir-equipo', abrir) }, [])
   return <main className="min-h-screen bg-[#f7f9fc] text-slate-900">
     {menuOpen && <BotonCerrarMenu onCerrar={() => setMenuOpen(false)} />}
     <BarraLateralRecepcionista activo={active} abierto={menuOpen} onNavegar={navigate} onCerrar={() => setMenuOpen(false)} />
     <section className="lg:pl-[260px]">
       <BarraSuperior onAbrirMenu={() => setMenuOpen(true)} onAbrirModal={openModal} onCerrarSesion={onCerrarSesion} usuario={usuario} onCambiarVistaRol={onCambiarVistaRol} />
-      <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-9">{active === 'Comunicaciones' ? <PanelEnvios /> : active === 'Lista de espera' ? <PanelEspera rol="recepcionista" onPaciente={id => openModal(`PacienteDetalle: ${id}`)} /> : active === 'Consultorios' ? <PanelConsultorios rol="recepcionista" /> : active === 'Pacientes' ? <DirectorioRecepcion openModal={openModal} /> : <PanelRecepcion seccion={active} nombre={usuario.nombre} openModal={openModal} />}</div>
+      <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-9">{active === 'Equipo' ? <PanelEquipo rol="recepcionista" /> : active === 'Comunicaciones' ? <PanelEnvios /> : active === 'Lista de espera' ? <PanelEspera rol="recepcionista" onPaciente={id => openModal(`PacienteDetalle: ${id}`)} /> : active === 'Consultorios' ? <PanelConsultorios rol="recepcionista" /> : active === 'Pacientes' ? <DirectorioRecepcion openModal={openModal} /> : <PanelRecepcion seccion={active} nombre={usuario.nombre} openModal={openModal} />}</div>
     </section>
     {notice && <div role="status" className="fixed bottom-6 right-6 z-50 flex max-w-[90vw] items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-sm text-white shadow-xl">{notice}<BotonCerrarAviso onCerrar={() => setNotice('')} /></div>}
     {(modal === 'Registrar paciente' || modal === 'Nuevo paciente') && <ModalRegistrarPaciente soloAdministrativo onClose={() => setModal(null)} onSave={nombre => { setNotice(`Paciente «${nombre}» registrado.`); window.dispatchEvent(new Event('datos-actualizados')); setModal(null) }} />}

@@ -11,6 +11,7 @@ async function preparar(page: Page, rol = 'enfermero', vacio = false) {
   await page.route('**/auth/v1/**', r => r.fulfill({ json: r.request().url().endsWith('/user') ? user : { user, access_token: token, refresh_token: 'simulado', expires_in: 3600, token_type: 'bearer' } }))
   await page.route('**/rest/v1/**', r => r.fulfill({ json: new URL(r.request().url()).pathname.endsWith('/usuarios') ? [{ id: 5, auth_user_id: user.id, nombre_completo: 'Personal de prueba', rol, esta_activo: true }] : [] }))
   const datos = {
+    resumenCamas: { total: 6, ocupadas: 2, libres: 4 }, mapaCamas: [{ id: 1, numero: 'A', habitacion: '101', tipo: 'General', clinica_id: 1, esta_ocupada: true, habilitada: true, habitacion_activa: true }, { id: 2, numero: 'B', habitacion: '101', tipo: 'General', clinica_id: 1, esta_ocupada: false, habilitada: true, habitacion_activa: true }],
     rol, usuarioId: 5, enfermeroId: rol === 'enfermero' ? 1 : null, servidorAhora: '2026-11-11T18:00:00Z',
     pacientes: vacio ? [] : [{ id: 1, nombre: 'Paciente asignado de prueba', telefono: '5551234567', contacto: 'Familiar', telefono_emergencia: '5557654321', alertas: '{"alergias":"Registradas en su ficha"}' }],
     enfermeros: [{ id: 1, nombre: 'Enfermero de prueba', clinica_id: 1 }, { id: 2, nombre: 'Relevo de prueba', clinica_id: 1 }],
@@ -34,14 +35,15 @@ async function preparar(page: Page, rol = 'enfermero', vacio = false) {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   if (rol === 'medico') { await expect(page.getByRole('heading', { name: 'Citas médicas', exact: true })).toBeVisible(); return { datos, escrituras } }
   if (rol !== 'enfermero') await page.getByRole('button', { name: 'Enfermería', exact: true }).click()
-  await expect(page.getByRole('heading', { name: rol === 'enfermero' ? 'Mi turno de enfermería' : 'Seguimiento de enfermería' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: rol === 'enfermero' ? 'Hola, Personal de prueba' : 'Seguimiento de enfermería' })).toBeVisible()
   return { datos, escrituras }
 }
 
 test('sin asignación muestra un turno vacío y no ofrece el directorio ni prescripciones', async ({ page }) => {
   await preparar(page, 'enfermero', true)
   await expect(page.getByText('No tienes pacientes asignados', { exact: false })).toBeVisible()
-  for (const nombre of ['Registrar paciente', 'Nueva orden', 'Registrar resultado', 'Nueva admisión', 'Tomar signos']) await expect(page.getByRole('button', { name: nombre, exact: true })).toHaveCount(0)
+  for (const nombre of ['Registrar paciente', 'Nueva orden', 'Registrar resultado', 'Nueva admisión']) await expect(page.getByRole('button', { name: nombre, exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Tomar signos', exact: true })).toBeDisabled()
 })
 
 test('registra signos desde el paciente asignado sin sobrescribir la ficha', async ({ page }) => {
@@ -58,7 +60,7 @@ test('registra signos desde el paciente asignado sin sobrescribir la ficha', asy
 
 test('la administración de medicamentos muestra la indicación sin campos para modificarla y exige confirmación', async ({ page }) => {
   const { escrituras } = await preparar(page)
-  await page.getByRole('button', { name: 'Medicamentos', exact: true }).click()
+  await page.getByRole('button', { name: 'Órdenes médicas', exact: true }).click()
   await page.getByRole('button', { name: 'Registrar administración', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Registrar administración' })
   await expect(modal.getByText('Según prescripción', { exact: true })).toBeVisible()
@@ -106,11 +108,13 @@ test('administración asigna paciente y turno, sin poder programar una dosis mé
   const { escrituras } = await preparar(page, 'admin')
   await page.getByRole('button', { name: 'Asignar turno', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Asignar paciente a un turno' })
+  await modal.getByLabel('Paciente', { exact: true }).selectOption('1')
   await modal.getByLabel('Enfermero', { exact: true }).selectOption('1')
   await modal.getByLabel('Área de atención').fill('Hospitalización')
   await modal.getByRole('button', { name: 'Guardar registro' }).click()
   await expect(modal).toHaveCount(0)
   expect(escrituras[0]).toMatchObject({ accion: 'asignar', datos: { pacienteId: 1, enfermeroId: 1, area: 'Hospitalización' } })
+  await page.getByRole('navigation', { name: 'Secciones de enfermería', exact: true }).getByRole('button', { name: 'Pacientes', exact: true }).click()
   await page.getByRole('button', { name: 'Programar atención', exact: true }).click()
   await expect(page.getByRole('dialog').getByRole('option', { name: 'Dosis de medicamento' })).toHaveCount(0)
 })
@@ -123,9 +127,44 @@ test('el médico no muestra el módulo de enfermería ni sus formularios de prog
   expect(escrituras).toHaveLength(0)
 })
 
+test('administración muestra todos los enfermeros en tarjetas y asigna desde la persona seleccionada', async ({ page }) => {
+  const { datos, escrituras } = await preparar(page, 'admin')
+  datos.enfermeros.push({ id: 3, nombre: 'Enfermero sin asignaciones', clinica_id: 1 })
+  await page.getByRole('button', { name: 'Actualizar', exact: true }).click()
+  const tarjetas = page.getByLabel('Enfermeros y asignaciones', { exact: true })
+  await expect(tarjetas.getByRole('article')).toHaveCount(3)
+  await expect(tarjetas.getByRole('article', { name: 'Enfermero Enfermero de prueba', exact: true })).toContainText('Con pacientes asignados ahora')
+  const libre = tarjetas.getByRole('article', { name: 'Enfermero Enfermero sin asignaciones', exact: true })
+  await expect(libre).toContainText('Sin asignación vigente')
+  await expect(libre).toContainText('Sin turnos asignados en los próximos siete días.')
+  const relevo = tarjetas.getByRole('article', { name: 'Enfermero Relevo de prueba', exact: true })
+  await relevo.getByRole('button', { name: 'Consultar asignaciones', exact: true }).click()
+  const detalle = page.getByRole('region', { name: 'Asignaciones del personal de enfermería', exact: true })
+  await expect(detalle.getByRole('combobox', { name: 'Filtrar enfermero', exact: true })).toHaveValue('2')
+  await expect(detalle.getByRole('row').filter({ hasText: 'Paciente asignado de prueba' })).toHaveCount(1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await relevo.getByRole('button', { name: 'Asignar paciente', exact: true }).click()
+  const modal = page.getByRole('dialog', { name: 'Asignar paciente a un turno', exact: true })
+  await expect(modal.getByRole('combobox', { name: 'Enfermero', exact: true })).toHaveValue('2')
+  await expect(modal.getByRole('combobox', { name: 'Paciente', exact: true })).toHaveValue('')
+  await modal.getByRole('combobox', { name: 'Paciente', exact: true }).selectOption('1')
+  await modal.getByLabel('Área de atención', { exact: true }).fill('Hospitalización')
+  await modal.getByRole('button', { name: 'Guardar registro', exact: true }).click()
+  await expect(modal).toHaveCount(0)
+  expect(escrituras[0]).toMatchObject({ accion: 'asignar', datos: { enfermeroId: 2, pacienteId: 1 } })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.screenshot({ path: '.herramientas/agenda-enfermeros-admin.png', fullPage: true })
+  await detalle.getByRole('button', { name: 'Ver seguimiento', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Pacientes', exact: true })).toBeVisible()
+  expect(escrituras).toHaveLength(1)
+})
+
 test('una nota en móvil conserva el borrador ante error', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   const { escrituras } = await preparar(page)
+  await page.getByRole('button', { name: 'Abrir menú', exact: true }).click()
+  await page.getByRole('complementary').getByRole('button', { name: 'Pacientes', exact: true }).click()
   await page.getByRole('button', { name: 'Añadir nota', exact: true }).click()
   const modal = page.getByRole('dialog', { name: 'Nueva nota de enfermería' })
   await modal.getByLabel('Valoración, cuidados y respuesta del paciente').fill('Cuidados del turno documentados')
@@ -140,7 +179,7 @@ test('una nota en móvil conserva el borrador ante error', async ({ page }) => {
 
 test('la entrega de turno se dirige al relevo que tiene asignado el paciente', async ({ page }) => {
   const { escrituras } = await preparar(page)
-  await page.getByRole('button', { name: 'Entrega de turno', exact: true }).click()
+  await page.getByRole('button', { name: 'Pacientes', exact: true }).click()
   await page.getByRole('button', { name: 'Preparar entrega de turno' }).click()
   const modal = page.getByRole('dialog', { name: 'Entregar turno del paciente' })
   await modal.getByLabel('Enfermero que recibe', { exact: true }).selectOption('2')

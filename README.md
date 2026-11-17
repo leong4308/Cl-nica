@@ -29,7 +29,7 @@ Para revisar la aplicación compilada, ejecuta `pnpm build` y después `pnpm sta
 
 1. Conserva un respaldo del proyecto antes de actualizar su base.
 2. Configura `SUPABASE_DB_URL` en `.env.local` con la URI de **Supabase → Connect** y la contraseña de la base. No es la clave de servicio. Los caracteres especiales de la contraseña deben codificarse en la URI. Nunca subas ese archivo a Git.
-3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `044_validacion_contactos.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
+3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `048_enfermeria_censo_y_selector.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
 4. Ejecuta `pnpm agenda:importar` para copiar las agendas privadas anteriores a PostgreSQL sin sobrescribir las ya publicadas. No se inventan horarios.
 5. También se pueden ejecutar esos archivos SQL, en orden numérico, desde el editor de Supabase. La importación de agendas sigue siendo necesaria si había horarios guardados en Storage.
 6. Inicia sesión como administrador y abre **Configuración → Verificar estado**. Comprueba los distintos roles antes de publicar.
@@ -57,7 +57,7 @@ La migración 024 permite confirmar asistencia, cancelar con confirmación y sol
 
 La migración 025 permite ejecutar el trabajador por HTTPS usando la clave de servicio del servidor. El bot no depende de la conexión PostgreSQL de `SUPABASE_DB_URL`; esa conexión sigue usándose para migraciones y respaldos. Una reserva exclusiva impide que dos instancias procesen el mismo bot.
 
-La migración 026 añade horarios libres para seleccionar desde el portal y Telegram. Elegir un turno reprograma la misma cita y confirma asistencia, con aviso al médico y recepción. Solo se ofrecen bloques publicados, sin descansos ni cruces de médico o paciente. Si faltan dos horas o menos para la cita actual, el servidor bloquea la reprogramación, incluidas solicitudes antiguas y ediciones del personal; confirmar y cancelar siguen disponibles. La agenda semanal se administra desde Médicos → Configurar horario.
+La migración 026 añade horarios libres para seleccionar desde el portal y Telegram. Elegir un turno reprograma la misma cita y confirma asistencia, con aviso al médico y recepción. Solo se ofrecen bloques publicados, sin descansos ni cruces de médico o paciente. Si faltan dos horas o menos para la cita actual, el servidor bloquea la reprogramación, incluidas solicitudes antiguas y ediciones del personal; confirmar y cancelar siguen disponibles. La agenda semanal se administra desde Usuarios → tarjeta del médico → Horario y descansos.
 
 ## Recuperación de contraseña
 
@@ -109,7 +109,7 @@ Los reportes PDF de citas, pacientes, expedientes e internación comparten encab
 
 ## Enfermería y continuidad de cuidados (028)
 
-El rol de enfermería usa Mi turno, pacientes asignados, notas y signos con historial y gráficas, administración de dosis programadas, seguimiento de muestras y entrega de turno con recepción confirmada. Administración asigna al paciente y el horario desde el nuevo módulo Enfermería; el médico programa indicaciones, responde incidencias y autoriza altas o traslados. Los permisos se aplican en la base y en las API. No se crean asignaciones ni mediciones ficticias. Consulta el [flujo completo y sus permisos](lib/enfermeria/README.md).
+El menú de enfermería contiene únicamente Resumen, Pacientes, Citas, Internación, Órdenes médicas y Laboratorio. El resumen sigue la distribución de Gabriel con datos del turno y ocupación real. Pacientes integra notas, signos, gráficas y entrega de turno; Órdenes médicas incluye la administración de dosis prescritas. La comunicación con médico y recepción se abre dentro de estas vistas. Administración asigna al paciente y el horario desde el nuevo módulo Enfermería; el médico programa indicaciones, responde incidencias y autoriza altas o traslados. Los permisos se aplican en la base y en las API. No se crean asignaciones ni mediciones ficticias. Consulta el [flujo completo y sus permisos](lib/enfermeria/README.md).
 
 
 ## Recepción y sala de espera
@@ -220,3 +220,17 @@ El login ofrece **Registrarse** y abre `/registrarse`. El formulario tiene dos p
 La API usa `auth.signUp` con la clave pública y una lista explícita de campos; no acepta elegir rol, médico, identificadores ni permiso de laboratorio. Auth asigna únicamente `paciente` y la migración 043 crea su ficha en la misma transacción. Los registros con datos incompletos no dejan cuentas parciales. Las fichas de pacientes ya registradas por recepción no se vinculan por coincidencia de correo: se conserva su flujo de invitación. La cuenta nueva no obtiene médicos asignados ni acceso a fichas ajenas; puede consultar su portal y solicitar una cita tras confirmar su correo.
 
 Supabase Auth actualmente exige confirmar el correo antes de entrar. Para testers externos, configura su servicio SMTP y permite el callback de la URL real de la aplicación en **Auth → URL Configuration**. Los correos de confirmación de Auth son independientes de los recordatorios enviados por el trabajador mediante Resend. Si Auth limita el envío o no permite el destinatario, el formulario conserva los datos y muestra el problema sin simular un registro correcto. No se desactiva la confirmación de correo ni se concede un rol de personal desde el registro público.
+
+## Comunicación del equipo y eliminaciones confirmadas (045–046)
+
+Los mensajes internos conectan enfermería, médicos, recepción y administración. Recepción recibe comunicaciones operativas; el contexto clínico requiere acceso vigente al paciente por ambos participantes. La campana permite abrir la conversación y responder. No se envía el cuerpo clínico a avisos externos.
+
+Administración inicia en Citas y ya no muestra Resumen. La eliminación de registros exige revisión de dependencias, motivo, confirmación y versión vigente. Los registros con historial dependiente se conservan; un ingreso activo requiere su alta clínica. Retirar un PDF lo quita del expediente y del portal, conserva una copia privada y registra la acción en auditoría. No elimina otros registros automáticamente.
+
+Consulta [las vistas y verificaciones](docs/enfermeria-y-eliminaciones-2026-11-17.md).
+
+## Ingreso urgente desde enfermería (047)
+
+El botón **Registrar ingreso urgente** abre un formulario de admisión con selección directa de paciente registrado, médico responsable de la clínica, cama libre, motivo y observaciones de enfermería. Exige confirmación y verifica la disponibilidad al guardar. Registra hospitalización, cama ocupada y episodio con autor en una transacción; los reintentos con la misma clave no duplican el ingreso. Notifica al médico y a recepción. El selector devuelve únicamente nombre y folio, sin abrir expedientes ajenos. El turno de cuidados sigue siendo asignado por administración; no se otorga acceso permanente al historial por registrar la admisión. Los botones de contacto conservan la comunicación del equipo.
+
+La versión 048 muestra al abrir la lista de pacientes activos sin hospitalización vigente, sin exigir nombre ni folio. Internación muestra camas disponibles, ocupadas y fuera de servicio con filtros y detalle de paciente, médico y fecha de ingreso. Se puede abrir una admisión con la cama libre preseleccionada. Este censo es operativo y se limita a la clínica del enfermero; los cuidados y el historial clínico continúan restringidos a los turnos asignados.

@@ -1,80 +1,11 @@
-'use client'
-
-import { ClipboardList } from 'lucide-react'
-import type { ClinicActions } from '@/components/modulos/compartidos/types'
+import { ClipboardList, HeartPulse, MessageSquare } from 'lucide-react'
+import type { PanelEnfermeriaDatos } from '@/lib/enfermeria/modelo'
+import type { NuevoMensajeEquipo } from '@/components/modulos/equipo/panel-equipo'
+import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from '@/components/modulos/compartidos/editor-clinico'
 import { EstadisticasEnfermero } from './estadisticas/estadisticas-enfermero'
 import { AccionesRapidasEnfermero } from './acciones-rapidas/acciones-rapidas-enfermero'
 import { PanelCamasEnfermero } from './monitoreo-camas/panel-camas-enfermero'
-
-type PropsDashboardEnfermero = ClinicActions & {
-  nombreUsuario: string
-}
-
-export function DashboardEnfermero({
-  nombreUsuario,
-  openModal,
-  navigate,
-}: PropsDashboardEnfermero) {
-  const hoyFormateado = new Date().toLocaleDateString('es-MX', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-
-  return (
-    <div className="space-y-7">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <span className="inline-block rounded-full bg-teal-100 px-3 py-1 text-[11px] font-semibold text-teal-800">
-            Enfermero
-          </span>
-          <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Hola, {nombreUsuario}
-          </h2>
-          <p className="mt-1 text-xs text-slate-500 capitalize">{hoyFormateado}</p>
-        </div>
-        <AccionesRapidasEnfermero openModal={openModal} navigate={navigate} />
-      </div>
-
-      <EstadisticasEnfermero />
-
-      <div className="grid gap-7 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <PanelCamasEnfermero onVerCamas={() => navigate('Internación')} />
-        </div>
-
-        <div className="space-y-6">
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ClipboardList size={18} className="text-teal-600" />
-                <h3 className="text-sm font-bold text-slate-900">Indicaciones y Órdenes</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('Órdenes médicas')}
-                className="text-xs font-semibold text-teal-600 hover:text-teal-700"
-              >
-                Ver todas →
-              </button>
-            </div>
-            <div className="mt-4 rounded-xl bg-slate-50 p-4 border border-slate-100">
-              <p className="text-xs font-medium text-slate-700">Administración de tratamientos</p>
-              <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
-                Revisa las órdenes prescritas por los médicos para suministrar medicamentos y actualizar su estado a realizado.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('Órdenes médicas')}
-                className="mt-3 w-full rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 transition-colors"
-              >
-                Revisar órdenes médicas
-              </button>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  )
+export function DashboardEnfermero({nombreUsuario,datos,onNavegar,onMensaje,onSignos,onIngreso}:{nombreUsuario:string;datos:PanelEnfermeriaDatos;onNavegar:(seccion:string)=>void;onMensaje:(inicial:NuevoMensajeEquipo)=>void;onSignos:()=>void;onIngreso:()=>void}) {
+ const pendientes=datos.tareas.filter(t=>t.estado==='pendiente').slice(0,3)
+ return <div className="space-y-6"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-teal-700">Enfermería · Mi turno</p><h2 className="mt-2 text-3xl font-semibold">Hola, {nombreUsuario}</h2><p className="mt-2 text-sm text-slate-500">{new Date(datos.servidorAhora).toLocaleDateString('es-MX',{timeZone:'America/Mexico_City',weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div><AccionesRapidasEnfermero onNavegar={onNavegar} onIngreso={onIngreso}/></header><EstadisticasEnfermero datos={datos}/><div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"><PanelCamasEnfermero datos={datos} onVerCamas={()=>onNavegar('Internación')}/><section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="flex items-center gap-2 font-semibold"><ClipboardList size={19} className="text-teal-700"/>Indicaciones y cuidados</h3>{!pendientes.length?<p className="my-5 text-sm text-slate-500">No tienes indicaciones pendientes en tus asignaciones actuales.</p>:<ul className="my-4 space-y-3">{pendientes.map(t=><li key={t.id} className="rounded-xl bg-slate-50 p-3 text-sm"><p className="font-medium">{t.titulo}</p><p className="mt-1 text-xs text-slate-500">{t.tipo==='medicamento'?'Dosis prescrita':'Control o cuidado'} · {new Date(t.programada).toLocaleTimeString('es-MX',{timeZone:'America/Mexico_City',hour:'2-digit',minute:'2-digit'})}</p></li>)}</ul>}<div className="mt-4 flex flex-wrap gap-2"><button type="button" className={BOTON_SECUNDARIO} onClick={()=>onNavegar('Órdenes médicas')}>Revisar indicaciones</button><button type="button" disabled={!datos.pacientes.length} className={BOTON_PRIMARIO} onClick={onSignos}><HeartPulse size={16}/>Tomar signos</button></div><div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><button type="button" className={BOTON_SECUNDARIO} onClick={()=>onMensaje({rolDestino:'recepcionista',asunto:'Coordinación del turno'})}><MessageSquare size={15}/>Contactar recepción</button><button type="button" className={BOTON_SECUNDARIO} onClick={()=>onMensaje({rolDestino:'medico',asunto:'Coordinación de atención'})}><MessageSquare size={15}/>Contactar médico</button><button type="button" className={BOTON_SECUNDARIO} onClick={()=>onNavegar('Equipo')}>Ver comunicaciones</button></div></section></div>{!datos.pacientes.length&&<section className="rounded-2xl border border-teal-200 bg-teal-50 p-5"><h3 className="font-semibold text-teal-900">No tienes pacientes asignados a un turno activo.</h3><p className="mt-2 text-sm leading-relaxed text-teal-800">Puedes consultar la disponibilidad de camas y coordinar ingresos con recepción. Administración asigna los pacientes y el horario de atención para habilitar sus datos clínicos.</p><button type="button" className={BOTON_SECUNDARIO+' mt-4'} onClick={()=>onMensaje({rolDestino:'admin',asunto:'Solicitud de asignación de turno',contenido:'Solicito revisar mis asignaciones de pacientes para el turno actual.'})}><MessageSquare size={16}/>Solicitar asignación</button></section>}</div>
 }

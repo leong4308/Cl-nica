@@ -1,3 +1,5 @@
+import { cuentaAutenticada, origenValido } from '@/lib/cuenta/servidor'
+import { retirarPdfConCopia } from '@/lib/documentos-retirada'
 import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
@@ -36,7 +38,7 @@ async function autorizar(contexto: Contexto, escritura = false) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return { respuesta: fallo('El almacenamiento de documentos no está configurado.', 500) } as const
   const admin = createAdminClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-  return { db, tipo, id, prefijo: `${tipo}/${id}`, storage: admin.storage } as const
+  return { db, tipo, id, rol: perfil.rol, prefijo: `${tipo}/${id}`, storage: admin.storage } as const
 }
 
 export async function GET(request: Request, contexto: Contexto) {
@@ -58,7 +60,7 @@ export async function GET(request: Request, contexto: Contexto) {
     }
     const { data, error } = await storage.from(BUCKET_DOCUMENTOS_CLINICOS).list(prefijo, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } })
     if (error) return fallo('No se pudieron consultar los documentos adjuntos.', 500)
-    return NextResponse.json({ archivos: (data ?? []).filter((f) => /\.pdf$/i.test(f.name)).map((f) => ({ nombre: nombrePdf(f.name), href: `/api/documentos-clinicos/${tipo}/${id}?archivo=${encodeURIComponent(f.name)}` })) }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ puedeEliminar: acceso.rol === 'admin', archivos: (data ?? []).filter((f) => /\.pdf$/i.test(f.name)).map((f) => ({ archivo: f.name, nombre: nombrePdf(f.name), href: `/api/documentos-clinicos/${tipo}/${id}?archivo=${encodeURIComponent(f.name)}` })) }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return fallo('No se pudo conectar con el almacenamiento de documentos.', 500) }
 }
 
@@ -81,4 +83,20 @@ export async function POST(request: Request, contexto: Contexto) {
     if (auditoria.error) { await acceso.storage.from(BUCKET_DOCUMENTOS_CLINICOS).remove([ruta]); return errorOperacion(auditoria.error) }
     return NextResponse.json({ ok: true })
   } catch { return fallo('No se pudo conectar para adjuntar el PDF.', 500) }
+}
+
+export async function DELETE(request: Request, contexto: Contexto) {
+ try {
+  if (!origenValido(request)) return fallo('Origen inválido.',403)
+  const sesion=await cuentaAutenticada();if(sesion.respuesta)return sesion.respuesta
+  if(sesion.usuario.rol!=='admin')return fallo('Solo administración puede eliminar documentos.',403)
+  const texto=await request.text();if(texto.length>3000)return fallo('La solicitud es demasiado extensa.',413)
+  let b;try{b=JSON.parse(texto)}catch{return fallo('Revisa los datos del documento.',400)}
+  if(!b||b.confirmado!==true||typeof b.archivo!=='string'||!/^[a-zA-Z0-9._-]+\.pdf$/i.test(b.archivo)||b.archivo.includes('..')||typeof b.motivo!=='string'||b.motivo.trim().length<10||b.motivo.length>1000)return fallo('Confirma el PDF e indica un motivo de 10 a 1000 caracteres.',400)
+  const a=await autorizar(contexto,true);if('respuesta' in a)return a.respuesta
+  const listado=await a.storage.from(BUCKET_DOCUMENTOS_CLINICOS).list(a.prefijo,{search:b.archivo,limit:100})
+  if(listado.error||!listado.data?.some(f=>f.name===b.archivo))return fallo('El PDF ya no existe en este registro. Actualiza los documentos.',409)
+  const r=await retirarPdfConCopia(a.storage,BUCKET_DOCUMENTOS_CLINICOS,`${a.prefijo}/${b.archivo}`,()=>a.db.rpc('clinica_admin_retirar_documento',{p_tipo:a.tipo,p_id:a.id,p_archivo:b.archivo,p_motivo:b.motivo.trim()}))
+  return r.ok?NextResponse.json({ok:true}):fallo(r.mensaje,r.status)
+ }catch{return fallo('No se pudo retirar el documento. Comprueba su estado antes de reintentar.',500)}
 }

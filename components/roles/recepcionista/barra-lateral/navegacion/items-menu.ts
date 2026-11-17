@@ -1,4 +1,4 @@
-import { Building2, ListOrdered, Mail, CalendarDays, LayoutDashboard, UsersRound, Armchair, Inbox } from 'lucide-react'
+import { MessageSquare, Building2, ListOrdered, Mail, CalendarDays, LayoutDashboard, UsersRound, Armchair, Inbox } from 'lucide-react'
 
 export const navItemsRecepcion = [
   ['Resumen', LayoutDashboard],
@@ -6,6 +6,7 @@ export const navItemsRecepcion = [
   ['Sala de espera', Armchair],
   ['Pacientes', UsersRound],
   ['Solicitudes', Inbox],
+  ['Equipo', MessageSquare],
   ['Lista de espera', ListOrdered],
   ['Consultorios', Building2],
   ['Comunicaciones', Mail],

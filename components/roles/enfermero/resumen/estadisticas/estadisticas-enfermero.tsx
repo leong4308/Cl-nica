@@ -1,67 +1,12 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Bed, ClipboardList, FlaskConical, Users } from 'lucide-react'
-import { Stat } from '@/components/modulos/compartidos/ui'
-import { cargarResumenCamas, cargarResumenEstadisticas } from '@/lib/supabase/datos'
-import { leerCamas, leerEstadisticas } from '@/lib/supabase/cache-modulos'
-
-export function EstadisticasEnfermero() {
-  const [estadisticas, setEstadisticas] = useState(() => leerEstadisticas())
-  const [camas, setCamas] = useState(() => leerCamas() ?? { ocupadas: 0, total: 0, libres: 0 })
-
-  useEffect(() => {
-    let vigente = true
-    const cargar = () => {
-      void Promise.all([cargarResumenEstadisticas(), cargarResumenCamas()]).then(
-        ([resStats, resCamas]) => {
-          if (!vigente) return
-          if (!resStats.error) setEstadisticas(resStats.filas)
-          if (!resCamas.error) setCamas(resCamas.filas)
-        },
-      )
-    }
-    cargar()
-    window.addEventListener('datos-actualizados', cargar)
-    return () => {
-      vigente = false
-      window.removeEventListener('datos-actualizados', cargar)
-    }
-  }, [])
-
-  const ordenes = estadisticas?.['Órdenes pendientes']?.value ?? '0'
-  const camasTexto = camas.total > 0 ? `${camas.ocupadas} / ${camas.total}` : '0'
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Stat
-        icon={Bed}
-        label="Camas ocupadas"
-        value={camasTexto}
-        meta={`${camas.libres} camas libres`}
-        tone="blue"
-      />
-      <Stat
-        icon={Users}
-        label="Pacientes internados"
-        value={String(camas.ocupadas)}
-        meta="En hospitalización"
-        tone="green"
-      />
-      <Stat
-        icon={ClipboardList}
-        label="Órdenes pendientes"
-        value={ordenes}
-        meta="Tratamientos y medicamentos"
-        tone="orange"
-      />
-      <Stat
-        icon={FlaskConical}
-        label="Laboratorio clínico"
-        value="Activo"
-        meta="Toma de muestras"
-        tone="blue"
-      />
-    </div>
-  )
+import type { PanelEnfermeriaDatos } from '@/lib/enfermeria/modelo'
+export function EstadisticasEnfermero({datos}:{datos:PanelEnfermeriaDatos}) {
+ const camas=datos.resumenCamas
+ const valores=[
+  {icon:Bed,titulo:'Camas ocupadas',numero:camas?`${camas.ocupadas} / ${camas.total}`:'—',ayuda:camas?`${camas.libres} camas disponibles en tu clínica`:'No se pudo consultar la ocupación'},
+  {icon:Users,titulo:'Pacientes asignados',numero:String(datos.pacientes.length),ayuda:`${datos.ingresos.length} en hospitalización durante tu turno`},
+  {icon:ClipboardList,titulo:'Indicaciones pendientes',numero:String(datos.tareas.filter(t=>t.estado==='pendiente').length),ayuda:'Dosis, controles y cuidados de tus pacientes'},
+  {icon:FlaskConical,titulo:'Muestras pendientes',numero:String(datos.muestras.filter(m=>m.estado_analisis!=='completado'&&!m.fecha_entrega_muestra).length),ayuda:'Toma y entrega de muestras asignadas'}
+ ]
+ return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{valores.map(v=><article key={v.titulo} className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between gap-3"><h3 className="text-sm text-slate-600">{v.titulo}</h3><v.icon size={20} className="text-teal-600" /></div><p className="mt-4 text-3xl font-semibold">{v.numero}</p><p className="mt-2 text-xs text-slate-500">{v.ayuda}</p></article>)}</div>
 }

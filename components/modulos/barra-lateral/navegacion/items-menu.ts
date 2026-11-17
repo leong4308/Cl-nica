@@ -1,4 +1,4 @@
-import { Building2, Inbox, ListOrdered, ChartNoAxesCombined, Bed, CalendarDays, ClipboardList, FileText, FlaskConical, LayoutDashboard, Settings, Stethoscope, UserRound, UsersRound } from 'lucide-react'
+import { MessageSquare, Building2, Inbox, ListOrdered, ChartNoAxesCombined, Bed, CalendarDays, ClipboardList, FileText, FlaskConical, LayoutDashboard, Settings, Stethoscope, UserRound, UsersRound } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 
@@ -23,7 +23,7 @@ export const navItems: NavItem[] = [
   {
     label: 'Resumen',
     icon: LayoutDashboard,
-    roles: ['admin', 'recepcionista', 'enfermero'],
+    roles: ['recepcionista', 'enfermero'],
   },
   {
     label: 'Mi Consulta',
@@ -65,6 +65,7 @@ export const navItems: NavItem[] = [
     icon: FlaskConical,
     roles: ['admin', 'medico', 'enfermero'],
   },
+  { label: 'Equipo', icon: MessageSquare, roles: ['admin', 'medico'] },
   { label: 'Comunicaciones', icon: Inbox, roles: ['admin', 'recepcionista'] },
   { label: 'Lista de espera', icon: ListOrdered, roles: ['admin', 'recepcionista'] },
   { label: 'Consultorios', icon: Building2, roles: ['admin', 'recepcionista'] },
@@ -77,7 +78,7 @@ export function obtenerNavItemsPorRol(rol: RolUsuario): NavItem[] {
 }
 
 export function obtenerItemDefaultPorRol(rol: RolUsuario): string {
-  if (rol === 'medico') return 'Citas'
+  if (rol === 'medico' || rol === 'admin') return 'Citas'
   return 'Resumen'
 }
 

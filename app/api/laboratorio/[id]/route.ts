@@ -1,9 +1,11 @@
+import { cuentaAutenticada, origenValido } from '@/lib/cuenta/servidor'
+import { retirarPdfConCopia } from '@/lib/documentos-retirada'
 import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { BUCKET_LABORATORIO, MAX_PDF_BYTES, validarPdf } from '@/lib/laboratorio/archivo-pdf'
+import { BUCKET_LABORATORIO, MAX_PDF_BYTES, validarPdf, nombrePdf } from '@/lib/laboratorio/archivo-pdf'
 
 type Contexto = { params: Promise<{ id: string }> }
 const fallo = (error: string, status: number) => NextResponse.json({ error }, { status })
@@ -38,6 +40,7 @@ export async function GET(_request: Request, { params }: Contexto) {
   try {
     const acceso = await autorizar((await params).id)
     if ('respuesta' in acceso) return acceso.respuesta
+    if (new URL(_request.url).searchParams.get('metadatos') === '1') { const archivo = acceso.solicitud.archivo_resultado?.split('/').pop() || ''; return NextResponse.json({ puedeEliminar: acceso.rol === 'admin', archivo, nombre: nombrePdf(archivo), version: acceso.solicitud.fecha_resultado ?? '' }, { headers: { 'Cache-Control': 'private, no-store' } }) }
     const ruta = acceso.solicitud.archivo_resultado
     if (!ruta || !ruta.startsWith(`${acceso.id}/`) || ruta.includes('..')) return fallo('Esta solicitud no tiene un PDF disponible.', 404)
     const admin = clienteArchivos()
@@ -121,4 +124,20 @@ export async function POST(request: Request, { params }: Contexto) {
     if (rutaNueva && admin) await admin.storage.from(BUCKET_LABORATORIO).remove([rutaNueva]).catch(() => {})
     return fallo(error instanceof Error ? error.message : 'No se pudo guardar el resultado.', 500)
   }
+}
+
+export async function DELETE(request: Request, {params}: Contexto) {
+ try {
+  if(!origenValido(request))return fallo('Origen inválido.',403)
+  const sesion=await cuentaAutenticada();if(sesion.respuesta)return sesion.respuesta
+  if(sesion.usuario.rol!=='admin')return fallo('Solo administración puede eliminar documentos.',403)
+  const texto=await request.text();if(texto.length>3000)return fallo('La solicitud es demasiado extensa.',413)
+  let b;try{b=JSON.parse(texto)}catch{return fallo('Revisa los datos del PDF.',400)}
+  if(!b||b.confirmado!==true||typeof b.archivo!=='string'||!/^[a-zA-Z0-9._-]+\.pdf$/i.test(b.archivo)||b.archivo.includes('..')||typeof b.version!=='string'||typeof b.motivo!=='string'||b.motivo.trim().length<10||b.motivo.length>1000)return fallo('Confirma el PDF e indica un motivo de 10 a 1000 caracteres.',400)
+  const a=await autorizar((await params).id);if('respuesta' in a)return a.respuesta
+  const ruta=a.solicitud.archivo_resultado
+  if(!ruta||ruta!==`${a.id}/${b.archivo}`||b.version!==(a.solicitud.fecha_resultado??''))return fallo('El PDF o su resultado cambió. Actualiza antes de eliminar.',409)
+  const admin=clienteArchivos(),r=await retirarPdfConCopia(admin.storage,BUCKET_LABORATORIO,ruta,()=>a.db.rpc('clinica_admin_retirar_documento',{p_tipo:'laboratorio',p_id:a.id,p_archivo:b.archivo,p_motivo:b.motivo.trim(),p_version:b.version}))
+  return r.ok?NextResponse.json({ok:true}):fallo(r.mensaje,r.status)
+ }catch{return fallo('No se pudo retirar el PDF. Comprueba su estado antes de reintentar.',500)}
 }

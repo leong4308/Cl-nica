@@ -24,7 +24,7 @@ before(async()=>{
 })
 
 test('la base real tiene instalada la versión compatible con las validaciones',async()=>{
- assert.equal(comprobar(await db.rpc('clinica_version'),'versión'),44)
+ assert.equal(comprobar(await db.rpc('clinica_version'),'versión'),48)
  assert.equal(comprobar(await db.rpc('clinica_registro_habilitado'),'registro público'),true)
 })
 

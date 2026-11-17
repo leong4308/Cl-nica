@@ -3,7 +3,7 @@ import { ConfirmacionClinica, type ConfirmacionClinicaDatos } from '../compartid
 import { EstadoLlegada } from '@/components/modulos/citas/estado-llegada'
 
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileText, Plus, RefreshCw, Settings2, Stethoscope, UserRound } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileText, Plus, RefreshCw, Stethoscope, UserRound } from 'lucide-react'
 import type { ClinicActions } from '../compartidos/types'
 import type { PerfilSesion } from '@/lib/supabase/sesion'
 import type { MedicoPerfil, CitaAgendaMedico, MedicamentoPrescrito } from './types'
@@ -18,7 +18,6 @@ import { ConsultaSoap } from './consulta-soap'
 import { PrescripcionReceta } from './prescripcion-receta'
 import { DisponibilidadMedico } from './disponibilidad-medico'
 import { ModalNuevaCita } from '../resumen/acciones-rapidas/nueva-cita/modal-nueva-cita'
-import { ConfigurarHorario } from './configurar-horario'
 import { DirectorioMedicos } from './directorio-medicos'
 
 const vacio: NotaConsulta = { subjetivo: '', objetivo: '', diagnosticos: [], plan: '' }
@@ -39,7 +38,6 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
   const [vista, setVista] = useState<'agenda' | 'directorio'>('agenda')
   const [tab, setTab] = useState<'paciente' | 'historial' | 'consulta'>('paciente')
   const [agendar, setAgendar] = useState(false)
-  const [configurar, setConfigurar] = useState(false)
   const [soap, setSoap] = useState(vacio)
   const [prescripciones, setPrescripciones] = useState<MedicamentoPrescrito[]>([])
   const [cambios, setCambios] = useState(false)
@@ -152,7 +150,6 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
       <div><p className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-600"><Stethoscope size={16} />Atención y seguimiento</p><h2 className="text-2xl font-semibold tracking-tight text-slate-900">{puedeRegistrarConsulta ? 'Mi Consulta' : 'Agenda médica'}</h2><p className="mt-2 text-sm text-slate-500">{puedeRegistrarConsulta ? 'Consulta la agenda y registra la atención del paciente.' : 'Organiza citas, revisa intervalos y consulta la disponibilidad.'}</p></div>
       <div className="flex flex-wrap gap-2">
         {!esMedico && <button type="button" disabled={guardando} className={BOTON_SECUNDARIO} onClick={() => setVista(vista === 'agenda' ? 'directorio' : 'agenda')}>{vista === 'agenda' ? 'Directorio' : 'Ver agenda'}</button>}
-        {esAdmin && <button type="button" className={BOTON_SECUNDARIO} disabled={!medico || !resumen || cargando || guardando} onClick={() => setConfigurar(true)}><Settings2 size={15} />Configurar horario</button>}
         {puedeAgendar && <button type="button" className={BOTON_PRIMARIO} disabled={!medico || guardando} onClick={() => setAgendar(true)}><Plus size={16} />Agendar cita</button>}
       </div>
     </header>
@@ -198,6 +195,5 @@ export function MedicosWorkstation({ notify, openModal, usuario, modoConsulta = 
       </div>
     </>}
     {agendar && <ModalNuevaCita medicoIdInicial={medicoId} onClose={() => setAgendar(false)} onSave={notify} />}
-    {configurar && medico && resumen && <ConfigurarHorario medicoId={medicoId} nombre={medico.nombre} iniciales={resumen.bloques} descansosIniciales={resumen.descansos} onClose={() => setConfigurar(false)} onSave={() => { notify('Horario configurado correctamente'); window.dispatchEvent(new Event('datos-actualizados')) }} />}
   </section>
 }
