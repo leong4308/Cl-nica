@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { horaClinica } from '@/lib/agenda/modelo'
 import { BOTON_PRIMARIO } from '@/components/modulos/compartidos/editor-clinico'
-type Estado = { id: number; estado: string; puedeIniciar: boolean; version: string; llegada: string | null; enConsulta: string | null }
-export function EstadoLlegada({ citaId }: { citaId: number }) {
-  const [estado, setEstado] = useState<Estado | null>(null)
+export type EstadoLlegadaDatos = { id: number; estado: string; puedeIniciar: boolean; version: string; llegada: string | null; enConsulta: string | null }
+export function EstadoLlegada({ citaId, onEstado }: { citaId: number; onEstado?: (estado: EstadoLlegadaDatos | null) => void }) {
+  const [estado, setEstado] = useState<EstadoLlegadaDatos | null>(null)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const clave = useRef<string | null>(null)
@@ -24,6 +24,7 @@ export function EstadoLlegada({ citaId }: { citaId: number }) {
     window.addEventListener('datos-actualizados', refrescar)
     return () => { controller.abort(); clearInterval(intervalo); window.removeEventListener('datos-actualizados', refrescar) }
   }, [cargar])
+  useEffect(() => { onEstado?.(estado) }, [estado, onEstado])
   async function iniciar() {
     if (!estado || guardando) return
     setGuardando(true); setError('')

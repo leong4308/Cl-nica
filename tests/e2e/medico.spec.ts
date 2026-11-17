@@ -9,6 +9,7 @@ async function preparar(page:Page,cerrada=false){
  const contenido={subjetivo:'Evolución registrada',objetivo:'Exploración documentada',diagnostico:'Problema clínico registrado',plan:'Plan registrado',pronostico:'',seguimiento:'Control según evolución',recetaLibre:'',medicamentos:[]}
  const ctx={editorId:user.id,cita:{id:35,pacienteId:1,paciente:'Paciente de prueba',medico:'Médico de prueba',cedula:'CED-1',inicio:'2026-11-12T18:00:00Z',estado:cerrada?'atendida':'confirmada',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:{id:1,contenido,estado_nota:cerrada?'cerrada':'borrador',diagnostico:contenido.diagnostico,receta:null,notas_doctor:null,cerrada_en:cerrada?'2026-11-12T18:00:00Z':null},correcciones:[] as object[],ordenes:[] as object[],catalogo:[{id:1,nombre:'Estudio de prueba'}]}
  const panel={dia:'2026-11-12',ahora:'2026-11-12T18:00:00Z',citas:[{id:35,pacienteId:1,paciente:'Paciente de prueba',inicio:'2026-11-12T18:00:00Z',fin:'2026-11-12T18:20:00Z',estado:ctx.cita.estado,motivo:'Seguimiento',llegada:'2026-11-12T17:50:00Z',enConsulta:'2026-11-12T17:55:00Z'}],abiertas:[],resultados:[{id:70,paciente:'Paciente de prueba',estudio:'Resultado de prueba',resultado:'Informe disponible',fecha:'2026-11-12T17:00:00Z',version:'b'.repeat(32),conPdf:false}],incidencias:[],puedeValidarLaboratorio:false}
+ await page.route('**/api/recepcion**',r=>r.fulfill({json:{id:35,estado:ctx.cita.estado,puedeIniciar:true,version:'a'.repeat(32),llegada:panel.citas[0].llegada,enConsulta:panel.citas[0].enConsulta}}))
  const escrituras:any[]=[];let fallo=false,versionNota=1
  await page.route('**/api/documentos-clinicos/**',r=>r.fulfill({json:{archivos:[]}}))
  await page.route('**/api/medico**',r=>{
@@ -243,4 +244,27 @@ test('Finalizar pide confirmación flotante, permite cancelar y no cierra si fal
  await confirmacion.getByRole('button',{name:'Confirmar cierre de consulta',exact:true}).click()
  await expect(modal.getByRole('status')).toHaveText('Consulta finalizada correctamente.')
  expect(escrituras[0].clave).toBe(escrituras[1].clave)
+})
+
+
+test('finalizar sin iniciar atención muestra un aviso a la derecha y no envía el cierre',async({page})=>{
+ const {panel,escrituras}=await preparar(page)
+ panel.citas[0].enConsulta=null as any
+ await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
+ const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+ await expect(modal.getByRole('button',{name:'Iniciar atención',exact:true})).toBeVisible()
+ await modal.getByRole('button',{name:'Finalizar consulta',exact:true}).click()
+ const aviso=modal.getByRole('alert')
+ await expect(aviso).toContainText('Primero pulsa Iniciar atención')
+ await expect(aviso).toBeInViewport()
+ const rect=await aviso.boundingBox();expect(rect!.x).toBeGreaterThan(600)
+ await expect(modal.getByRole('button',{name:'Recargar nota del servidor'})).toHaveCount(0)
+ await expect(page.getByRole('alertdialog')).toHaveCount(0)
+ expect(escrituras.filter(e=>e.datos?.cerrar)).toHaveLength(0)
+ panel.citas[0].enConsulta='2026-11-12T18:00:00Z'
+ await page.evaluate(()=>window.dispatchEvent(new Event('datos-actualizados')))
+ await expect(modal.getByText(/Consulta iniciada a las/)).toBeVisible()
+ await expect(aviso).toHaveCount(0)
+ await modal.getByRole('button',{name:'Finalizar consulta',exact:true}).click()
+ await expect(page.getByRole('alertdialog',{name:'Finalizar consulta'})).toBeVisible()
 })

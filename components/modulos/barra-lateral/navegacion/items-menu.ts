@@ -5,7 +5,7 @@ import type { RolUsuario } from '@/lib/supabase/tipos-rol'
 /**
  * Permisos por rol:
  * - admin: Ve todo (dashboard global, todos los módulos, gestión de usuarios)
- * - recepcionista: Resumen, Citas, Pacientes, Médicos (solo directorio)
+ * - recepcionista: Resumen, Citas (incluye médicos y horarios), Pacientes
  * - medico: Citas, Pacientes y Expedientes; Mi Consulta queda en administración
  * - enfermero: Resumen, Citas, Pacientes, Internación, Órdenes médicas
  * - paciente: Solo su perfil (no aplica menú lateral)
@@ -43,7 +43,7 @@ export const navItems: NavItem[] = [
   {
     label: 'Médicos',
     icon: Stethoscope,
-    roles: ['admin', 'recepcionista'],
+    roles: ['admin'],
   },
   {
     label: 'Expedientes',

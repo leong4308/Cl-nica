@@ -6,7 +6,7 @@ import { ConfirmacionClinica, type ConfirmacionClinicaDatos } from '@/components
 import { NotificacionFlotante } from '@/components/modulos/compartidos/notificacion-flotante'
 import { ModalMarco } from '@/components/modulos/compartidos/modal-marco'
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CAMPO_CLINICO, ETIQUETA_CLINICA } from '@/components/modulos/compartidos/editor-clinico'
-import { EstadoLlegada } from '@/components/modulos/citas/estado-llegada'
+import { EstadoLlegada, type EstadoLlegadaDatos } from '@/components/modulos/citas/estado-llegada'
 import { DocumentosClinicos } from '@/components/modulos/compartidos/documentos-clinicos'
 import { contenidoInicial, CONTENIDO_VACIO, imprimirReceta, operarMedico, type ConsultaMedica, type ContenidoConsulta } from '@/lib/medico/modelo'
 import { claveBorradorConsulta, firmaContenidoConsulta, leerBorradorConsulta, medicamentosCompletos, protegerBorradorConsulta, retirarBorradorConsulta, type BorradorConsulta } from '@/lib/medico/borrador'
@@ -19,6 +19,8 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
   const [error, setError] = useState(''), [mensaje, setMensaje] = useState(''), [guardando, setGuardando] = useState(false), [cambios, setCambios] = useState(false)
   const [tab, setTab] = useState<string>(tabInicial), [motivo, setMotivo] = useState(''), [correccion, setCorreccion] = useState('')
   const [orden, setOrden] = useState({ tipo: 'analisis', descripcion: '', instrucciones: '', analisisId: '' })
+  const [llegada, setLlegada] = useState<EstadoLlegadaDatos | null>(null)
+  const [conflicto, setConflicto] = useState(false)
   const [notificacionId, setNotificacionId] = useState(0)
   function notificar(texto: string) { setMensaje(texto); setNotificacionId(n => n + 1) }
   const [confirmacion, setConfirmacion] = useState<ConfirmacionClinicaDatos | null>(null)
@@ -75,6 +77,12 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     void leerServidor().then(b => { if (vigente) presentar(b, true) }).catch(e => { if (vigente) setError(e.message || 'No se pudo consultar la nota.') })
     return () => { vigente = false; montado.current = false }
   }, [citaId])
+  function confirmarFinalizacion() {
+    if (!llegada?.enConsulta) {
+      setConflicto(false); setMensaje(''); setError(!llegada ? 'Espera a que se compruebe el estado de llegada y vuelve a intentar.' : llegada.llegada ? 'Primero pulsa Iniciar atención. Después podrás finalizar la consulta.' : 'Recepción debe registrar la llegada del paciente y el médico iniciar la atención antes de finalizar.'); return
+    }
+    setError(''); setConfirmacion({ titulo: 'Finalizar consulta', mensaje: 'Se guardará la nota y la cita quedará atendida. Después del cierre no podrás modificar la nota original; podrás añadir aclaraciones. ¿Deseas finalizar la consulta?', confirmar: 'Confirmar cierre de consulta', tono: 'primario', accion: () => { void ejecutar('guardar', { cerrar: true }) } })
+  }
   function solicitudGuardar(cerrar: boolean) {
     const payload = { citaId, version: actual.current!.version, contenido: contenidoActual.current, cerrar }, firma = JSON.stringify({ accion: 'guardar', payload })
     if (pendiente.current?.firma !== firma) pendiente.current = { firma, clave: crypto.randomUUID() }
@@ -87,7 +95,7 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     if (!medicamentosCompletos(contenidoActual.current)) { setEstadoBorrador('Avance protegido en esta pestaña. Completa los datos de los medicamentos para guardarlo en la clínica.'); if (!automatico) setError('Completa nombre, dosis, vía, frecuencia y duración de cada medicamento antes de guardar.'); return false }
     const guardar = async () => {
       ocupado.current = true
-      if (automatico) setAutoguardando(true); else { setGuardando(true); setError(''); setMensaje('') }
+      if (automatico) setAutoguardando(true); else { setGuardando(true); setError(''); setMensaje(''); setConflicto(false) }
       const { payload, clave } = solicitudGuardar(cerrar), firma = firmaContenidoConsulta(payload.contenido)
       try {
         const r = await operarMedico('guardar', payload, clave), b = await leerServidor()
@@ -104,6 +112,7 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
         window.dispatchEvent(new Event('datos-actualizados')); return true
       } catch (e) {
         pausaAuto.current = true
+        setConflicto((e as { status?: number })?.status === 409)
         if (montado.current) { const texto = e instanceof Error ? e.message : 'No se pudo guardar.'; setError(texto); setEstadoBorrador(proteger() ? 'Tu avance está protegido en esta pestaña. Revisa el aviso y pulsa Guardar para reintentar.' : 'No se pudo proteger el avance. No cierres la ventana hasta guardarlo.') }
         return false
       } finally { ocupado.current = false; if (montado.current) { setGuardando(false); setAutoguardando(false) } }
@@ -143,20 +152,21 @@ export function ModalConsultaMedica({ citaId, onClose, onControl, tabInicial = '
     if (!actual.current || ocupado.current) return
     const payload = { citaId, version: actual.current.version, ...extra }, firma = JSON.stringify({ accion, payload })
     if (pendiente.current?.firma !== firma) pendiente.current = { firma, clave: crypto.randomUUID() }
-    ocupado.current = true; setGuardando(true); setError(''); setMensaje('')
+    ocupado.current = true; setGuardando(true); setError(''); setMensaje(''); setConflicto(false)
     try { const r = await operarMedico(accion, payload, pendiente.current.clave); notificar(r.mensaje); pendiente.current = null; await cargar(false); setMotivo(''); setCorreccion(''); if (accion === 'orden') setOrden({tipo:'analisis',descripcion:'',instrucciones:'',analisisId:''}); window.dispatchEvent(new Event('datos-actualizados')) }
     catch (e) { setError(e instanceof Error ? e.message : 'No se pudo guardar. Tu borrador se conserva.') }
     finally { ocupado.current = false; setGuardando(false) }
   }
   useEffect(()=>{if(tab!=='historial'||!consulta)return;let vigente=true;void cargarHistorialPaciente(consulta.cita.pacienteId).then(r=>{if(vigente){if(r.error)setError(r.error);else setHistorial(r.filas)}});return()=>{vigente=false}},[tab,consulta?.cita.pacienteId])
+  useEffect(() => { if (llegada?.enConsulta) setError(texto => /Primero pulsa Iniciar atención|Recepción debe registrar/.test(texto) ? '' : texto) }, [llegada?.enConsulta])
   const alertas = leerFichaClinica(consulta?.cita.alertas)
-  return <ModalMarco title="Atención médica" ancho="max-w-6xl" contenidoFijo onClose={salir} aviso={mensaje ? <NotificacionFlotante key={notificacionId} mensaje={mensaje} onCerrar={() => setMensaje('')} /> : undefined} footer={<div className="flex flex-wrap justify-between gap-3"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={salir}>Cerrar</button>{tab === 'nota' && editable && <div className="flex flex-wrap gap-2"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={() => void ejecutar('guardar', { contenido: datos, cerrar: false })}>Guardar</button><button disabled={guardando} className={BOTON_PRIMARIO} onClick={() => setConfirmacion({ titulo: 'Finalizar consulta', mensaje: 'Se guardará la nota y la cita quedará atendida. Después del cierre no podrás modificar la nota original; podrás añadir aclaraciones. ¿Deseas finalizar la consulta?', confirmar: 'Confirmar cierre de consulta', tono: 'primario', accion: () => { void ejecutar('guardar', { cerrar: true }) } })}>Finalizar consulta</button></div>}{cerrada && consulta?.puedeEditar && onControl && <button className={BOTON_PRIMARIO} onClick={() => onControl(consulta.cita.pacienteId, citaId)}>Programar control</button>}{cerrada && <button className={BOTON_SECUNDARIO} onClick={() => { try { imprimirReceta(consulta!) } catch (e) { setError((e as Error).message) } }}>Receta PDF</button>}</div>}>
+  return <ModalMarco title="Atención médica" ancho="max-w-6xl" contenidoFijo onClose={salir} aviso={error ? <NotificacionFlotante tono="error" mensaje={error} onCerrar={() => setError('')}>{conflicto && <button type="button" disabled={guardando} className="ml-3 font-semibold underline" onClick={() => { const recargar = () => { void cargar().then(() => setError('')).catch(e => setError(e.message)) }; if (!cambios) recargar(); else setConfirmacion({ titulo: 'Recargar nota del servidor', mensaje: 'Se reemplazará el avance de esta ventana por la nota guardada en la clínica. Los cambios pendientes se descartarán.', confirmar: 'Recargar nota', accion: recargar }) }}>Recargar nota del servidor</button>}</NotificacionFlotante> : mensaje ? <NotificacionFlotante key={notificacionId} mensaje={mensaje} onCerrar={() => setMensaje('')} /> : undefined} footer={<div className="flex flex-wrap justify-between gap-3"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={salir}>Cerrar</button>{tab === 'nota' && editable && <div className="flex flex-wrap gap-2"><button disabled={guardando} className={BOTON_SECUNDARIO} onClick={() => void ejecutar('guardar', { contenido: datos, cerrar: false })}>Guardar</button><button disabled={guardando} className={BOTON_PRIMARIO} onClick={confirmarFinalizacion}>Finalizar consulta</button></div>}{cerrada && consulta?.puedeEditar && onControl && <button className={BOTON_PRIMARIO} onClick={() => onControl(consulta.cita.pacienteId, citaId)}>Programar control</button>}{cerrada && <button className={BOTON_SECUNDARIO} onClick={() => { try { imprimirReceta(consulta!) } catch (e) { setError((e as Error).message) } }}>Receta PDF</button>}</div>}>
     {confirmacion && <ConfirmacionClinica {...confirmacion} onCancelar={() => setConfirmacion(null)} onConfirmar={() => { const accion = confirmacion.accion; setConfirmacion(null); accion() }} />}
-    {error && <p role="alert" className="mb-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{error}<button type="button" disabled={guardando} className="ml-3 font-semibold underline" onClick={() => { const recargar = () => { void cargar().then(() => setError('')).catch(e => setError(e.message)) }; if (!cambios) recargar(); else setConfirmacion({ titulo: 'Recargar nota del servidor', mensaje: 'Se reemplazará el avance de esta ventana por la nota guardada en la clínica. Los cambios pendientes se descartarán.', confirmar: 'Recargar nota', accion: recargar }) }}>Recargar nota del servidor</button></p>}
+
     {editable && estadoBorrador && <p aria-live="polite" className="mb-4 text-xs text-slate-500">{autoguardando ? 'Guardando automáticamente…' : estadoBorrador}</p>}
     {recuperable && <section className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm text-amber-900">Hay un borrador recuperado, pero la nota del servidor cambió. No se reemplazará automáticamente. Puedes recuperar tu avance para revisarlo y después pulsar Guardar.</p><button type="button" className={BOTON_SECUNDARIO + ' mt-3'} onClick={() => { const copia = recuperable.contenido; contenidoActual.current = copia; setDatos(copia); sucio.current = true; setCambios(true); proteger(); setRecuperable(null); setEstadoBorrador('Borrador recuperado. Revisa la nota y pulsa Guardar para confirmar tus cambios.'); }}>Recuperar mi borrador</button><button type="button" className={BOTON_SECUNDARIO + ' ml-3 mt-3'} onClick={() => { setConfirmacion({ titulo: 'Descartar borrador recuperado', mensaje: 'Se eliminará la copia de recuperación de esta pestaña y se conservará la nota del servidor.', confirmar: 'Descartar borrador', accion: () => { retirarBorradorConsulta(claveLocal.current); setRecuperable(null); pausaAuto.current = false } }) }}>Conservar nota del servidor</button></section>}
     {!consulta ? <p className="py-8 text-sm text-slate-500">{error ? 'La consulta no está disponible.' : 'Consultando nota…'}</p> : <div className="space-y-5"><div className="rounded-2xl bg-slate-50 p-5"><p className="text-xs font-medium text-blue-700">Cita #{citaId} · {cerrada ? 'Nota cerrada' : 'Borrador'}</p><h3 className="mt-2 text-xl font-semibold">{consulta.cita.paciente}</h3><p className="mt-2 text-sm text-slate-600">{consulta.cita.medico} · {consulta.cita.motivo}</p><p className="mt-3 text-xs text-slate-600">Alergias: {alertas.alergias || 'Sin registro'} · Antecedentes: {alertas.condicionesCronicas || 'Sin registro'}</p></div>
-      <EstadoLlegada citaId={citaId} />
+      <EstadoLlegada citaId={citaId} onEstado={setLlegada} />
       {consulta.signos && <section className={caja}><h4 className="font-semibold">{cerrada?'Signos conservados al cerrar la nota':'Últimos signos registrados por enfermería'}</h4><p className="mt-2 text-xs text-slate-500">{fechaEnfermeria(consulta.signos.fecha)} · {consulta.signos.autor}</p><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{SIGNOS_ENFERMERIA.filter(s=>consulta.signos?.valores[s.id]!=null).map(s=><div className="rounded-xl bg-slate-50 p-3" key={s.id}><dt className="text-xs text-slate-500">{s.nombre}</dt><dd className="mt-1 font-semibold">{consulta.signos!.valores[s.id]} <span className="text-xs font-normal text-slate-500">{s.unidad}</span></dd></div>)}</dl></section>}
       <nav aria-label="Secciones de atención" className="flex flex-wrap gap-2">{[['nota', 'Nota clínica'], ['ordenes', 'Órdenes ambulatorias'], ['documentos', 'Documentos'], ['historial', 'Historial del paciente'], ['cita', 'Coordinar cita'], ['correcciones', 'Aclaraciones']].filter(([id])=>id!=='cita'||consulta.puedeSolicitarCambio).map(([id, titulo]) => <button disabled={guardando} key={id} className={tab === id ? BOTON_PRIMARIO : BOTON_SECUNDARIO} onClick={() => setTab(id)}>{titulo}</button>)}</nav>
       {tab === 'nota' && <fieldset disabled={!editable || guardando} className="space-y-5"><div className="grid gap-4 md:grid-cols-2">{([['subjetivo', 'Motivo, síntomas y evolución'], ['objetivo', 'Exploración y hallazgos'], ['diagnostico', 'Diagnóstico o problema clínico'], ['plan', 'Plan de tratamiento e indicaciones'], ['pronostico', 'Pronóstico'], ['seguimiento', 'Seguimiento y próxima revisión']] as const).map(([k, titulo]) => <label key={k} className={ETIQUETA_CLINICA}>{titulo}<textarea rows={4} maxLength={8000} className={CAMPO_CLINICO} value={datos[k]} onChange={e => campo(k, e.target.value)} /></label>)}</div>
