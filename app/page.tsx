@@ -43,6 +43,7 @@ import { precargarModulos } from '@/lib/supabase/cache-modulos'
 import { InterfazRecepcionista } from '@/components/roles/recepcionista'
 import { InterfazEnfermero } from '@/components/roles/enfermero'
 import { InterfazPaciente } from '@/components/roles/paciente/interfaz-paciente'
+import { ProveedorAgendaMedica } from '@/components/roles/medico/agenda-medica-contexto'
 import { ModalNuevoExpediente, ModalDetalleExpediente } from '@/components/modulos/expedientes'
 import { ModalNuevaAdmision, ModalDetalleInternacion } from '@/components/modulos/internacion'
 import { ModalNuevaOrden, ModalGestionOrden } from '@/components/modulos/ordenes-medicas'
@@ -288,7 +289,7 @@ const openModal = (title: string) => {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc] text-slate-900">
+    <ProveedorAgendaMedica key={`${perfil.usuarioId}:${perfil.rol}`} activo={perfil.rol === 'medico'}><main className="min-h-screen bg-[#f7f9fc] text-slate-900">
       {menuOpen && <BotonCerrarMenu onCerrar={() => setMenuOpen(false)} />}
 
       <BarraLateral
@@ -398,6 +399,7 @@ const openModal = (title: string) => {
         }
         return (
           <ModalDetalleExpediente
+            key={modal}
             expediente={expObj}
             modo={modo}
             puedeEditar={perfil.rol === 'admin' || perfil.rol === 'medico'}
@@ -483,6 +485,6 @@ const openModal = (title: string) => {
           {...accionesCita}
         />
       )}
-    </main>
+    </main></ProveedorAgendaMedica>
   )
 }

@@ -29,7 +29,7 @@ async function preparar(page:Page,cerrada=false){
  await page.route(raiz,async r=>{const respuesta=await r.fetch({headers:{...r.request().headers(),cookie:''}});await r.fulfill({response:respuesta})})
  return {ctx,panel,escrituras,fallar:()=>{fallo=true}}
 }
-test('consulta estructurada finaliza con confirmación y emite receta desde la nota cerrada',async({page})=>{
+test('consulta estructurada finaliza con confirmación sin ofrecer el PDF de receta',async({page})=>{
  const {escrituras}=await preparar(page)
  await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
  const modal=page.getByRole('dialog')
@@ -45,7 +45,7 @@ test('consulta estructurada finaliza con confirmación y emite receta desde la n
  await expect(modal.getByRole('status')).toBeInViewport()
  expect(escrituras.find(e=>e.datos?.cerrar)).toMatchObject({accion:'guardar',datos:{citaId:35,cerrar:true,contenido:{plan:'Plan actualizado por el médico'}}})
  await expect(modal.getByLabel('Diagnóstico o problema clínico')).toBeDisabled()
- const popup=page.waitForEvent('popup');await modal.getByRole('button',{name:'Receta PDF',exact:true}).click();await expect((await popup).getByText('Prescripción vinculada a la consulta #35')).toBeVisible()
+ await expect(modal.getByRole('button',{name:'Receta PDF',exact:true})).toHaveCount(0)
 })
 test('un fallo temporal conserva el borrador y reintentar usa el mismo identificador',async({page})=>{
  const {escrituras,fallar}=await preparar(page);await page.getByRole('button',{name:'Abrir consulta',exact:true}).click()
@@ -141,8 +141,8 @@ test('la alerta de medicamento permite cancelar y bloquea fondo, teclado y despl
  const scroll=await page.evaluate(()=>({y:scrollY,main:document.querySelector('main')?.scrollTop}))
  await page.mouse.move(4,4);await page.mouse.wheel(0,700)
  expect(await page.evaluate(()=>({y:scrollY,main:document.querySelector('main')?.scrollTop}))).toEqual(scroll)
- await page.locator('button').filter({hasText:/^Nueva cita$/}).click({force:true})
- await expect(alerta).toBeVisible();await expect(page.getByRole('dialog',{name:'Nueva cita',exact:true})).toHaveCount(0)
+ await page.locator('button').filter({hasText:/^Programar control$/}).click({force:true})
+ await expect(alerta).toBeVisible();await expect(page.getByRole('heading',{name:'Controles clínicos',exact:true})).toHaveCount(0)
  await page.screenshot({path:'.herramientas/alerta-eliminar-medicamento.png',fullPage:true})
  await alerta.getByRole('button',{name:'Cancelar',exact:true}).click()
  await expect(modal.getByLabel('Medicamento',{exact:true})).toHaveValue('Medicamento que requiere confirmación')
@@ -318,4 +318,31 @@ test('los avisos no tapan el formulario, caducan a cinco segundos incluso con el
  await expect(exito).toContainText('Consulta guardada.')
  await exito.hover()
  await expect(exito).toHaveCount(0,{timeout:7000})
+})
+
+
+test('indicadores y menú comparten las cinco citas activas y se actualizan sin recargar',async({page})=>{
+ const {panel}=await preparar(page)
+ const tarjeta=(nombre:string)=>page.locator('article').filter({has:page.getByText(nombre,{exact:true})}).first()
+ const menu=page.getByRole('button',{name:'Citas',exact:true})
+ await expect(menu.locator('small')).toHaveText('1')
+ const base=panel.citas[0]
+ for(let i=1;i<10;i++) panel.citas.push({...base,id:35+i,paciente:`Paciente ${i}`,estado:i<5?'confirmada':i===5?'cancelada_paciente':'atendida',llegada:i===1?base.llegada:null as any,enConsulta:null as any})
+ panel.abiertas.push({id:35,paciente:base.paciente,inicio:base.inicio} as never)
+ // Simula cambios de otra sesión: no emite eventos locales ni pulsa Actualizar.
+ await expect(tarjeta('Citas por atender').locator('p').last()).toHaveText('5',{timeout:8000})
+ await expect(menu.locator('small')).toHaveText('5')
+ await expect(tarjeta('En espera').locator('p').last()).toHaveText('1')
+ await expect(tarjeta('Consultas abiertas').locator('p').last()).toHaveText('1')
+ await expect(tarjeta('Resultados por revisar').locator('p').last()).toHaveText('1')
+ panel.citas[0].estado='atendida';panel.abiertas=[];panel.resultados=[]
+ await expect(tarjeta('Citas por atender').locator('p').last()).toHaveText('4',{timeout:8000})
+ await expect(menu.locator('small')).toHaveText('4')
+ await expect(tarjeta('Consultas abiertas').locator('p').last()).toHaveText('0')
+ await expect(tarjeta('Resultados por revisar').locator('p').last()).toHaveText('0')
+ await page.getByLabel('Fecha de la agenda',{exact:true}).fill('2026-11-13')
+ // El servidor cambia su respuesta para esa fecha.
+ panel.dia='2026-11-13';panel.citas=[]
+ await expect(tarjeta('Citas por atender').locator('p').last()).toHaveText('0',{timeout:8000})
+ await expect(menu.locator('small')).toHaveText('0')
 })

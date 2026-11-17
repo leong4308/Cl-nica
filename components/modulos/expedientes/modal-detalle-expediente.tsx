@@ -44,7 +44,10 @@ export function ModalDetalleExpediente({ expediente, modo: modoInicial = 'ver', 
       onSave?.(`Expediente clínico de ${datos.paciente} actualizado correctamente`); onClose()
     } finally { setGuardando(false) }
   }
-  if (datos.notaEstado && datos.citaId) return <ModalConsultaMedica key={datos.citaId} citaId={datos.citaId} tabInicial={modo === 'editar' && datos.notaEstado === 'cerrada' ? 'correcciones' : 'nota'} onClose={onClose} />
+  // Resolver el tipo de nota antes de montar un diálogo evita abrir el editor
+  // antiguo y sustituirlo inmediatamente por la consulta estructurada.
+  if (cargando) return null
+  if (cargaCorrecta && datos.notaEstado && datos.citaId) return <ModalConsultaMedica key={datos.citaId} citaId={datos.citaId} tabInicial={modo === 'editar' && datos.notaEstado === 'cerrada' ? 'correcciones' : 'nota'} onClose={onClose} />
   const editando = modo === 'editar'
   return <ModalMarco title={editando ? 'Modificar expediente clínico' : 'Expediente clínico'} ancho="max-w-5xl" contenidoFijo onClose={() => { if (!ocupado) onClose() }} footer={<div className="flex flex-wrap justify-between gap-3"><button type="button" className={BOTON_SECUNDARIO} onClick={onClose} disabled={ocupado}>{editando ? 'Cancelar' : 'Cerrar'}</button>{editando ? <button key="guardar" type="submit" form="form-editar-expediente" className={BOTON_PRIMARIO} disabled={ocupado || cargando || !cargaCorrecta || !diagnostico.trim()}>{guardando && <Loader2 size={16} className="animate-spin" />}{guardando ? 'Guardando...' : 'Guardar cambios'}</button> : puedeEditar && <button key="editar" type="button" className={BOTON_PRIMARIO} onClick={(event) => { event.preventDefault(); setModo('editar') }} disabled={cargando || !cargaCorrecta}>Editar expediente</button>}</div>}>
     <p className="mb-5 text-sm text-slate-500">{editando ? 'Actualiza la información de esta consulta y sus documentos.' : 'Consulta el diagnóstico, el tratamiento y el seguimiento del paciente.'}</p><AvisoClinico mensaje={error} />

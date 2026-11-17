@@ -9,7 +9,7 @@ async function preparar(page: Page, modulo: string) {
   await simularDirectorioPacientes(page, [paciente])
   const medico = { id: 1, usuarios: { nombre_completo: 'Dra. de prueba' } }
   const cita = { id: 1, motivo: 'Seguimiento', inicio: '2026-11-05T12:00:00Z', fin: '2026-11-05T12:50:00Z', estado: 'atendida', perfiles_pacientes: paciente, perfiles_medicos: medico }
-  const expediente = { id: 1, cita_id: 1, diagnostico: 'Diagnóstico registrado', receta: 'Receta registrada', notas_doctor: 'Evolución registrada', creado_en: '2026-11-05T12:00:00Z', citas: cita }
+  const expediente = { estado_nota: undefined as string | undefined, id: 1, cita_id: 1, diagnostico: 'Diagnóstico registrado', receta: 'Receta registrada', notas_doctor: 'Evolución registrada', creado_en: '2026-11-05T12:00:00Z', citas: cita }
   const orden = { id: 1, descripcion: 'Indicación registrada', instrucciones: 'Instrucciones registradas', estado: 'prescrita', tipo_orden: 'analisis', episodio_id: 1, fecha_prescripcion: '2026-11-05T12:00:00Z', episodios_medicos: { tipo_episodio: 'Evolución', perfiles_medicos: medico } }
   const escrituras: { ruta: string; cuerpo: string }[] = []
   let subidas = 0
@@ -46,7 +46,7 @@ async function preparar(page: Page, modulo: string) {
   await page.locator('input[type=password]').fill('ClaveDePrueba123*')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   await page.getByRole('button', { name: modulo, exact: true }).click()
-  return { escrituras, fallarSubida: () => { fallarPrimeraSubida = true } }
+  return { expediente, escrituras, fallarSubida: () => { fallarPrimeraSubida = true } }
 }
 
 for (const modulo of ['Expedientes', 'Órdenes médicas']) {
@@ -110,3 +110,28 @@ test('pacientes conserva el formulario y su perfil sin carga de PDF', async ({ p
   await expect(modal.getByRole('tab', { name: 'Datos del paciente' })).toHaveAttribute('aria-selected', 'true')
   await expect(modal.locator('input[type=file]')).toHaveCount(0)
 })
+
+
+for (const accion of ['Ver detalle', 'Editar registro']) {
+ test(`expediente estructurado: ${accion} abre una sola ventana sin pasar por el editor antiguo`,async({page})=>{
+  const {expediente}=await preparar(page,'Expedientes')
+  expediente.estado_nota='cerrada'
+  await page.route('**/api/medico**',r=>r.fulfill({json:{editorId:'11111111-1111-4111-8111-111111111111',cita:{id:1,pacienteId:1,paciente:'Paciente de prueba',medico:'Dra. de prueba',cedula:'PRUEBA',inicio:'2026-11-05T12:00:00Z',estado:'atendida',motivo:'Seguimiento',alertas:null},version:'a'.repeat(32),puedeEditar:true,nota:{id:1,estado_nota:'cerrada',contenido:{subjetivo:'Evolución',objetivo:'Exploración',diagnostico:'Diagnóstico registrado',plan:'Plan registrado',pronostico:'',seguimiento:'',recetaLibre:'',medicamentos:[]}},correcciones:[],ordenes:[],catalogo:[]}}))
+  await page.evaluate(()=>{
+   (window as any).__ventanasAbiertas=[]
+   const registrar=(el:Element)=>{if(el.matches('dialog'))(window as any).__ventanasAbiertas.push(el);el.querySelectorAll('dialog').forEach(d=>(window as any).__ventanasAbiertas.push(d))}
+   new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n instanceof Element)registrar(n)}))).observe(document.body,{childList:true,subtree:true})
+  })
+  const fila=page.getByRole('row').filter({has:page.getByRole('button',{name:'Ver detalle',exact:true})}).first()
+  await fila.getByRole('button',{name:accion,exact:true}).click()
+  const modal=page.getByRole('dialog',{name:'Atención médica',exact:true})
+  await expect(modal.getByRole('heading',{name:'Paciente de prueba',exact:true})).toBeVisible()
+  await expect(page.locator('dialog[open]')).toHaveCount(1)
+  expect(await page.evaluate(()=>(window as any).__ventanasAbiertas.length)).toBe(1)
+  await expect(modal.getByRole('button',{name:'Receta PDF',exact:true})).toHaveCount(0)
+  if(accion==='Editar registro') await expect(modal.getByLabel('Texto de la aclaración')).toBeVisible()
+  else await expect(modal.getByLabel('Diagnóstico o problema clínico')).toBeDisabled()
+  await modal.getByRole('button',{name:'Cerrar',exact:true}).last().click()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+ })
+}

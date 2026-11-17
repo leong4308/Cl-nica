@@ -1,5 +1,6 @@
 'use client'
 
+import { usarAgendaMedica, citaActivaMedica } from '@/components/roles/medico/agenda-medica-contexto'
 import { useEffect, useState } from 'react'
 import { HeartPulse } from 'lucide-react'
 import { cargarInsigniasMenu } from '@/lib/supabase/datos'
@@ -20,6 +21,7 @@ type BarraLateralProps = {
 }
 
 export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerrar, rol }: BarraLateralProps) {
+  const agendaMedica = usarAgendaMedica()
   const [insignias, setInsignias] = useState<Record<string, string>>(() => leerInsignias())
   const esAdmin = rol === 'admin'
   const itemsNav = obtenerNavItemsPorRol(rol)
@@ -71,7 +73,7 @@ export function BarraLateral({ activo, abierto, onNavegar, onAbrirModal, onCerra
             etiqueta={item.label}
             Icono={item.icon}
             activo={activo === item.label}
-            insignia={insignias[item.label]}
+            insignia={rol === 'medico' && item.label === 'Citas' ? (agendaMedica.datos?.dia === agendaMedica.dia ? String(agendaMedica.datos.citas.filter(citaActivaMedica).length) : undefined) : insignias[item.label]}
             onNavegar={onNavegar}
           />
         ))}

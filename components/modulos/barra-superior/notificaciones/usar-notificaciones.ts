@@ -61,7 +61,7 @@ export function usarNotificaciones(usuarioId?: number) {
     const actualizar = () => { void refrescar() }
     window.addEventListener('focus', actualizar); window.addEventListener('datos-actualizados', actualizar)
     const db = createClient()
-    const canal = usuarioId ? db.channel(`notificaciones-${usuarioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'notificaciones', filter: `usuario_id=eq.${usuarioId}` }, actualizar).subscribe() : null
+    const canal = usuarioId ? db.channel(`notificaciones-${usuarioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'notificaciones', filter: `usuario_id=eq.${usuarioId}` }, () => { actualizar(); window.dispatchEvent(new Event('datos-actualizados')) }).subscribe() : null
     return () => {
       vigente.current = false; secuencia.current++
       window.clearInterval(timer)
