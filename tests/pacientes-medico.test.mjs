@@ -7,10 +7,20 @@ const require = createRequire(import.meta.url)
 function cargar(ruta, deps = {}) {
   const js = ts.transpileModule(readFileSync(new URL(ruta, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
-  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : deps[id] ?? require(id), exports)
+  new Function('require', 'exports', js)((id) => id === '@/lib/pacientes/acceso' ? { autorizarRegistro: async () => null } : id === '@/lib/supabase/error-operacion' ? cargar('../lib/supabase/error-operacion.ts') : deps[id] ?? (id === '@/lib/cuenta/validacion' ? cargar('../lib/cuenta/validacion.ts') : require(id)), exports)
   return exports
 }
 const listado = cargar('../lib/pacientes/listado.ts')
+
+test('registrar un paciente valida sus contactos, identidad y nacimiento antes de la transacción',async()=>{
+ const llamadas=[],query={select(){return query},eq(){return query},maybeSingle:async()=>({data:{rol:'recepcionista',esta_activo:true}})}
+ const db={auth:{getUser:async()=>({data:{user:{id:'recepcion'}}})},from:()=>query,rpc:async(...args)=>{llamadas.push(args);return{data:{ok:true}}}}
+ const api=cargar('../app/api/pacientes/route.ts',{'@/lib/cuenta/servidor':{origenValido:()=>true},'@/lib/supabase/server':{createClient:async()=>db},'@/lib/pacientes/listado':listado})
+ const enviar=body=>api.POST(new Request('http://localhost/api/pacientes',{method:'POST',body:JSON.stringify(body)}))
+ const base={nombre:'María-José López',telefono:'0123456789',fechaNacimiento:'1990-05-14',genero:'F',correo:'paciente@example.test'}
+ for(const cambio of [{telefono:'123'},{telefono:'12345678901'},{telefono:'961-123-4567'},{nombre:'Paciente123'},{fechaNacimiento:'1899-01-01'},{fechaNacimiento:'2100-01-01'},{correo:'no-correo'},{contactoEmergencia:'Contacto solo'},{genero:'X'},{notasMedicas:'a'.repeat(8001)}])assert.equal((await enviar({...base,...cambio})).status,400)
+ assert.equal(llamadas.length,0);assert.equal((await enviar(base)).status,200);assert.equal(llamadas.length,1)
+})
 function escenario({ sinPerfil = false, fallo = false } = {}) {
   const tablas = {
     paciente_medicos: [],

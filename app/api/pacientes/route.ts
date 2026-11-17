@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { cuentaAutenticada, origenValido } from '@/lib/cuenta/servidor'
+import { validarNombreTelefono, validarNacimiento, validarContactoEmergencia, correoValido } from '@/lib/cuenta/validacion'
 import { listarPacientes } from '@/lib/pacientes/listado'
 
 export async function GET() {
@@ -36,7 +37,14 @@ export async function POST(request: Request) {
   const { data: solicitante } = await sessionClient.from('usuarios').select('rol, esta_activo').eq('auth_user_id', user.id).maybeSingle()
   if (!solicitante?.esta_activo || !['admin', 'medico', 'enfermero', 'recepcionista'].includes(solicitante.rol)) return NextResponse.json({ error: 'No tienes permiso para registrar pacientes.' }, { status: 403 })
 
-  const body = (await request.json()) as CuerpoPaciente
+  const body = (await request.json().catch(() => null)) as CuerpoPaciente | null
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Revisa los datos del paciente.' }, { status: 400 })
+  const errorDatos = validarNombreTelefono(body.nombre, body.telefono) || validarContactoEmergencia(body.contactoEmergencia, body.telefonoEmergencia)
+  if (errorDatos) return NextResponse.json({ error: errorDatos }, { status: 400 })
+  if (!validarNacimiento(body.fechaNacimiento)) return NextResponse.json({ error: 'La fecha de nacimiento debe estar entre 1900 y hoy.' }, { status: 400 })
+  if (body.correo && !correoValido(body.correo)) return NextResponse.json({ error: 'Escribe un correo electrónico válido de hasta 150 caracteres.' }, { status: 400 })
+  if (body.genero && !['M', 'F', 'O'].includes(body.genero)) return NextResponse.json({ error: 'Selecciona un género válido.' }, { status: 400 })
+  if (body.notasMedicas !== undefined && (typeof body.notasMedicas !== 'string' || body.notasMedicas.length > 8000)) return NextResponse.json({ error: 'Las notas admiten hasta 8000 caracteres.' }, { status: 400 })
   const nombre = typeof body?.nombre === 'string' ? body.nombre.trim() : ''
   if (!nombre) {
     return NextResponse.json({ error: 'El nombre completo es obligatorio.' }, { status: 400 })

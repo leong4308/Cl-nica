@@ -29,7 +29,7 @@ Para revisar la aplicación compilada, ejecuta `pnpm build` y después `pnpm sta
 
 1. Conserva un respaldo del proyecto antes de actualizar su base.
 2. Configura `SUPABASE_DB_URL` en `.env.local` con la URI de **Supabase → Connect** y la contraseña de la base. No es la clave de servicio. Los caracteres especiales de la contraseña deben codificarse en la URI. Nunca subas ese archivo a Git.
-3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `042_prorroga_consultorios.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
+3. Ejecuta `pnpm db:actualizar`. Aplica las migraciones de `018_seguridad_y_auditoria.sql` a `044_validacion_contactos.sql`, comprueba sus hashes y registra las versiones. Si existen citas solapadas o ingresos activos duplicados, se detiene sin eliminarlos. Resuelve los conflictos antes de volver a ejecutar.
 4. Ejecuta `pnpm agenda:importar` para copiar las agendas privadas anteriores a PostgreSQL sin sobrescribir las ya publicadas. No se inventan horarios.
 5. También se pueden ejecutar esos archivos SQL, en orden numérico, desde el editor de Supabase. La importación de agendas sigue siendo necesaria si había horarios guardados en Storage.
 6. Inicia sesión como administrador y abre **Configuración → Verificar estado**. Comprueba los distintos roles antes de publicar.
@@ -181,7 +181,7 @@ La API valida los campos y la función SQL obtiene la ficha desde la sesión act
 
 ## Revisión final del 16 de noviembre de 2026
 
-Consulta [el informe de revisión de los cinco roles](docs/revision-final-2026-11-16.md) para conocer el alcance, las versiones comprobadas y las condiciones pendientes del despliegue. La base requiere la versión **42**. Las muestras ambulatorias respetan la asignación de enfermería y las órdenes hospitalarias pueden devolver su identificador al guardarse sin ampliar permisos clínicos.
+Consulta [el informe de revisión de los cinco roles](docs/revision-final-2026-11-16.md) para conocer el alcance, las versiones comprobadas y las condiciones pendientes del despliegue. La base requiere la versión **44**. Las muestras ambulatorias respetan la asignación de enfermería y las órdenes hospitalarias pueden devolver su identificador al guardarse sin ampliar permisos clínicos.
 
 La migración 042 permite prorrogar una asignación mediante la acción administrativa `consultorios:prorrogar_turno` (`id`, `version`, `hasta`). Crea una continuación desde el día siguiente al vencimiento, conservando consultorio, médico, día y horas. Exige sesión de administrador, versión vigente e idempotencia; conserva las restricciones de cruce y la auditoría. Cada continuación dura hasta 366 días y debe empezar dentro del próximo año.
 
@@ -195,3 +195,20 @@ Para ejecutar solo la interfaz utiliza `npm run dev:solo`. Con una compilación 
 `npm run notificaciones:estado` consulta la reserva, la configuración y los recuentos de las colas sin enviar mensajes ni consumir actualizaciones del bot. Administración y recepción también pueden consultar **Comunicaciones**.
 
 El remitente `onboarding@resend.dev` solo permite pruebas al correo titular de Resend; no habilita recordatorios a los correos de los demás pacientes. No se redirigen sus datos a una dirección de prueba ni se cambian sus cuentas automáticamente. Para esos destinatarios hace falta verificar un dominio y usarlo en `EMAIL_FROM`. Referencia: [limitación del remitente de prueba de Resend](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
+
+Si npm consume `--port` en PowerShell, el lanzador también acepta el puerto abreviado (`npm run start:avisos -- 3001`). Para evitar la interpretación de argumentos de npm, usa directamente `node .\scripts\aplicacion-con-avisos.mjs start --port 3001`. El puerto se pasa a Next como opción y no como directorio.
+
+
+## Validación de contactos y revisión funcional (044)
+
+Los teléfonos personales y de emergencia admiten exactamente 10 dígitos; se conservan ceros iniciales y no se recortan números pegados demasiado largos. Registro, pacientes, perfil y enfermería comparten restricciones de nombres, nacimiento y contacto de emergencia, respaldadas por validación de API y triggers SQL. La migración 044 normaliza únicamente separadores de números nacionales existentes sin cambiar sus dígitos.
+
+Consulta el [informe de validaciones y prueba funcional](docs/validaciones-y-prueba-funcional-2026-11-16.md) para los resultados de los cinco roles, Telegram, correo y las condiciones pendientes para acceso público. `pnpm test:db` comprueba la base real en modo de solo lectura; `pnpm test` usa pruebas unitarias y bases SQL aisladas.
+
+## Registro público de pacientes (043)
+
+El login ofrece **Registrarse** y abre `/registrarse`. El formulario tiene dos pasos y exige nombre completo, teléfono, fecha de nacimiento, género, nombre y teléfono de emergencia, correo y contraseña con confirmación. La contraseña conserva el requisito de 12 a 128 caracteres, mayúsculas, minúsculas y números. Las validaciones se aplican también en la API y en PostgreSQL para los datos de la ficha.
+
+La API usa `auth.signUp` con la clave pública y una lista explícita de campos; no acepta elegir rol, médico, identificadores ni permiso de laboratorio. Auth asigna únicamente `paciente` y la migración 043 crea su ficha en la misma transacción. Los registros con datos incompletos no dejan cuentas parciales. Las fichas de pacientes ya registradas por recepción no se vinculan por coincidencia de correo: se conserva su flujo de invitación. La cuenta nueva no obtiene médicos asignados ni acceso a fichas ajenas; puede consultar su portal y solicitar una cita tras confirmar su correo.
+
+Supabase Auth actualmente exige confirmar el correo antes de entrar. Para testers externos, configura su servicio SMTP y permite el callback de la URL real de la aplicación en **Auth → URL Configuration**. Los correos de confirmación de Auth son independientes de los recordatorios enviados por el trabajador mediante Resend. Si Auth limita el envío o no permite el destinatario, el formulario conserva los datos y muestra el problema sin simular un registro correcto. No se desactiva la confirmación de correo ni se concede un rol de personal desde el registro público.

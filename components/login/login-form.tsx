@@ -184,6 +184,10 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           <BotonIngresar cargando={loading} />
         </form>
 
+        <p className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-center text-sm text-slate-600">
+          ¿Eres un paciente nuevo?{' '}<a href="/registrarse" className="font-semibold text-blue-700 hover:text-blue-900">Registrarse</a>
+        </p>
+
         <p className="mt-6 text-center text-xs leading-5 text-[#64748b]">
           Clínica Nova • Sistema de Gestión Hospitalaria Integral
         </p>

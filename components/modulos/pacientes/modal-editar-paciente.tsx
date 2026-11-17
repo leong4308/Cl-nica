@@ -1,4 +1,6 @@
 'use client'
+import { CampoTelefono } from '../compartidos/campo-telefono'
+import { fechaClinica } from '@/lib/agenda/modelo'
 
 import { useEffect, useState } from 'react'
 import { Loader2, Phone, UserRound } from 'lucide-react'
@@ -47,17 +49,17 @@ export function ModalEditarPaciente({ pacienteId, onClose, onSave }: { pacienteI
     <AvisoClinico mensaje={error} />{mensaje && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{mensaje}</p>}
     {!datos ? !error && <p role="status" className="py-12 text-center text-sm text-slate-500">Cargando paciente...</p> : <form id="form-editar-paciente" onSubmit={guardar}><fieldset disabled={guardando} className="grid min-w-0 gap-5 md:grid-cols-2">
       <PanelClinico icon={UserRound} titulo="Datos personales" ayuda={`Paciente #${pacienteId}`}><div className="space-y-4">
-        <label className={ETIQUETA_CLINICA}>Nombre completo<input className={CAMPO_CLINICO} value={datos.nombre} onChange={(e) => actualizar('nombre', e.target.value)} required maxLength={200} autoComplete="name" /></label>
-        <label className={ETIQUETA_CLINICA}>Teléfono<input type="tel" className={CAMPO_CLINICO} value={datos.telefono} onChange={(e) => actualizar('telefono', e.target.value)} maxLength={20} /></label>
-        <label className={ETIQUETA_CLINICA}>Fecha de nacimiento<input type="date" className={CAMPO_CLINICO} value={datos.fechaNacimiento} onChange={(e) => actualizar('fechaNacimiento', e.target.value)} max={new Date().toISOString().slice(0, 10)} /></label>
+        <label className={ETIQUETA_CLINICA}>Nombre completo<input className={CAMPO_CLINICO} value={datos.nombre} onChange={(e) => actualizar('nombre', e.target.value)} required minLength={3} maxLength={200} autoComplete="name" /></label>
+        <label className={ETIQUETA_CLINICA}>Teléfono<CampoTelefono className={CAMPO_CLINICO} value={datos.telefono} onValueChange={valor => actualizar('telefono', valor)} /></label>
+        <label className={ETIQUETA_CLINICA}>Fecha de nacimiento<input type="date" className={CAMPO_CLINICO} value={datos.fechaNacimiento} onChange={(e) => actualizar('fechaNacimiento', e.target.value)} min="1900-01-01" max={fechaClinica()} /></label>
         <label className={ETIQUETA_CLINICA}>Género<select className={CAMPO_CLINICO} value={datos.genero} onChange={(e) => actualizar('genero', e.target.value)}><option value="">Sin registrar</option><option value="F">Femenino</option><option value="M">Masculino</option><option value="O">Otro</option></select></label>
       </div></PanelClinico>
       <PanelClinico icon={Phone} titulo="Contacto y acceso" ayuda="Información para comunicarse con el paciente." suave><div className="space-y-4">
         <label className={ETIQUETA_CLINICA}>Correo de acceso<input type="email" autoComplete="off" maxLength={150} className={CAMPO_CLINICO + (puedeEditarCorreo ? '' : ' bg-slate-50')} value={datos.correo} onChange={e => actualizar('correo', e.target.value)} readOnly={!puedeEditarCorreo} /></label>
         <p className="text-xs leading-relaxed text-slate-500">{!puedeEditarCorreo ? 'Administración o recepción pueden modificar el correo de acceso.' : vinculado ? 'El paciente confirmará el cambio desde su nuevo correo. Hasta entonces podrá seguir entrando con el actual y conservará su contraseña.' : 'Guarda un correo real para poder enviarle su invitación al portal.'}</p>
         {correoPendiente && <p role="status" className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">Cambio pendiente de confirmación a <strong className="break-all">{correoPendiente}</strong>. El acceso actual se conserva.</p>}
-        <label className={ETIQUETA_CLINICA}>Contacto de emergencia<input className={CAMPO_CLINICO} value={datos.contactoEmergencia} onChange={(e) => actualizar('contactoEmergencia', e.target.value)} maxLength={200} /></label>
-        <label className={ETIQUETA_CLINICA}>Teléfono de emergencia<input type="tel" className={CAMPO_CLINICO} value={datos.telefonoEmergencia} onChange={(e) => actualizar('telefonoEmergencia', e.target.value)} maxLength={20} /></label>
+        <label className={ETIQUETA_CLINICA}>Contacto de emergencia<input className={CAMPO_CLINICO} value={datos.contactoEmergencia} onChange={(e) => actualizar('contactoEmergencia', e.target.value)} minLength={3} maxLength={200} /></label>
+        <label className={ETIQUETA_CLINICA}>Teléfono de emergencia<CampoTelefono className={CAMPO_CLINICO} value={datos.telefonoEmergencia} onValueChange={valor => actualizar('telefonoEmergencia', valor)} /></label>
       </div></PanelClinico>
     </fieldset></form>}
   </ModalMarco>

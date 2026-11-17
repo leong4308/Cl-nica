@@ -1,3 +1,4 @@
+import { validarNombreTelefono, nombrePersonaValido, telefonoValido, correoValido } from '@/lib/cuenta/validacion'
 import { errorOperacion } from '@/lib/supabase/error-operacion'
 import { origenValido } from '@/lib/cuenta/servidor'
 import { NextResponse } from 'next/server'
@@ -79,6 +80,8 @@ export async function PATCH(request: Request) {
 
   if (!id) return NextResponse.json({ error: 'ID de usuario requerido.' }, { status: 400 })
 
+  if (nombre !== undefined && !nombrePersonaValido(nombre)) return NextResponse.json({ error: 'El nombre debe tener de 3 a 200 caracteres, sin números ni símbolos.' }, { status: 400 })
+  if (!telefonoValido(telefono)) return NextResponse.json({ error: 'El teléfono debe tener exactamente 10 dígitos.' }, { status: 400 })
   const updates: Record<string, unknown> = {}
   if (esta_activo !== undefined) updates.esta_activo = Boolean(esta_activo)
   if (nombre) updates.nombre_completo = nombre.trim()
@@ -127,6 +130,9 @@ export async function POST(request: Request) {
   if (!email || !password || !nombre || password.length < 6) {
     return NextResponse.json({ error: 'Nombre, correo y una contraseña de al menos 6 caracteres son obligatorios.' }, { status: 400 })
   }
+  const errorContacto = validarNombreTelefono(nombre, body.telefono)
+  if (errorContacto) return NextResponse.json({ error: errorContacto }, { status: 400 })
+  if (!correoValido(email)) return NextResponse.json({ error: 'Escribe un correo válido de hasta 150 caracteres.' }, { status: 400 })
   if (rol === 'medico' && !body.especialidad?.trim()) {
     return NextResponse.json({ error: 'Para registrar un médico debes indicar su especialidad.' }, { status: 400 })
   }

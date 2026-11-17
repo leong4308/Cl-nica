@@ -3,7 +3,7 @@ import { autorizarRegistro } from '@/lib/pacientes/acceso'
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { validarNacimiento, validarNombreTelefono } from '@/lib/cuenta/validacion'
+import { validarNacimiento, validarNombreTelefono, validarContactoEmergencia } from '@/lib/cuenta/validacion'
 import { configuracionCorreo, correoCambioAcceso, enviarCorreo } from '@/lib/notificaciones/correo.mjs'
 
 type Contexto = { params: Promise<{ id: string }> }
@@ -59,7 +59,9 @@ export async function PATCH(request: Request, contexto: Contexto) {
     if (validacion) return fallo(validacion, 400)
     if (!validarNacimiento(body.fechaNacimiento)) return fallo('Revisa la fecha de nacimiento.', 400)
     if (!['', 'M', 'F', 'O'].includes(body.genero ?? '')) return fallo('Género inválido.', 400)
-    if (typeof body.contactoEmergencia !== 'string' || body.contactoEmergencia.length > 200 || typeof body.telefonoEmergencia !== 'string' || body.telefonoEmergencia.length > 20) return fallo('Revisa los datos del contacto de emergencia.', 400)
+    if (typeof body.contactoEmergencia !== 'string' || typeof body.telefonoEmergencia !== 'string') return fallo('Revisa los datos del contacto de emergencia.', 400)
+    const errorContacto = validarContactoEmergencia(body.contactoEmergencia, body.telefonoEmergencia)
+    if (errorContacto) return fallo(errorContacto, 400)
     if (body.correo !== undefined && typeof body.correo !== 'string') return fallo('Escribe un correo válido.', 400)
     const actual = correoVisible(acceso.usuario.correo), nuevo = typeof body.correo === 'string' ? body.correo.trim().toLowerCase() : actual
     const cambiaCorreo = nuevo !== actual

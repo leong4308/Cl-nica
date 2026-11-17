@@ -1,4 +1,5 @@
 'use client'
+import { CampoTelefono } from '@/components/modulos/compartidos/campo-telefono'
 import { useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { ModalMarco } from '@/components/modulos/compartidos/modal-marco'
@@ -19,7 +20,7 @@ export function FormularioCuidado({ formulario: f, datos, onClose, onGuardar }: 
   const ingreso = datos.ingresos.find(i => i.id === Number(b.internacionId))
   const movimiento = datos.movimientos.find(m => m.id === Number(b.autorizacionId))
   const destinatarios = [...new Map(datos.turnos.filter(t => t.paciente_id === Number(b.pacienteId) && t.enfermero_id !== datos.enfermeroId).map(t => [t.enfermero_id, t])).values()]
-  const entrada = (etiqueta: string, campo: string, tipo = 'text', requerido = true) => <label className="block text-sm font-medium text-slate-700">{etiqueta}<input aria-label={etiqueta} type={tipo} step={tipo === 'number' ? 'any' : undefined} required={requerido} maxLength={campo === 'area' ? 120 : 200} className={CAMPO_CLINICO} value={texto(campo)} onChange={e => cambiar(campo, e.target.value)} /></label>
+  const entrada = (etiqueta: string, campo: string, tipo = 'text', requerido = true) => <label className="block text-sm font-medium text-slate-700">{etiqueta}{tipo === 'tel' ? <CampoTelefono aria-label={etiqueta} required={requerido} className={CAMPO_CLINICO} value={texto(campo)} onValueChange={valor => cambiar(campo, valor)} /> : <input aria-label={etiqueta} type={tipo} step={tipo === 'number' ? 'any' : undefined} required={requerido} maxLength={campo === 'area' ? 120 : 200} className={CAMPO_CLINICO} value={texto(campo)} onChange={e => cambiar(campo, e.target.value)} />}</label>
   const nota = (etiqueta = 'Observaciones', requerido = true) => <label className="block text-sm font-medium text-slate-700">{etiqueta}<textarea aria-label={etiqueta} required={requerido} maxLength={f.accion === 'acusar' ? 2000 : 8000} rows={4} value={texto('texto')} onChange={e => cambiar('texto', e.target.value)} className={CAMPO_CLINICO + ' resize-y'} /></label>
   const fechaHora = (etiqueta: string, campo: string) => <div className="grid grid-cols-2 gap-3">{entrada(etiqueta + ' · fecha', campo + 'Fecha', 'date')}{entrada(etiqueta + ' · hora', campo + 'Hora', 'time')}</div>
   async function guardar(e: React.FormEvent) {

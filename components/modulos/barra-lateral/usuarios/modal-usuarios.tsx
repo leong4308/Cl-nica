@@ -401,6 +401,8 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
                     <input
                       required
                       type="text"
+                      minLength={3}
+                      maxLength={200}
                       placeholder="Ej. Dra. Laura Ruiz"
                       value={form.nombre}
                       onChange={(e) => setForm({ ...form, nombre: e.target.value })}
@@ -413,6 +415,7 @@ export function ModalUsuarios({ onClose, onSave }: { onClose: () => void; onSave
                     <input
                       required
                       type="email"
+                      maxLength={150}
                       placeholder="usuario@clinicanova.com"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}

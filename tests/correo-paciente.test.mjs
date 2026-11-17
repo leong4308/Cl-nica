@@ -46,7 +46,7 @@ test('la confirmación deriva usuario y dirección del token y conserva la contr
  assert.equal(r.status,200);assert.equal(atributos.id,'cuenta-real');assert.equal(atributos.a.email,'nuevo@example.test');assert.equal(atributos.a.password,undefined)
 })
 test('el formulario de registro incluye correo opcional normalizado',()=>{
- const {payloadPaciente,DATOS_PACIENTE_INICIALES}=cargar('../components/modulos/compartidos/campos-paciente.tsx')
+ const {payloadPaciente,DATOS_PACIENTE_INICIALES}=cargar('../components/modulos/compartidos/campos-paciente.tsx',{'./campo-telefono':{},'@/lib/agenda/modelo':{}})
  assert.equal(payloadPaciente({...DATOS_PACIENTE_INICIALES,nombre:'Paciente',correo:'  PACIENTE@example.test '}).correo,'paciente@example.test')
  assert.equal(payloadPaciente(DATOS_PACIENTE_INICIALES).correo,undefined)
 })

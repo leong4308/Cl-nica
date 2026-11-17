@@ -1,4 +1,6 @@
 'use client'
+import { CampoTelefono } from './campo-telefono'
+import { fechaClinica } from '@/lib/agenda/modelo'
 
 export type DatosPacienteFormulario = {
   nombre: string
@@ -59,6 +61,8 @@ export function CamposPaciente({
         <input
           id={`${prefijoId}-nombre`}
           type="text"
+          minLength={3}
+          maxLength={200}
           required
           disabled={disabled}
           autoFocus={autoFocusNombre}
@@ -78,13 +82,12 @@ export function CamposPaciente({
         <label htmlFor={`${prefijoId}-tel`} className={ETIQUETA}>
           Teléfono
         </label>
-        <input
+        <CampoTelefono
           id={`${prefijoId}-tel`}
-          type="tel"
           disabled={disabled}
-          placeholder="55 1234 5678"
+          placeholder="5512345678"
           value={datos.telefono}
-          onChange={(e) => onChange('telefono', e.target.value)}
+          onValueChange={valor => onChange('telefono', valor)}
           className={CAMPO}
         />
       </div>
@@ -97,6 +100,8 @@ export function CamposPaciente({
           <input
             id={`${prefijoId}-fecha-nac`}
             type="date"
+            min="1900-01-01"
+            max={fechaClinica()}
             disabled={disabled}
             value={datos.fechaNacimiento}
             onChange={(e) => onChange('fechaNacimiento', e.target.value)}
@@ -128,6 +133,7 @@ export function CamposPaciente({
         <textarea
           id={`${prefijoId}-notas`}
           rows={3}
+          maxLength={8000}
           disabled={disabled}
           placeholder="Alergias, condiciones previas, etc."
           value={datos.notasMedicas}

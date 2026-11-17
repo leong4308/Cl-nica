@@ -116,7 +116,8 @@ test('los médicos colaboradores consultan notas cerradas sin poder modificar no
  await assert.rejects(como(2,tx=>tx.query("update citas set estado='pendiente' where id=200")),e=>e.code==='42501')
 })
 test('el médico coordina cambios mediante recepción conservando la cita y la identidad del paciente',async()=>{
- await db.exec("insert into citas(id,paciente_id,medico_id,clinica_id,inicio,fin) values(201,1,1,1,now()+interval '3 hours',now()+interval '3 hours 20 minutes')")
+ // Una hora fija del siguiente día evita que la prueba cruce medianoche al ejecutarse por la noche.
+ await db.exec("insert into citas(id,paciente_id,medico_id,clinica_id,inicio,fin) select 201,1,1,1,((clock_timestamp() at time zone 'America/Mexico_City')::date+1+time '10:00') at time zone 'America/Mexico_City',((clock_timestamp() at time zone 'America/Mexico_City')::date+1+time '10:20') at time zone 'America/Mexico_City'")
  const ctx=await leer(2,201),datos={citaId:201,version:ctx.version,motivo:'Solicito coordinar otro horario con el paciente'},k=clave()
  await operar(2,'solicitar_cambio',datos,k);await operar(2,'solicitar_cambio',datos,k)
  const solicitudes=(await como(4,tx=>tx.query('select clinica_listar_cambios_cita() r'))).rows[0].r

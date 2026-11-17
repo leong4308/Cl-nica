@@ -30,12 +30,20 @@ test('preferencias no permiten abrir páginas ajenas al rol', () => {
   assert.equal(preferencias.normalizarPreferencias({ textoGrande: 'true' }, 'admin').textoGrande, false)
 })
 test('valida teléfonos, nombres y fechas de nacimiento reales', () => {
-  assert.equal(validacion.validarNombreTelefono('Ana', '+52 555 555 5555'), null)
+  assert.equal(validacion.validarNombreTelefono('Ana', '5555555555'), null)
   assert.match(validacion.validarNombreTelefono('', ''), /nombre/)
   assert.match(validacion.validarNombreTelefono('Ana', 'telefono'), /teléfono/)
   assert.equal(validacion.validarNacimiento('2000-02-29'), true)
   assert.equal(validacion.validarNacimiento('2001-02-29'), false)
   assert.equal(validacion.validarNacimiento('2999-01-01'), false)
+  assert.equal(validacion.validarNacimiento('1899-12-31'), false)
+  for (const nombre of ['María-José López', "Ana O'Connor", 'Dr. Jorge Méndez', 'Jose\u0301 Pérez']) assert.equal(validacion.validarNombreTelefono(nombre, '0123456789'), null)
+  for (const nombre of ['Ana123', '   ', 'Ana\nLópez', '<script>', 'A', '---']) assert.ok(validacion.validarNombreTelefono(nombre, '0123456789'))
+  for (const telefono of ['123456789', '12345678901', '+529611234567', '961-123-4567', ' 9611234567', '961123456a', 9611234567]) assert.ok(validacion.validarNombreTelefono('Ana', telefono))
+  assert.equal(validacion.validarNombreTelefono('Ana', ''), null)
+  assert.equal(validacion.validarContactoEmergencia('', ''), null)
+  assert.equal(validacion.validarContactoEmergencia('Ana López', '0123456789'), null)
+  for (const [nombre, telefono] of [['Ana López',''],['','9611234567'],['Ana123','9611234567'],['Ana López','961-123-4567']]) assert.ok(validacion.validarContactoEmergencia(nombre,telefono))
 })
 test('el perfil de sesión se obtiene del usuario autenticado y del rol de la base', async () => {
   const filtros = []

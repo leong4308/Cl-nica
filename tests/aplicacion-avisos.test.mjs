@@ -1,14 +1,14 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {EventEmitter} from 'node:events'
-import {iniciarAplicacionConAvisos} from '../lib/operacion/aplicacion-avisos.mjs'
-function preparar(plataforma='linux') {
+import {iniciarAplicacionConAvisos,normalizarArgumentosArranque} from '../lib/operacion/aplicacion-avisos.mjs'
+function preparar(plataforma='linux',argumentos=['--port','3001']) {
  const hijos=[],tiempos=[],avisos=[]
  const ejecutar=(bin,args,opciones)=>{
   const p=new EventEmitter();Object.assign(p,{pid:100+hijos.length,connected:opciones.stdio instanceof Array,enviados:[],senales:[],send(m,cb){this.enviados.push(m);cb?.()},kill(s){this.senales.push(s)}})
   hijos.push({bin,args,opciones,p});return p
  }
- const app=iniciarAplicacionConAvisos('dev',['--port','3001'],{ejecutar,plataforma,avisar:m=>avisos.push(m),programar:(fn,ms)=>{const t={fn,ms,unref(){},cancelado:false};tiempos.push(t);return t},cancelar:t=>{if(t)t.cancelado=true}})
+ const app=iniciarAplicacionConAvisos('dev',argumentos,{ejecutar,plataforma,avisar:m=>avisos.push(m),programar:(fn,ms)=>{const t={fn,ms,unref(){},cancelado:false};tiempos.push(t);return t},cancelar:t=>{if(t)t.cancelado=true}})
  return {app,hijos,tiempos,avisos}
 }
 test('arranca Next y el trabajador en la carpeta del proyecto, sin shell ni credenciales en argumentos',async()=>{
@@ -41,4 +41,17 @@ test('el cierre en Windows termina solo el árbol de Next creado y espera el cie
 })
 test('no acepta comandos arbitrarios como modo de arranque',()=>{
  assert.throws(()=>iniciarAplicacionConAvisos('otro'),/dev o start/)
+})
+
+test('un puerto que llega sin la opción desde npm se envía a Next como puerto y no como carpeta',async()=>{
+ const {app,hijos}=preparar('linux',['3001'])
+ assert.deepEqual(hijos[1].args.slice(1),['dev','--port','3001'])
+ hijos[1].p.emit('exit',0);hijos[0].p.emit('exit',0);assert.equal(await app.terminado,0)
+})
+
+test('valida el puerto abreviado antes de iniciar procesos y conserva los argumentos explícitos',()=>{
+ for(const valor of ['0','65536','999999999999999999999'])assert.throws(()=>normalizarArgumentosArranque([valor]),/puerto/)
+ assert.deepEqual(normalizarArgumentosArranque(['65535']),['--port','65535'])
+ assert.deepEqual(normalizarArgumentosArranque(['--port','3001','--hostname','127.0.0.1']),['--port','3001','--hostname','127.0.0.1'])
+ assert.deepEqual(normalizarArgumentosArranque([]),[])
 })
